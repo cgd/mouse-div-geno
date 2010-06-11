@@ -356,7 +356,7 @@ genotypeSexchr = function(nm, ns, trans, doCNV) {
     list(geno = geno, vino = vino, conf = conf, baf = baf, llr = llr)
 }
 
-
+# test three groups
 test123 = function(tscore2, tscore3, nm, tgeno2, tgeno3, rmid, thres, 
     iig, nsize) {
     if (length(tscore3) < 3) 
@@ -386,6 +386,8 @@ test13 = function(tscore3, nm, tgeno3, rmid, geno) {
         geno = tgeno3
     geno
 }
+
+# test two groups
 test12 = function(tscore2, nm, tgeno, rmid, thres, iig, nsize) {
     if (length(tscore2) < 3) 
         mscore = 0

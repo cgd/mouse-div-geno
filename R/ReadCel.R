@@ -35,7 +35,8 @@ ReadCelFile = function(celfiledir, outfiledir, allid, ABid, chrid, CGFLcorrectio
     rm(ABid)
     if (subset) 
         chrid = chrid$schrid
-    else chrid = chrid$chrid
+    else
+        chrid = chrid$chrid
     
     setwd(celfiledir)
     gender = NULL
@@ -72,7 +73,7 @@ ReadCelFile = function(celfiledir, outfiledir, allid, ABid, chrid, CGFLcorrectio
             M = res$x
             S = res$y
         }
-        if (is.element(trans, "MAtrans")) {
+        else if (is.element(trans, "MAtrans")) {
             # then prior??
             M = allAint - allBint
             S = (allAint + allBint)/2
@@ -176,6 +177,7 @@ genotypethis = function(savefiledir, MM, SS, hint, isMale, trans, chr,
     
     autosome = match(chr, c(1:19))
     if (!is.na(autosome)) {
+        # process in blocks of 2000 to balance efficiency and memory use
         conf = geno = vino = baf = llr = NULL
         sp = seq(1, nn, 2000)
         lls = length(sp)

@@ -32,7 +32,8 @@ MouseDivGenotype = function(allid, ABid, chrid, CGFLcorrection = NULL,
     mpos = chrid$mpos
     if (subset) 
         chrid = chrid$schrid
-    else chrid = chrid$chrid
+    else
+        chrid = chrid$chrid
     
     setwd(celfiledir)
     gender = isMale = NULL
@@ -55,6 +56,8 @@ MouseDivGenotype = function(allid, ABid, chrid, CGFLcorrection = NULL,
     mchr1 = mchr
     if (iiy | iix) 
         mchr1 = unique(c(mchr, "X", "Y"))
+    
+    # iter through CEL files
     for (i in 1:nfile) {
         y = as.matrix(read.celfile(as.character(filenames[i]), intensity.means.only = TRUE)[["INTENSITY"]][["MEAN"]][allid])
         y = log2(y)
@@ -63,6 +66,8 @@ MouseDivGenotype = function(allid, ABid, chrid, CGFLcorrection = NULL,
             y = y + CGFLcorrection
         if (length(reference) > 0) 
             y <- normalize.quantiles.use.target(y, target = reference)
+        
+        # separate a alleles from be alleles
         allAint = y[Aid, 1, drop = FALSE]
         allBint = y[Bid, 1, drop = FALSE]
         allAint <- subColSummarizeMedian(matrix(allAint, ncol = 1), SNPname)
@@ -78,6 +83,8 @@ MouseDivGenotype = function(allid, ABid, chrid, CGFLcorrection = NULL,
             M = allAint - allBint
             S = (allAint + allBint)/2
         }
+        
+        # divide CEL file up into chromosome pieces
         for (chri in mchr1) {
             xname2 = paste(outfiledir, "/", gsub(".CEL", "CHR", filenames[i]), chri, sep = "", collapse = "")
             MM1 = M[chrid == chri, ]
@@ -92,6 +99,7 @@ MouseDivGenotype = function(allid, ABid, chrid, CGFLcorrection = NULL,
     ii = match(mchr1, mchr)
     mchr1 = mchr1[!is.na(ii)]
     for (chri in mchr1) {
+        # paste the chromosomes together for genotyping
         MM = SS = NULL
         for (i in 1:nfile) {
             xname1 = paste(outfiledir, "/", gsub(".CEL", "CHR", filenames[i]), chri, sep = "", collapse = "")
