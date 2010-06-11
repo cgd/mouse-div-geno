@@ -140,6 +140,8 @@ genotype = function(nm, ns, hint1, trans, doCNV) {
             if (any(tgeno2 == -1)) 
                 tgeno2 = vdist(adata[, 1], adata[, 2]/5, tgeno2)
             tscore2 = silhouette(match(tgeno2[!rmid], unique(tgeno2[!rmid])), dist(nm[!rmid]))
+            if(is.na(tscore2)) stop("Internal Error: silhouette score is NA")
+            
             if (istwo) {
                 geno = test12(tscore2, nm, tgeno2, rmid, thres, iig, nsize)
                 v1 = vinotype(nm, ns, geno, doCNV)

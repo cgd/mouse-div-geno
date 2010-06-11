@@ -10,7 +10,7 @@
 MouseDivGenotype = function(allid, ABid, chrid, CGFLcorrection = NULL, 
     reference = NULL, hint = NULL, trans = c("CCStrans", "MAtrans"), celnamefile = NULL, 
     mchr = c(1:19, "X", "Y", "M"), celfiledir, outfiledir, subset = FALSE, doCNV = FALSE, 
-    exon1info = NULL, exon2info = NULL, exonoutfiledir, cnvoutfiledir) {
+    exon1info = NULL, exon2info = NULL, exonoutfiledir, cnvoutfiledir, verbose = FALSE) {
     library("affyio")
     library("preprocessCore")
     library("cluster")
@@ -59,6 +59,8 @@ MouseDivGenotype = function(allid, ABid, chrid, CGFLcorrection = NULL,
     
     # iter through CEL files
     for (i in 1:nfile) {
+        if(verbose) cat("Reading and normalizing CEL file: ", filenames[i], "\n", sep="")
+        
         y = as.matrix(read.celfile(as.character(filenames[i]), intensity.means.only = TRUE)[["INTENSITY"]][["MEAN"]][allid])
         y = log2(y)
         if (length(CGFLcorrection) > 0)
@@ -86,9 +88,21 @@ MouseDivGenotype = function(allid, ABid, chrid, CGFLcorrection = NULL,
         
         # divide CEL file up into chromosome pieces
         for (chri in mchr1) {
+            currRows <- which(chrid == chri)
+            if(length(currRows) == 0)
+            {
+                stop("Failed to find any probes on chromosome ", chri);
+            }
+            
             xname2 = paste(outfiledir, "/", gsub(".CEL", "CHR", filenames[i]), chri, sep = "", collapse = "")
-            MM1 = M[chrid == chri, ]
-            SS1 = S[chrid == chri, ]
+            if(verbose)
+            {
+                cat("Saving ", length(currRows),
+                    " probes in chromosome ", chri, " to ", xname2, "\n", sep="")
+            }
+            
+            MM1 = M[currRows, ]
+            SS1 = S[currRows, ]
             save(MM1, SS1, file = xname2)
         }
     }
@@ -99,6 +113,8 @@ MouseDivGenotype = function(allid, ABid, chrid, CGFLcorrection = NULL,
     ii = match(mchr1, mchr)
     mchr1 = mchr1[!is.na(ii)]
     for (chri in mchr1) {
+        if(verbose) cat("geno/vinotyping chromosome ", chri, "\n", sep="")
+        
         # paste the chromosomes together for genotyping
         MM = SS = NULL
         for (i in 1:nfile) {
