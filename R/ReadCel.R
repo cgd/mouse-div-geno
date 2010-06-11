@@ -177,12 +177,17 @@ genotypethis = function(savefiledir, MM, SS, hint, isMale, trans, chr,
     
     autosome = match(chr, c(1:19))
     if (!is.na(autosome)) {
+        #cat("in autosome part of genotype this\n")
+        
         # process in blocks of 2000 to balance efficiency and memory use
         conf = geno = vino = baf = llr = NULL
         sp = seq(1, nn, 2000)
         lls = length(sp)
         ep = c(sp[2:lls] - 1, nn)
         for (iter in 1:lls) {
+            #cat("timing iteration ", iter, "\n", sep="")
+            #startTime <- getTime()
+            
             tmp = sp[iter]:ep[iter]
             genom = apply(cbind(MM[tmp, ], SS[tmp, ], hint[tmp]), 1, function(x, 
                 trans, doCNV, n) {
@@ -198,6 +203,8 @@ genotypethis = function(savefiledir, MM, SS, hint, isMale, trans, chr,
                 baf = rbind(baf, genom[, c((3 * n + 1):(4 * n))])
                 llr = rbind(llr, genom[, c((4 * n + 1):(5 * n))])
             }
+            
+            #timeReport(startTime)
         }
         rownames(geno) = rownames(conf) = rownames(vino) = rownames(MM)
         colnames(geno) = colnames(conf) = colnames(vino) = colnames(MM)

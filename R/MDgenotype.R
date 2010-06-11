@@ -14,6 +14,8 @@ MouseDivGenotype = function(allid, ABid, chrid, CGFLcorrection = NULL,
     library("affyio")
     library("preprocessCore")
     library("cluster")
+    #library("time")
+    
     trans = match.arg(trans)
     if (missing(celfiledir)) 
         celfiledir = getwd()
@@ -115,6 +117,8 @@ MouseDivGenotype = function(allid, ABid, chrid, CGFLcorrection = NULL,
     for (chri in mchr1) {
         if(verbose) cat("geno/vinotyping chromosome ", chri, "\n", sep="")
         
+        #startTime <- getTime()
+    
         # paste the chromosomes together for genotyping
         MM = SS = NULL
         for (i in 1:nfile) {
@@ -136,8 +140,15 @@ MouseDivGenotype = function(allid, ABid, chrid, CGFLcorrection = NULL,
         isMale = rep(TRUE, ncol(MM))
         if (length(hint) == 0) 
             hint1 = NULL
-        else hint1 = hint[[chri]]
+        else
+            hint1 = hint[[chri]]
+        #cat("time it took us to get to genotypethis\n")
+        #timeReport(startTime)
+        
+        #startTime <- getTime()
         genotypethis(outfiledir, MM, SS, hint1, isMale, trans, chri, doCNV)
+        #cat("time it took us to complete genotypethis\n")
+        #timeReport(startTime)
     }
     
     if (iix | iiy) {

@@ -30,6 +30,9 @@ genotype = function(nm, ns, hint1, trans, doCNV) {
     MAtransthres = c(-0.8, -0.6, -0.3, 0.3, 0.6, 0.8)
     if (is.element(trans, "MAtrans")) 
         thres = MAtransthres
+    
+    # rmid is used to remove the values that fall outside of our chosen
+    # threshold
     rmid = nm >= thres[2] & nm <= thres[5] & ns < quantile(ns, 0.2)
     lnrmid = sum(!rmid)
     istwo = isone = FALSE
@@ -70,6 +73,9 @@ genotype = function(nm, ns, hint1, trans, doCNV) {
         llr = v1$llr
     }
     else {
+        #cat("timing section 1\n")
+        #startTime <- proc.time()[3]
+        
         ##============================================ obvious two groups SNPs
         if (all(nm <= thres[5])) {
             # 2,3
@@ -89,6 +95,11 @@ genotype = function(nm, ns, hint1, trans, doCNV) {
         delta = 0.001
         imax = 50
         iter = 0
+        
+        #cat(proc.time()[3] - startTime, "\n")
+        #cat("iterating\n")
+        #startTime <- proc.time()[3]
+        
         while (ok & iter <= imax) {
             iter = iter + 1
             T <- E.step2(theta1, nm[!rmid])
@@ -108,6 +119,11 @@ genotype = function(nm, ns, hint1, trans, doCNV) {
             }
             otheta1 = theta1
         }
+        #cat(proc.time()[3] - startTime, "\n")
+        
+        #cat("OK done iterating now prepping of ielse\n")
+        #startTime <- proc.time()[3]
+        
         T = round(T, 4)
         tgeno2 = rep(-1, nsize)
         geno2 = rep(-1, lnrmid)
@@ -151,6 +167,11 @@ genotype = function(nm, ns, hint1, trans, doCNV) {
                 llr = v1$llr
             }
         }
+        #cat(proc.time()[3] - startTime, "\n")
+        
+        #cat("working on if !istwo\n")
+        #startTime <- proc.time()[3]
+        
         if (!istwo) {
             #======== test 3
             otheta1 = theta1 = list(tau = c(1/3, 1/3, 1/3), mu1 = hint[1], mu2 = hint[2], mu3 = hint[3], sigma1 = 0.1, sigma2 = 0.1, sigma3 = 0.1)
@@ -245,6 +266,8 @@ genotype = function(nm, ns, hint1, trans, doCNV) {
                 }
             }
         } # end of if(!istwo)
+        #cat(proc.time()[3] - startTime, "\n")
+        #cat("##############################\n")
     }
     list(geno = geno, vino = vino, conf = conf, baf = baf, llr = llr)
 }
