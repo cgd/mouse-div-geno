@@ -16,13 +16,12 @@
 # nm = MM[1,]; ns = SS[1,]
 # geno = genotype(nm, ns, hint = NULL)
 #======================================================================
-genotype = function(nm, ns, hint1, trans) {
+genotype = function(nm, ns, hint1, trans, doCNV) {
     hint = rep(0, 3)
     hint[1] = max(nm)
     hint[3] = min(nm)
-    if (is.na(hint[2])) 
-        hint[2] = 0
-    else hint[2] = hint1
+    if (length(hint1) != 0) 
+        hint[2] = hint1
     
     nsize = length(nm)
     thres = c(-0.4, -0.3, -0.15, 0.15, 0.3, 0.4)
@@ -31,33 +30,41 @@ genotype = function(nm, ns, hint1, trans) {
         thres = MAtransthres
     rmid = nm >= thres[2] & nm <= thres[5] & ns < quantile(ns, 0.2)
     lnrmid = sum(!rmid)
-    istwo = FALSE
+    istwo = isone = FALSE
     iig = NULL
     #================================================ obvious one group SNPs
     if (all(nm[!rmid] < thres[1])) {
         geno = rep(3, nsize)
-        v1 = vinotype(nm, ns, geno)
+        v1 = vinotype(nm, ns, geno, doCNV)
         vino = v1$vino
         conf = v1$conf
+        baf = v1$BAF
+        llr = v1$llr
     }
     else if (all(nm[!rmid] > thres[6])) {
         geno = rep(1, nsize)
-        v1 = vinotype(nm, ns, geno)
+        v1 = vinotype(nm, ns, geno, doCNV)
         vino = v1$vino
         conf = v1$conf
+        baf = v1$BAF
+        llr = v1$llr
     }
     else if (all(nm[!rmid] >= thres[3] & nm[!rmid] <= thres[4])) {
         geno = rep(2, nsize)
-        v1 = vinotype(nm, ns, geno)
+        v1 = vinotype(nm, ns, geno, doCNV)
         vino = v1$vino
         conf = v1$conf
+        baf = v1$BAF
+        llr = v1$llr
     }
     else if (all(nm[!rmid] <= thres[2] | nm[!rmid] >= thres[5])) {
         geno = rep(1, nsize)
         geno[nm < 0] = 3
-        v2 = vinotype(nm, ns, geno)
-        vino = v2$vino
-        conf = v2$conf
+        v1 = vinotype(nm, ns, geno, doCNV)
+        vino = v1$vino
+        conf = v1$conf
+        baf = v1$BAF
+        llr = v1$llr
     }
     else {
         ##============================================ obvious two groups SNPs
@@ -112,16 +119,20 @@ genotype = function(nm, ns, hint1, trans) {
             0.5, ii]), th))] = ii
         tgeno2[!rmid] = geno2
         if (length(unique(tgeno2[tgeno2 != -1])) == 1) {
-            istwo = TRUE
+            isone = TRUE
             mm = median(nm)
             if (mm > thres[5]) 
                 geno = rep(1, nsize)
             else if (mm < thres[2]) 
                 geno = rep(3, nsize)
             else geno = rep(2, nsize)
-            v1 = vinotype(nm, ns, geno)
-            vino = v1$vino
-            conf = v1$conf
+            if (istwo) {
+                v1 = vinotype(nm, ns, geno, doCNV)
+                vino = v1$vino
+                conf = v1$conf
+                baf = v1$BAF
+                llr = v1$llr
+            }
         }
         else {
             if (any(tgeno2 == -1)) 
@@ -129,9 +140,11 @@ genotype = function(nm, ns, hint1, trans) {
             tscore2 = silhouette(match(tgeno2[!rmid], unique(tgeno2[!rmid])), dist(nm[!rmid]))
             if (istwo) {
                 geno = test12(tscore2, nm, tgeno2, rmid, thres, iig, nsize)
-                v1 = vinotype(nm, ns, geno)
+                v1 = vinotype(nm, ns, geno, doCNV)
                 vino = v1$vino
                 conf = v1$conf
+                baf = v1$BAF
+                llr = v1$llr
             }
         }
         if (!istwo) {
@@ -177,18 +190,21 @@ genotype = function(nm, ns, hint1, trans) {
             tt = table(T[geno3 == -1, mm[2, 3]])
             stt = sort(tt, decreasing = TRUE)[1]
             th = sort(as.numeric(names(tt[tt == stt])), decreasing = TRUE)[1]
-            out[mm[2, 3]] = max(median(T[T[, mm[2, 1]] < min(out[mm[2, 1]], 0.5) & 
-                T[, mm[2, 2]] < min(out[mm[2, 2]], 0.5), mm[2, 3]]), th)
+            out[mm[2, 3]] = max(median(T[T[, mm[2, 1]] <= min(out[mm[2, 1]], 0.5) & 
+                T[, mm[2, 2]] <= min(out[mm[2, 2]], 0.5), mm[2, 3]]), th)
             tt = table(T[geno3 == -1, mm[3, 3]])
             stt = sort(tt, decreasing = TRUE)[1]
             th = sort(as.numeric(names(tt[tt == stt])), decreasing = TRUE)[1]
-            out[mm[3, 3]] = max(median(T[T[, mm[3, 1]] < min(out[mm[3, 1]], 0.5) & 
-                T[, mm[3, 2]] < min(out[mm[3, 2]], 0.5), mm[3, 3]]), th)
+            out[mm[3, 3]] = max(median(T[T[, mm[3, 1]] <= min(out[mm[3, 1]], 0.5) & 
+                T[, mm[3, 2]] <= min(out[mm[3, 2]], 0.5), mm[3, 3]]), th)
             if (any(is.na(out))) {
-                geno = test12(tscore2, nm, tgeno2, rmid, thres, iig, nsize)
-                v1 = vinotype(nm, ns, geno)
+                if (!isone) 
+                  geno = test12(tscore2, nm, tgeno2, rmid, thres, iig, nsize)
+                v1 = vinotype(nm, ns, geno, doCNV)
                 vino = v1$vino
                 conf = v1$conf
+                baf = v1$BAF
+                llr = v1$llr
             }
             else {
                 out[out1 < out] = out1[out1 < out]
@@ -196,31 +212,45 @@ genotype = function(nm, ns, hint1, trans) {
                 geno3[T[, mm[2, 3]] >= out[mm[2, 3]]] = mm[2, 3]
                 geno3[T[, mm[3, 3]] >= out[mm[3, 3]]] = mm[3, 3]
                 tgeno3[!rmid] = geno3
-                # need confidence score here
                 if (length(unique(tgeno3[tgeno3 != -1])) < 3) {
-                  geno = test12(tscore2, nm, tgeno2, rmid, thres, iig, nsize)
-                  v1 = vinotype(nm, ns, geno)
+                  if (!isone) 
+                    geno = test12(tscore2, nm, tgeno2, rmid, thres, iig, nsize)
+                  v1 = vinotype(nm, ns, geno, doCNV)
                   vino = v1$vino
                   conf = v1$conf
+                  baf = v1$BAF
+                  llr = v1$llr
                 }
                 else {
                   if (any(tgeno3 == -1)) 
                     tgeno3 = vdist(adata[, 1], adata[, 2]/5, tgeno3)
                   tscore3 = silhouette(match(tgeno3[!rmid], unique(tgeno3[!rmid])), 
                     dist(nm[!rmid]))
-                  geno = test123(tscore2, tscore3, nm, tgeno2, tgeno3, rmid, thres, 
-                    iig, nsize)
-                  v3 = vinotype(nm, ns, geno)
-                  vino = v3$vino
-                  conf = v3$conf
+                  if (isone) {
+                    geno = test13(tscore3, nm, tgeno3, rmid, geno)
+                    v1 = vinotype(nm, ns, geno, doCNV)
+                    vino = v1$vino
+                    conf = v1$conf
+                    baf = v1$BAF
+                    llr = v1$llr
+                  }
+                  else {
+                    geno = test123(tscore2, tscore3, nm, tgeno2, tgeno3, rmid, thres, 
+                      iig, nsize)
+                    v1 = vinotype(nm, ns, geno, doCNV)
+                    vino = v1$vino
+                    conf = v1$conf
+                    baf = v1$BAF
+                    llr = v1$llr
+                  }
                 }
             }
         }
     }
-    list(geno = geno, vino = vino, conf = conf)
+    list(geno = geno, vino = vino, conf = conf, baf = baf, llr = llr)
 }
 
-genotypeSexchr = function(nm, ns, trans) {
+genotypeSexchr = function(nm, ns, trans, doCNV) {
     nsize = length(nm)
     hint = c(max(nm), min(nm))
     thres = c(-0.4, -0.3, -0.15, 0.15, 0.3, 0.4)
@@ -230,27 +260,32 @@ genotypeSexchr = function(nm, ns, trans) {
     rmid = nm >= thres[2] & nm <= thres[5] & ns < quantile(ns, 0.2)
     lnrmid = sum(!rmid)
     
-    if (all(nm[!rmid] < thres[1])) {
+    if (all(nm[!rmid] < thres[3])) {
         geno = rep(3, nsize)
-        v1 = vinotype(nm, ns, geno)
+        v1 = vinotype(nm, ns, geno, doCNV)
         vino = v1$vino
         conf = v1$conf
+        baf = v1$BAF
+        llr = v1$llr
     }
-    else if (all(nm[!rmid] > thres[6])) {
+    else if (all(nm[!rmid] > thres[4])) {
         geno = rep(1, nsize)
-        v1 = vinotype(nm, ns, geno)
+        v1 = vinotype(nm, ns, geno, doCNV)
         vino = v1$vino
         conf = v1$conf
+        baf = v1$BAF
+        llr = v1$llr
     }
     else if (all(nm[!rmid] <= thres[3] | nm[!rmid] >= thres[4])) {
         geno = rep(1, nsize)
         geno[nm < 0] = 3
-        v2 = vinotype(nm, ns, geno)
-        vino = v2$vino
-        conf = v2$conf
+        v1 = vinotype(nm, ns, geno, doCNV)
+        vino = v1$vino
+        conf = v1$conf
+        baf = v1$BAF
+        llr = v1$llr
     }
     else {
-        iig = c(1, 3)
         adata = cbind(nm, ns/(max(ns) - min(ns)))
         #======== test 2
         otheta1 = theta1 = list(tau = c(0.5, 0.5), mu1 = hint[1], mu2 = hint[2], 
@@ -262,6 +297,7 @@ genotypeSexchr = function(nm, ns, trans) {
         while (ok & iter <= imax) {
             iter = iter + 1
             T <- E.step2(theta1, nm[!rmid])
+            T[is.na(T)] = 0.5
             theta1 <- M.step2(T, nm[!rmid])
             ok1 = TRUE
             if (theta1$tau[1] > 0) 
@@ -296,31 +332,41 @@ genotypeSexchr = function(nm, ns, trans) {
             geno = rep(1, nsize)
             if (mm < 0) 
                 geno = rep(3, nsize)
-            v1 = vinotype(nm, ns, geno)
+            v1 = vinotype(nm, ns, geno, doCNV)
             vino = v1$vino
             conf = v1$conf
+            baf = v1$BAF
+            llr = v1$llr
         }
         else {
             if (any(geno == -1)) 
                 geno = vdist(adata[, 1], adata[, 2]/2, geno)
-            geno[geno == 2] = 3
-            v1 = vinotype(nm, ns, geno)
+            keepthis = tapply(nm, geno, mean)
+            if (keepthis[1] > keepthis[2]) 
+                geno[geno == 2] = 3
+            else {
+                geno[geno == 1] = 3
+                geno[geno == 2] = 1
+            }
+            v1 = vinotype(nm, ns, geno, doCNV)
             vino = v1$vino
             conf = v1$conf
+            baf = v1$BAF
+            llr = v1$llr
         }
     }
-    list(geno = geno, vino = vino, conf = conf)
+    list(geno = geno, vino = vino, conf = conf, baf = baf, llr = llr)
 }
 
 
 test123 = function(tscore2, tscore3, nm, tgeno2, tgeno3, rmid, thres, 
     iig, nsize) {
-    mscore2 = mean(tscore2[, 3])
-    mscore3 = mean(tscore3[, 3])
     if (length(tscore3) < 3) 
         mscore3 = 0
+    else mscore3 = mean(tscore3[, 3])
     if (length(tscore2) < 3) 
         mscore2 = 0
+    else mscore2 = mean(tscore2[, 3])
     d1 = quantile(nm[tgeno3 == 1 & !rmid], 0.1) - quantile(nm[tgeno3 == 2 & !rmid], 
         0.9)
     d2 = quantile(nm[tgeno3 == 2 & !rmid], 0.1) - quantile(nm[tgeno3 == 3 & !rmid], 
@@ -331,10 +377,22 @@ test123 = function(tscore2, tscore3, nm, tgeno2, tgeno3, rmid, thres,
     geno
 }
 
+test13 = function(tscore3, nm, tgeno3, rmid, geno) {
+    if (length(tscore3) < 3) 
+        mscore3 = 0
+    else mscore3 = mean(tscore3[, 3])
+    d1 = quantile(nm[tgeno3 == 1 & !rmid], 0.1) - quantile(nm[tgeno3 == 2 & !rmid], 
+        0.9)
+    d2 = quantile(nm[tgeno3 == 2 & !rmid], 0.1) - quantile(nm[tgeno3 == 3 & !rmid], 
+        0.9)
+    if (mscore3 > 0.65 & (d1 > 0.1 & d2 > 0.1)) 
+        geno = tgeno3
+    geno
+}
 test12 = function(tscore2, nm, tgeno, rmid, thres, iig, nsize) {
-    mscore = mean(tscore2[, 3])
     if (length(tscore2) < 3) 
         mscore = 0
+    else mscore = mean(tscore2[, 3])
     d = quantile(nm[tgeno == 1 & !rmid], 0.1) - quantile(nm[tgeno == 2 & !rmid], 
         0.9)
     if (mscore > 0.6 & d > 0.1) {

@@ -7,28 +7,34 @@
 # This is the main function to genotype the Mouse Diversity Array.
 #
 #########################################################################
-MouseDivGenotype = function(celfiledir, outfiledir, allid, ABid, chrid, 
-    CGFLcorrection = NULL, reference = NULL, hint = NULL, trans = c("CCStrans", "MAtrans"), 
-    celnamefile = NULL, mchr = c(1:19, "X", "Y", "M"), subset = FALSE) {
-    library(affyio)
+MouseDivGenotype = function(allid, ABid, chrid, CGFLcorrection = NULL, 
+    reference = NULL, hint = NULL, trans = c("CCStrans", "MAtrans"), celnamefile = NULL, 
+    mchr = c(1:19, "X", "Y", "M"), celfiledir, outfiledir, subset = FALSE, doCNV = FALSE, 
+    exon1info = NULL, exon2info = NULL, exonoutfiledir, cnvoutfiledir) {
+    library("affyio")
     library("preprocessCore")
-    library(cluster)
+    library("cluster")
     trans = match.arg(trans)
-    print(trans)
     if (missing(celfiledir)) 
         celfiledir = getwd()
     if (missing(outfiledir)) 
         outfiledir = getwd()
-    setwd(celfiledir)
+    if (missing(exonoutfiledir)) 
+        exonoutfiledir = getwd()
+    if (missing(cnvoutfiledir)) 
+        cnvoutfiledir = getwd()
     if (missing(allid) | missing(ABid)) 
         stop("No CDF file information")
     SNPname = ABid$SNPname
     Aid = ABid$allAid
     Bid = ABid$allBid
     rm(ABid)
+    mpos = chrid$mpos
     if (subset) 
-        chrid = schrid
-    rm(schrid, mpos)
+        chrid = chrid$schrid
+    else chrid = chrid$chrid
+    
+    setwd(celfiledir)
     gender = isMale = NULL
     if (length(celnamefile) == 0) {
         tmp = dir()
@@ -43,8 +49,11 @@ MouseDivGenotype = function(celfiledir, outfiledir, allid, ABid, chrid,
         filenames = filenames[, 1]
     }
     nfile = length(filenames)
+    
+    # read individual files
     iiy = !is.na(match("Y", mchr))
     iix = !is.na(match("X", mchr))
+    mchr1 = mchr
     if (iiy | iix) 
         mchr1 = unique(c(mchr, "X", "Y"))
     for (i in 1:nfile) {
@@ -76,8 +85,8 @@ MouseDivGenotype = function(celfiledir, outfiledir, allid, ABid, chrid,
         }
     }
     
+    # combine all sampels and genotype by chromosomes
     autoint = NULL
-    pseudoautosomalID = c(21845:21870)
     mchr1 = c(1:19, "M")
     ii = match(mchr1, mchr)
     mchr1 = mchr1[!is.na(ii)]
@@ -103,7 +112,7 @@ MouseDivGenotype = function(celfiledir, outfiledir, allid, ABid, chrid,
         if (length(hint) == 0) 
             hint1 = NULL
         else hint1 = hint[[chri]]
-        genotypethis(outfiledir, MM, SS, hint1, isMale, trans, chri, pseudoautosomalID)
+        genotypethis(outfiledir, MM, SS, hint1, isMale, trans, chri, doCNV)
     }
     
     if (iix | iiy) {
@@ -162,10 +171,14 @@ MouseDivGenotype = function(celfiledir, outfiledir, allid, ABid, chrid,
             if (length(hint) == 0) 
                 hint1 = NULL
             else hint1 = hint[[20]]
-            genotypethis(outfiledir, MM, SS, hint1, isMale, trans, "X", pseudoautosomalID)
+            genotypethis(outfiledir, MM, SS, hint1, isMale, trans, "X", doCNV)
         }
         if (iiy) 
-            genotypethis(outfiledir, MMy, SSy, NULL, isMale, trans, "Y", pseudoautosomalID)
+            genotypethis(outfiledir, MMy, SSy, NULL, isMale, trans, "Y", doCNV)
+    }
+    if (doCNV) {
+        penCNVinput(chrid, mpos, exon1info, exon2info, celfiledir, filenames, outfiledir, 
+            exonoutfiledir, cnvoutfiledir, mchr)
     }
 }
 

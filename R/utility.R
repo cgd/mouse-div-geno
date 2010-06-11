@@ -15,27 +15,46 @@ imageplot = function(filename, plotname = "imageplot.jpg") {
     dev.off()
 }
 
-densityplot = function(filenames, plotname = "densityplot.jpg") {
+densityplot = function(filenames, allid, ABid, type = c("Average", "MatchedSet"), 
+    plotname = "densityplot.jpg") {
     library(affyio)
     library("preprocessCore")
-    
+    SNPname = ABid$SNPname
+    Aid = ABid$allAid
+    Bid = ABid$allBid
+    rm(ABid)
     nfile = length(filenames)
+    type2 = type == "MatchedSet"
     jpeg(plotname, width = 1200, heigh = 1200)
-    y = as.matrix(read.celfile(as.character(filenames[1]), intensity.means.only = TRUE)[["INTENSITY"]][["MEAN"]][fid])
+    y = as.matrix(read.celfile(as.character(filenames[1]), intensity.means.only = TRUE)[["INTENSITY"]][["MEAN"]][allid])
     y = log2(y)
-    allAint = y[allAid, 1, drop = FALSE]
-    allBint = y[allBid, 1, drop = FALSE]
-    allAint <- subColSummarizeMedian(matrix(allAint, ncol = 1), allA)
-    allBint <- subColSummarizeMedian(matrix(allBint, ncol = 1), allA)
-    plot(density(c(allAint, allBint)), xlab = "", ylab = "")
+    allAint = y[Aid, 1, drop = FALSE]
+    allBint = y[Bid, 1, drop = FALSE]
+    allAint <- subColSummarizeMedian(matrix(allAint, ncol = 1), SNPname)
+    allBint <- subColSummarizeMedian(matrix(allBint, ncol = 1), SNPname)
+    if (type2) {
+        xlab = "Matched sequence intensity"
+        tmp = allAint
+        tmp[allAint < allBint] = allBint[allAint < allBint]
+    }
+    else {
+        xlab = "Average intensity"
+        tmp = (allAint + allBint)/2
+    }
+    plot(density(tmp), xlab = xlab, ylab = "")
     for (i in 2:nfile) {
-        y = as.matrix(read.celfile(as.character(filenames[i]), intensity.means.only = TRUE)[["INTENSITY"]][["MEAN"]][fid])
+        y = as.matrix(read.celfile(as.character(filenames[i]), intensity.means.only = TRUE)[["INTENSITY"]][["MEAN"]][allid])
         y = log2(y)
-        allAint = y[allAid, 1, drop = FALSE]
-        allBint = y[allBid, 1, drop = FALSE]
-        allAint <- subColSummarizeMedian(matrix(allAint, ncol = 1), allA)
-        allBint <- subColSummarizeMedian(matrix(allBint, ncol = 1), allA)
-        lines(density(c(allAint, allBint)))
+        allAint = y[Aid, 1, drop = FALSE]
+        allBint = y[Bid, 1, drop = FALSE]
+        allAint <- subColSummarizeMedian(matrix(allAint, ncol = 1), SNPname)
+        allBint <- subColSummarizeMedian(matrix(allBint, ncol = 1), SNPname)
+        if (type2) {
+            tmp = allAint
+            tmp[allAint < allBint] = allBint[allAint < allBint]
+        }
+        else tmp = (allAint + allBint)/2
+        lines(density(tmp))
     }
     dev.off()
 } 

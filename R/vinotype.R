@@ -14,7 +14,31 @@
 # geno = genotype(nm, ns, hint = NULL)
 # vino = vinotype(nm, ns, geno)
 #======================================================================
-vinotype = function(nm, ns, geno) {
+bicov <- function(x, y) {
+    mx <- median(x)
+    my <- median(y)
+    ux <- abs((x - mx)/(9 * qnorm(0.75) * mad(x)))
+    uy <- abs((y - my)/(9 * qnorm(0.75) * mad(y)))
+    aval <- ifelse(ux <= 1, 1, 0)
+    bval <- ifelse(uy <= 1, 1, 0)
+    top <- sum(aval * (x - mx) * (1 - ux^2)^2 * bval * (y - my) * (1 - uy^2)^2)
+    top <- length(x) * top
+    botx <- sum(aval * (1 - ux^2) * (1 - 5 * ux^2))
+    boty <- sum(bval * (1 - uy^2) * (1 - 5 * uy^2))
+    bi <- top/(botx * boty)
+    bi
+}
+bivar <- function(x) {
+    mx <- median(x)
+    ux <- abs((x - mx)/(9 * qnorm(0.75) * mad(x)))
+    aval <- ifelse(ux <= 1, 1, 0)
+    top <- sum((aval * (x - mx) * (1 - ux^2)^2)^2)
+    top <- length(x) * top
+    botx <- (sum(aval * (1 - ux^2) * (1 - 5 * ux^2)))^2
+    bi <- top/botx
+    bi
+}
+vinotype = function(nm, ns, geno, doCNV) {
     #=========== find centers
     iig = sort(unique(geno))
     ngeno = length(iig)
@@ -30,7 +54,7 @@ vinotype = function(nm, ns, geno) {
             mms = min(tapply(ns[!is.na(g)], geno[!is.na(g)], median))
         else mms = median(ns)
     }
-    mm = ms = NULL
+    mm = ms = rep(0, 3)
     adata = cbind(nm, ns)
     nsize = length(geno)
     vino = rep(-1, nsize)
@@ -53,8 +77,6 @@ vinotype = function(nm, ns, geno) {
                 if (l > th) 
                   th = th + 1
                 donns = diff(onns)
-                b = boxplot(donns, range = 2, plot = FALSE)
-                b$out = c(b$out, donns[donns > 1.5])
                 tb = boxplot(donns, range = 5, plot = FALSE)
                 if (sum(tb$out > 0.2) > 0) {
                   tb$out = tb$out[tb$out > 0.2]
@@ -64,29 +86,20 @@ vinotype = function(nm, ns, geno) {
                     vino[geno == 2 & ns <= onns[max(k)]] = 1
                   }
                 }
-                if (length(b$out) > 0) {
-                  k = match(b$out, donns)
-                  k = k[k < th]
-                  if (length(k) > 0) {
-                    k = max(k) + 1
-                    nns = onns[k:l]
-                    nnm = onnm[k:l]
-                  }
-                }
             }
-            mm = c(mm, mean(nnm))
-            ms = c(ms, mean(nns))
-            if (length(nnm) == 1) 
-                ss[[ik]] = NA
-            else {
-                ss[[ik]] = cov(cbind(nnm, nns))
-                m = m + ss[[ik]]
-                lm = lm + 1
-            }
+            mm[ik] = median(nnm)
+            ms[ik] = median(nns)
+            ssm = matrix(0, 2, 2)
+            ssm[1, 1] = bivar(nnm)
+            ssm[2, 2] = bivar(nns)
+            ssm[1, 2] = ssm[2, 1] = bicov(nnm, nns)
+            ss[[ik]] = ssm
+            m = m + ss[[ik]]
+            lm = lm + 1
         }
         else {
-            mm = c(mm, nm[geno == ik])
-            ms = c(ms, ns[geno == ik])
+            mm[ik] = nm[geno == ik]
+            ms[ik] = ns[geno == ik]
             ss[[ik]] = NA
         }
     }
@@ -96,14 +109,20 @@ vinotype = function(nm, ns, geno) {
             ss[[ik]] = m
         else ss[[ik]] = ss[[ik]] * 0.5 + m * 0.5
     }
+    BAF = llr = rep(0, nsize)
+    if (doCNV) {
+        cnvinputs = CNVinput(nm, ns, geno, mm, ms, ss, nsize, ngeno, iig)
+        BAF = cnvinputs$BAF
+        llr = cnvinputs$llr
+    }
     #=========== test 2 vs. 3
     if (ngeno == 3) {
         l1 = sum(geno == 1)
         l2 = sum(geno == 2)
         l3 = sum(geno == 3)
         mdd = rep(0, nsize)
+        th = c(0.99, 0.95, 0.99)
         if (l1 > 1 & det(ss[[1]]) > 10^(-10)) {
-            th = c(0.99, 0.95, 0.99)
             tmp = mahalanobis(adata[geno == 1, ], c(mm[1], ms[1]), ss[[1]])
             dd1 = pchisq(tmp, df = 2)
             mdd[geno == 1] = dd1
@@ -129,20 +148,22 @@ vinotype = function(nm, ns, geno) {
         th = c(0.99, 0.95, 0.99)
         th = th[iig]
         if (l1 > 1 & det(ss[[iig[1]]]) > 10^(-10)) {
-            tmp = mahalanobis(adata[geno == iig[1], ], c(mm[1], ms[1]), ss[[iig[1]]])
+            tmp = mahalanobis(adata[geno == iig[1], ], c(mm[iig[1]], ms[iig[1]]), 
+                ss[[iig[1]]])
             dd1 = pchisq(tmp, df = 2)
             mdd[geno == iig[1]] = dd1
             vino1[geno == iig[1]][dd1 < th[1]] = 2
         }
         if (l2 > 1 & det(ss[[iig[2]]]) > 10^(-10)) {
-            tmp = mahalanobis(adata[geno == iig[2], ], c(mm[2], ms[2]), ss[[iig[2]]])
+            tmp = mahalanobis(adata[geno == iig[2], ], c(mm[iig[2]], ms[iig[2]]), 
+                ss[[iig[2]]])
             dd2 = pchisq(tmp, df = 2)
             mdd[geno == iig[2]] = dd2
             vino1[geno == iig[2]][dd2 < th[2]] = 2
         }
     }
     if (ngeno == 1) {
-        tmp = mahalanobis(adata, c(mm[1], ms[1]), ss[[iig[1]]])
+        tmp = mahalanobis(adata, c(mm[iig[1]], ms[iig[1]]), ss[[iig[1]]])
         mdd = pchisq(tmp, df = 2)
         vino1[mdd < 0.99] = 2
     }
@@ -158,21 +179,135 @@ vinotype = function(nm, ns, geno) {
         g = match(bdsn, dsn)
         th = sum(ns < median(ns))
         g = g[g < th]
-        vino[ns <= sn[g]] = 1
+        if (length(g) > 0) 
+            vino[ns <= sn[max(g)]] = 1
     }
     if (any(vino == 1) & any(vino == -1)) 
         vino = vdist(nm/5, ns/(2 * (max(ns) - min(ns))), vino)
-    # update the genotype membership after vino being removed
-    #ug = sort( unique( geno[ vino != 1 ] ) )
-    #if( length(ug) == 2 ){
-    #  tmp = c(median( nm[ geno== ug[1] & vino != 1 ] ), median(nm[ geno == ug[2] & vino != 1]) )
-    #  if( tmp[1] > .3 & tmp[2] < -.3 ) iig = c(1,3)
-    #  else if( tmp[1] < .3 ) iig = c(2,3)
-    #  else if( tmp[2] > -.3 ) iig = c(1,2)
-    #  else iig = c(1,2)
-    #  geno = iig[ match(geno, ug) ]
-    #}
-    list(vino = vino, conf = mdd)
+    list(vino = vino, conf = mdd, BAF = BAF, llr = llr)
+}
+
+CNVinput = function(nm, ns, geno, mm, ms, ss, nsize, ngeno, iig) {
+    BAF = llr = rep(0, nsize)
+    if (ngeno == 3) {
+        c1 = sqrt(ss[[1]][1, 1])
+        c2 = sqrt(ss[[2]][1, 1])
+        c3 = sqrt(ss[[3]][1, 1])
+        s1 = sqrt(ss[[1]][2, 2])
+        s2 = sqrt(ss[[2]][2, 2])
+        s3 = sqrt(ss[[3]][2, 2])
+        tmp = nm >= mm[1]
+        if (any(tmp)) {
+            BAF[tmp] = 0
+            llr[tmp] = log2(ns[tmp]/ns[1])
+        }
+        tmp = nm < mm[1] & nm > mm[2]
+        if (any(tmp)) {
+            k1 = (mm[1] - nm[tmp])/c1
+            k2 = (nm[tmp] - mm[2])/c2
+            BAF[tmp] = 0.5 * k1/(k1 + k2)
+            llr[tmp] = log2(ns[tmp]/((k2 * ns[1] + k1 * ns[2])/(k1 + k2)))
+        }
+        tmp = nm <= mm[2] & nm > mm[3]
+        if (any(tmp)) {
+            k1 = (mm[2] - nm[tmp])/c2
+            k2 = (nm[tmp] - mm[3])/c3
+            BAF[tmp] = 0.5 + 0.5 * k1/(k1 + k2)
+            llr[tmp] = log2(ns[tmp]/((k2 * ns[2] + k1 * ns[3])/(k1 + k2)))
+        }
+        tmp = nm <= mm[3]
+        if (any(tmp)) {
+            BAF[tmp] = 1
+            llr[tmp] = log2(ns[tmp]/ns[3])
+        }
+    }
+    if (ngeno == 2) {
+        id = sum(iig)
+        if (id == 4) {
+            c1 = sqrt(ss[[1]][1, 1])
+            c3 = sqrt(ss[[3]][1, 1])
+            s1 = sqrt(ss[[1]][2, 2])
+            s3 = sqrt(ss[[3]][2, 2])
+            tmp = nm >= mm[1]
+            if (any(tmp)) {
+                BAF[tmp] = 0
+                llr[tmp] = log2(ns[tmp]/ns[1])
+            }
+            tmp = nm < mm[1] & nm > mm[3]
+            if (any(tmp)) {
+                k1 = (mm[1] - nm[tmp])/c1
+                k3 = (nm[tmp] - mm[3])/c3
+                BAF[tmp] = k1/(k1 + k3)
+                llr[tmp] = log2(ns[tmp]/((k3 * ns[1] + k1 * ns[3])/(k1 + k3)))
+            }
+            tmp = nm <= mm[3]
+            if (any(tmp)) {
+                BAF[tmp] = 1
+                llr[tmp] = log2(ns[tmp]/ns[3])
+            }
+        }
+        if (id == 5) {
+            c2 = sqrt(ss[[2]][1, 1])
+            c3 = sqrt(ss[[3]][1, 1])
+            s2 = sqrt(ss[[2]][2, 2])
+            s3 = sqrt(ss[[3]][2, 2])
+            tmp = nm >= mm[2]
+            if (any(tmp)) {
+                BAF[tmp] = 0.5
+                llr[tmp] = log2(ns[tmp]/ns[2])
+            }
+            tmp = nm < mm[2] & nm > mm[3]
+            if (any(tmp)) {
+                k2 = (mm[2] - nm[tmp])/c2
+                k3 = (nm[tmp] - mm[3])/c3
+                BAF[tmp] = 0.5 + 0.5 * k2/(k2 + k3)
+                llr[tmp] = log2(ns[tmp]/((k3 * ns[2] + k2 * ns[3])/(k2 + k3)))
+            }
+            tmp = nm <= mm[3]
+            if (any(tmp)) {
+                BAF[tmp] = 1
+                llr[tmp] = log2(ns[tmp]/ns[3])
+            }
+        }
+        if (id == 3) {
+            c1 = sqrt(ss[[1]][1, 1])
+            c2 = sqrt(ss[[2]][1, 1])
+            s1 = sqrt(ss[[1]][2, 2])
+            s2 = sqrt(ss[[2]][2, 2])
+            tmp = nm >= mm[1]
+            if (any(tmp)) {
+                BAF[tmp] = 0
+                llr[tmp] = log2(ns[tmp]/ns[1])
+            }
+            tmp = nm < mm[1] & nm > mm[2]
+            if (any(tmp)) {
+                k1 = (mm[1] - nm[tmp])/c1
+                k2 = (nm[tmp] - mm[2])/c2
+                BAF[tmp] = 0.5 * k1/(k1 + k2)
+                llr[tmp] = log2(ns[tmp]/((k1 * ns[2] + k2 * ns[1])/(k1 + k2)))
+            }
+            tmp = nm <= mm[2]
+            if (any(tmp)) {
+                BAF[tmp] = 0.5
+                llr[tmp] = log2(ns[tmp]/ns[2])
+            }
+        }
+    }
+    if (ngeno == 1) {
+        if (iig == 1) {
+            BAF = rep(0, nsize)
+            llr = log2(ns/ns[1])
+        }
+        if (iig == 2) {
+            BAF = rep(0.5, nsize)
+            llr = log2(ns/ns[2])
+        }
+        if (iig == 3) {
+            BAF = rep(1, nsize)
+            llr = log2(ns/ns[3])
+        }
+    }
+    list(BAF = BAF, llr = llr)
 }
 
  
