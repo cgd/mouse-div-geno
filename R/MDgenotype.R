@@ -38,8 +38,7 @@ MouseDivGenotype = function(allid, ABid, chrid, CGFLcorrection = NULL,
     gender = isMale = NULL
     if (length(celnamefile) == 0) {
         tmp = dir()
-        isCel = apply(matrix(tmp, ncol = 1), 1, function(x) length(grep(".CEL", x)) > 
-            0)
+        isCel = apply(matrix(tmp, ncol = 1), 1, function(x) length(grep(".CEL", x)) > 0)
         filenames = tmp[isCel]
     }
     else {
@@ -59,7 +58,8 @@ MouseDivGenotype = function(allid, ABid, chrid, CGFLcorrection = NULL,
     for (i in 1:nfile) {
         y = as.matrix(read.celfile(as.character(filenames[i]), intensity.means.only = TRUE)[["INTENSITY"]][["MEAN"]][allid])
         y = log2(y)
-        if (length(CGFLcorrection) > 0) 
+        if (length(CGFLcorrection) > 0)
+            # C+G and fragment length correction y
             y = y + CGFLcorrection
         if (length(reference) > 0) 
             y <- normalize.quantiles.use.target(y, target = reference)
@@ -68,17 +68,18 @@ MouseDivGenotype = function(allid, ABid, chrid, CGFLcorrection = NULL,
         allAint <- subColSummarizeMedian(matrix(allAint, ncol = 1), SNPname)
         allBint <- subColSummarizeMedian(matrix(allBint, ncol = 1), SNPname)
         if (is.element(trans, "CCStrans")) {
+            # fixed K??
             res = ccstrans(2^allAint, 2^allBint)
             M = res$x
             S = res$y
         }
         if (is.element(trans, "MAtrans")) {
+            # then prior??
             M = allAint - allBint
             S = (allAint + allBint)/2
         }
         for (chri in mchr1) {
-            xname2 = paste(outfiledir, "/", gsub(".CEL", "CHR", filenames[i]), chri, 
-                sep = "", collapse = "")
+            xname2 = paste(outfiledir, "/", gsub(".CEL", "CHR", filenames[i]), chri, sep = "", collapse = "")
             MM1 = M[chrid == chri, ]
             SS1 = S[chrid == chri, ]
             save(MM1, SS1, file = xname2)
@@ -93,8 +94,8 @@ MouseDivGenotype = function(allid, ABid, chrid, CGFLcorrection = NULL,
     for (chri in mchr1) {
         MM = SS = NULL
         for (i in 1:nfile) {
-            xname1 = paste(outfiledir, "/", gsub(".CEL", "CHR", filenames[i]), chri, 
-                sep = "", collapse = "")
+            xname1 = paste(outfiledir, "/", gsub(".CEL", "CHR", filenames[i]), chri, sep = "", collapse = "")
+            # origa,origb
             load(xname1)
             MM = cbind(MM, MM1)
             SS = cbind(SS, SS1)
@@ -118,8 +119,8 @@ MouseDivGenotype = function(allid, ABid, chrid, CGFLcorrection = NULL,
     if (iix | iiy) {
         MM = SS = NULL
         for (i in 1:nfile) {
-            xname1 = paste(outfiledir, "/", gsub(".CEL", "CHR", filenames[i]), "Y", 
-                sep = "", collapse = "")
+            xname1 = paste(outfiledir, "/", gsub(".CEL", "CHR", filenames[i]), "Y", sep = "", collapse = "")
+            # origa,origb
             load(xname1)
             MM = cbind(MM, MM1)
             SS = cbind(SS, SS1)
@@ -138,8 +139,7 @@ MouseDivGenotype = function(allid, ABid, chrid, CGFLcorrection = NULL,
         }
         MM = SS = NULL
         for (i in 1:nfile) {
-            xname1 = paste(outfiledir, "/", gsub(".CEL", "CHR", filenames[i]), "X", 
-                sep = "", collapse = "")
+            xname1 = paste(outfiledir, "/", gsub(".CEL", "CHR", filenames[i]), "X", sep = "", collapse = "")
             load(xname1)
             MM = cbind(MM, MM1)
             SS = cbind(SS, SS1)
@@ -177,8 +177,7 @@ MouseDivGenotype = function(allid, ABid, chrid, CGFLcorrection = NULL,
             genotypethis(outfiledir, MMy, SSy, NULL, isMale, trans, "Y", doCNV)
     }
     if (doCNV) {
-        penCNVinput(chrid, mpos, exon1info, exon2info, celfiledir, filenames, outfiledir, 
-            exonoutfiledir, cnvoutfiledir, mchr)
+        penCNVinput(chrid, mpos, exon1info, exon2info, celfiledir, filenames, outfiledir, exonoutfiledir, cnvoutfiledir, mchr)
     }
 }
 

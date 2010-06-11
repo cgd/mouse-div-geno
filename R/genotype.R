@@ -24,6 +24,8 @@ genotype = function(nm, ns, hint1, trans, doCNV) {
         hint[2] = hint1
     
     nsize = length(nm)
+    
+    # thres is for CCStrans
     thres = c(-0.4, -0.3, -0.15, 0.15, 0.3, 0.4)
     MAtransthres = c(-0.8, -0.6, -0.3, 0.3, 0.6, 0.8)
     if (is.element(trans, "MAtrans")) 
@@ -58,6 +60,7 @@ genotype = function(nm, ns, hint1, trans, doCNV) {
         llr = v1$llr
     }
     else if (all(nm[!rmid] <= thres[2] | nm[!rmid] >= thres[5])) {
+        # 1,3
         geno = rep(1, nsize)
         geno[nm < 0] = 3
         v1 = vinotype(nm, ns, geno, doCNV)
@@ -69,18 +72,19 @@ genotype = function(nm, ns, hint1, trans, doCNV) {
     else {
         ##============================================ obvious two groups SNPs
         if (all(nm <= thres[5])) {
+            # 2,3
             istwo = TRUE
             iig = c(2, 3)
         }
         if (all(nm >= thres[2])) {
+            # 1,2
             istwo = TRUE
             iig = c(1, 2)
         }
         adata = cbind(nm, ns/(max(ns) - min(ns)))
         nsize = length(nm)
         #======== test 2 ====== based on one dimension at this time rather than two
-        otheta1 = theta1 = list(tau = c(0.5, 0.5), mu1 = hint[1], mu2 = hint[3], 
-            sigma1 = 0.01, sigma2 = 0.01)
+        otheta1 = theta1 = list(tau = c(0.5, 0.5), mu1 = hint[1], mu2 = hint[3], sigma1 = 0.01, sigma2 = 0.01)
         ok = TRUE
         delta = 0.001
         imax = 50
@@ -95,8 +99,7 @@ genotype = function(nm, ns, hint1, trans, doCNV) {
                 ok1 = ok1 * (abs(theta1$mu1[1] - otheta1$mu1[1]) < delta)
             if (theta1$tau[2] > 0) 
                 ok1 = ok1 * (abs(theta1$mu2[1] - otheta1$mu2[1]) < delta)
-            if (ok1 | is.na(theta1$sigma1) | is.na(theta1$sigma2) | is.infinite(theta1$sigma1) | 
-                is.infinite(theta1$sigma2)) 
+            if (ok1 | is.na(theta1$sigma1) | is.na(theta1$sigma2) | is.infinite(theta1$sigma1) | is.infinite(theta1$sigma2)) 
                 ok = FALSE
             if (ok) {
                 m = (theta1$sigma1 + theta1$sigma2)/2
@@ -115,8 +118,7 @@ genotype = function(nm, ns, hint1, trans, doCNV) {
         tt = table(T[geno2 == -1, ii])
         stt = sort(tt, decreasing = TRUE)[1]
         th = sort(as.numeric(names(tt[tt == stt])), decreasing = TRUE)[1]
-        geno2[geno2 == -1 & T[, ii] >= min(max(T[, ii]), max(median(T[T[, ig[1]] < 
-            0.5, ii]), th))] = ii
+        geno2[geno2 == -1 & T[, ii] >= min(max(T[, ii]), max(median(T[T[, ig[1]] < 0.5, ii]), th))] = ii
         tgeno2[!rmid] = geno2
         if (length(unique(tgeno2[tgeno2 != -1])) == 1) {
             isone = TRUE
@@ -148,8 +150,8 @@ genotype = function(nm, ns, hint1, trans, doCNV) {
             }
         }
         if (!istwo) {
-            otheta1 = theta1 = list(tau = c(1/3, 1/3, 1/3), mu1 = hint[1], mu2 = hint[2], 
-                mu3 = hint[3], sigma1 = 0.1, sigma2 = 0.1, sigma3 = 0.1)
+            #======== test 3
+            otheta1 = theta1 = list(tau = c(1/3, 1/3, 1/3), mu1 = hint[1], mu2 = hint[2], mu3 = hint[3], sigma1 = 0.1, sigma2 = 0.1, sigma3 = 0.1)
             ok = TRUE
             delta = 0.001
             imax = 50
@@ -185,18 +187,15 @@ genotype = function(nm, ns, hint1, trans, doCNV) {
             mm = mm[ig, ]
             out1 = apply(T, 2, max)
             out = rep(1, 3)
-            out[mm[1, 3]] = median(T[T[, mm[1, 1]] < 0.5 & T[, mm[1, 2]] < 0.5, mm[1, 
-                3]])
+            out[mm[1, 3]] = median(T[T[, mm[1, 1]] < 0.5 & T[, mm[1, 2]] < 0.5, mm[1, 3]])
             tt = table(T[geno3 == -1, mm[2, 3]])
             stt = sort(tt, decreasing = TRUE)[1]
             th = sort(as.numeric(names(tt[tt == stt])), decreasing = TRUE)[1]
-            out[mm[2, 3]] = max(median(T[T[, mm[2, 1]] <= min(out[mm[2, 1]], 0.5) & 
-                T[, mm[2, 2]] <= min(out[mm[2, 2]], 0.5), mm[2, 3]]), th)
+            out[mm[2, 3]] = max(median(T[T[, mm[2, 1]] <= min(out[mm[2, 1]], 0.5) & T[, mm[2, 2]] <= min(out[mm[2, 2]], 0.5), mm[2, 3]]), th)
             tt = table(T[geno3 == -1, mm[3, 3]])
             stt = sort(tt, decreasing = TRUE)[1]
             th = sort(as.numeric(names(tt[tt == stt])), decreasing = TRUE)[1]
-            out[mm[3, 3]] = max(median(T[T[, mm[3, 1]] <= min(out[mm[3, 1]], 0.5) & 
-                T[, mm[3, 2]] <= min(out[mm[3, 2]], 0.5), mm[3, 3]]), th)
+            out[mm[3, 3]] = max(median(T[T[, mm[3, 1]] <= min(out[mm[3, 1]], 0.5) & T[, mm[3, 2]] <= min(out[mm[3, 2]], 0.5), mm[3, 3]]), th)
             if (any(is.na(out))) {
                 if (!isone) 
                   geno = test12(tscore2, nm, tgeno2, rmid, thres, iig, nsize)
@@ -224,8 +223,7 @@ genotype = function(nm, ns, hint1, trans, doCNV) {
                 else {
                   if (any(tgeno3 == -1)) 
                     tgeno3 = vdist(adata[, 1], adata[, 2]/5, tgeno3)
-                  tscore3 = silhouette(match(tgeno3[!rmid], unique(tgeno3[!rmid])), 
-                    dist(nm[!rmid]))
+                  tscore3 = silhouette(match(tgeno3[!rmid], unique(tgeno3[!rmid])), dist(nm[!rmid]))
                   if (isone) {
                     geno = test13(tscore3, nm, tgeno3, rmid, geno)
                     v1 = vinotype(nm, ns, geno, doCNV)
@@ -235,8 +233,7 @@ genotype = function(nm, ns, hint1, trans, doCNV) {
                     llr = v1$llr
                   }
                   else {
-                    geno = test123(tscore2, tscore3, nm, tgeno2, tgeno3, rmid, thres, 
-                      iig, nsize)
+                    geno = test123(tscore2, tscore3, nm, tgeno2, tgeno3, rmid, thres, iig, nsize)
                     v1 = vinotype(nm, ns, geno, doCNV)
                     vino = v1$vino
                     conf = v1$conf
@@ -245,14 +242,17 @@ genotype = function(nm, ns, hint1, trans, doCNV) {
                   }
                 }
             }
-        }
+        } # end of if(!istwo)
     }
     list(geno = geno, vino = vino, conf = conf, baf = baf, llr = llr)
 }
 
+# genotyping for the X chromosome (always only two groups)
 genotypeSexchr = function(nm, ns, trans, doCNV) {
     nsize = length(nm)
     hint = c(max(nm), min(nm))
+    
+    # thres is for CCStrans 
     thres = c(-0.4, -0.3, -0.15, 0.15, 0.3, 0.4)
     MAtransthres = c(-0.8, -0.6, -0.3, 0.3, 0.6, 0.8)
     if (is.element(trans, "MAtrans")) 
@@ -277,6 +277,7 @@ genotypeSexchr = function(nm, ns, trans, doCNV) {
         llr = v1$llr
     }
     else if (all(nm[!rmid] <= thres[3] | nm[!rmid] >= thres[4])) {
+        # 1,3
         geno = rep(1, nsize)
         geno[nm < 0] = 3
         v1 = vinotype(nm, ns, geno, doCNV)
@@ -288,8 +289,7 @@ genotypeSexchr = function(nm, ns, trans, doCNV) {
     else {
         adata = cbind(nm, ns/(max(ns) - min(ns)))
         #======== test 2
-        otheta1 = theta1 = list(tau = c(0.5, 0.5), mu1 = hint[1], mu2 = hint[2], 
-            sigma1 = 0.01, sigma2 = 0.01)
+        otheta1 = theta1 = list(tau = c(0.5, 0.5), mu1 = hint[1], mu2 = hint[2], sigma1 = 0.01, sigma2 = 0.01)
         ok = TRUE
         delta = 0.001
         imax = 50
@@ -304,8 +304,7 @@ genotypeSexchr = function(nm, ns, trans, doCNV) {
                 ok1 = ok1 * (abs(theta1$mu1[1] - otheta1$mu1[1]) < delta)
             if (theta1$tau[2] > 0) 
                 ok1 = ok1 * (abs(theta1$mu2[1] - otheta1$mu2[1]) < delta)
-            if (ok1 | is.na(theta1$sigma1) | is.na(theta1$sigma2) | is.infinite(theta1$sigma1) | 
-                is.infinite(theta1$sigma2)) 
+            if (ok1 | is.na(theta1$sigma1) | is.na(theta1$sigma2) | is.infinite(theta1$sigma1) | is.infinite(theta1$sigma2)) 
                 ok = FALSE
             if (ok) {
                 m = (theta1$sigma1 + theta1$sigma2)/2
@@ -324,8 +323,7 @@ genotypeSexchr = function(nm, ns, trans, doCNV) {
         tt = table(T[geno2 == -1, ii])
         stt = sort(tt, decreasing = TRUE)[1]
         th = sort(as.numeric(names(tt[tt == stt])), decreasing = TRUE)[1]
-        geno2[geno2 == -1 & T[, ii] >= min(max(T[, ii]), max(median(T[T[, ig[1]] < 
-            0.5, ii]), th))] = ii
+        geno2[geno2 == -1 & T[, ii] >= min(max(T[, ii]), max(median(T[T[, ig[1]] < 0.5, ii]), th))] = ii
         geno[!rmid] = geno2
         if (length(unique(geno[geno != -1])) == 1) {
             mm = median(nm)
@@ -367,12 +365,13 @@ test123 = function(tscore2, tscore3, nm, tgeno2, tgeno3, rmid, thres,
     if (length(tscore2) < 3) 
         mscore2 = 0
     else mscore2 = mean(tscore2[, 3])
-    d1 = quantile(nm[tgeno3 == 1 & !rmid], 0.1) - quantile(nm[tgeno3 == 2 & !rmid], 
-        0.9)
-    d2 = quantile(nm[tgeno3 == 2 & !rmid], 0.1) - quantile(nm[tgeno3 == 3 & !rmid], 
-        0.9)
-    if (((mscore2 - mscore3 <= 0.1) | mscore3 > 0.8) & (d1 > 0.1 & d2 > 0.1)) 
+    
+    d1 = quantile(nm[tgeno3 == 1 & !rmid], 0.1) - quantile(nm[tgeno3 == 2 & !rmid], 0.9)
+    d2 = quantile(nm[tgeno3 == 2 & !rmid], 0.1) - quantile(nm[tgeno3 == 3 & !rmid], 0.9)
+    if (((mscore2 - mscore3 <= 0.1) | mscore3 > 0.8) & (d1 > 0.1 & d2 > 0.1)) {
+        # three groups
         geno = tgeno3
+    }
     else geno = test12(tscore2, nm, tgeno2, rmid, thres, iig, nsize)
     geno
 }
@@ -381,10 +380,8 @@ test13 = function(tscore3, nm, tgeno3, rmid, geno) {
     if (length(tscore3) < 3) 
         mscore3 = 0
     else mscore3 = mean(tscore3[, 3])
-    d1 = quantile(nm[tgeno3 == 1 & !rmid], 0.1) - quantile(nm[tgeno3 == 2 & !rmid], 
-        0.9)
-    d2 = quantile(nm[tgeno3 == 2 & !rmid], 0.1) - quantile(nm[tgeno3 == 3 & !rmid], 
-        0.9)
+    d1 = quantile(nm[tgeno3 == 1 & !rmid], 0.1) - quantile(nm[tgeno3 == 2 & !rmid], 0.9)
+    d2 = quantile(nm[tgeno3 == 2 & !rmid], 0.1) - quantile(nm[tgeno3 == 3 & !rmid], 0.9)
     if (mscore3 > 0.65 & (d1 > 0.1 & d2 > 0.1)) 
         geno = tgeno3
     geno
@@ -393,8 +390,9 @@ test12 = function(tscore2, nm, tgeno, rmid, thres, iig, nsize) {
     if (length(tscore2) < 3) 
         mscore = 0
     else mscore = mean(tscore2[, 3])
-    d = quantile(nm[tgeno == 1 & !rmid], 0.1) - quantile(nm[tgeno == 2 & !rmid], 
-        0.9)
+    d = quantile(nm[tgeno == 1 & !rmid], 0.1) - quantile(nm[tgeno == 2 & !rmid], 0.9)
+    
+    # two group
     if (mscore > 0.6 & d > 0.1) {
         if (length(iig) == 0) {
             tmp = c(median(nm[tgeno == 1]), median(nm[tgeno == 2]))
@@ -465,8 +463,7 @@ M.step3 <- function(T, data) {
         mu3 = weighted.mean(data, T[, 3])
         sigma3 = cov.wt(matrix(data, ncol = 1), T[, 3])$cov
     }
-    list(tau = tau, mu1 = mu1, mu2 = mu2, mu3 = mu3, sigma1 = sigma1, sigma2 = sigma2, 
-        sigma3 = sigma3)
+    list(tau = tau, mu1 = mu1, mu2 = mu2, mu3 = mu3, sigma1 = sigma1, sigma2 = sigma2, sigma3 = sigma3)
 }
 
 E.step2 <- function(theta, data) {

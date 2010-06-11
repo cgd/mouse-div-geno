@@ -11,9 +11,12 @@ penCNVinput = function(chrid, mpos, exon1info, exon2info, celfiledir,
             exon2info$chrid, exon2info$mpos, exon2info$exon2, exon2info$CGFLcorrection, 
             exon2info$reference, filenames, mchr)
     for (chri in mchr) {
+        # load BAF
         xname = paste(snpsavefiledir, "/baf", chri, sep = "", collapse = "")
         load(xname)
         file.remove(xname)
+        
+        # load LLR
         xname = paste(snpsavefiledir, "/llr", chri, sep = "", collapse = "")
         load(xname)
         file.remove(xname)
@@ -83,6 +86,8 @@ igp = function(celfiledir, outfiledir, outfilename, id, chrid, mpos, ename,
     for (i in 1:nfile) {
         y = as.matrix(read.celfile(as.character(filenames[i]), intensity.means.only = TRUE)[["INTENSITY"]][["MEAN"]][id])
         y = log2(y)
+        
+        # GC and fragment length correct y
         y = y + CGFLcorrection
         y <- normalize.quantiles.use.target(y, target = reference)
         y <- subColSummarizeMedian(matrix(y, ncol = 1), ename)

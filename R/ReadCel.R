@@ -57,7 +57,8 @@ ReadCelFile = function(celfiledir, outfiledir, allid, ABid, chrid, CGFLcorrectio
     for (i in 1:nfile) {
         y = as.matrix(read.celfile(as.character(filenames[i]), intensity.means.only = TRUE)[["INTENSITY"]][["MEAN"]][allid])
         y = log2(y)
-        if (length(CGFLcorrection) > 0) 
+        if (length(CGFLcorrection) > 0)
+            # C+G and fragment length correction y
             y = y + CGFLcorrection
         if (length(reference) > 0) 
             y <- normalize.quantiles.use.target(y, target = reference)
@@ -66,20 +67,20 @@ ReadCelFile = function(celfiledir, outfiledir, allid, ABid, chrid, CGFLcorrectio
         allAint <- subColSummarizeMedian(matrix(allAint, ncol = 1), SNPname)
         allBint <- subColSummarizeMedian(matrix(allBint, ncol = 1), SNPname)
         if (is.element(trans, "CCStrans")) {
+            # fixed K??
             res = ccstrans(2^allAint, 2^allBint)
             M = res$x
             S = res$y
         }
         if (is.element(trans, "MAtrans")) {
+            # then prior??
             M = allAint - allBint
             S = (allAint + allBint)/2
         }
-        xname1 = paste(outfiledir, "/", gsub(".CEL", "intensity", filenames[i]), 
-            sep = "", collapse = "")
+        xname1 = paste(outfiledir, "/", gsub(".CEL", "intensity", filenames[i]), sep = "", collapse = "")
         save(M, S, file = xname1)
         for (chri in mchr) {
-            xname2 = paste(outfiledir, "/", gsub(".CEL", "CHR", filenames[i]), chri, 
-                sep = "", collapse = "")
+            xname2 = paste(outfiledir, "/", gsub(".CEL", "CHR", filenames[i]), chri, sep = "", collapse = "")
             MM1 = M[chrid == chri, ]
             SS1 = S[chrid == chri, ]
             save(MM1, SS1, file = xname2)
@@ -90,8 +91,8 @@ ReadCelFile = function(celfiledir, outfiledir, allid, ABid, chrid, CGFLcorrectio
     for (chri in mchr) {
         MM = SS = NULL
         for (i in 1:nfile) {
-            xname1 = paste(outfiledir, "/", gsub(".CEL", "CHR", filenames[i]), chri, 
-                sep = "", collapse = "")
+            xname1 = paste(outfiledir, "/", gsub(".CEL", "CHR", filenames[i]), chri, sep = "", collapse = "")
+            # origa,origb
             load(xname1)
             MM = cbind(MM, MM1)
             SS = cbind(SS, SS1)
@@ -234,6 +235,7 @@ genotypethis = function(savefiledir, MM, SS, hint, isMale, trans, chr,
         ep = c(sp[2:lls] - 1, length(id))
         n = sum(!isMale)
         if (n > 1) {
+            # for female three groups
             confm = genom = vinom = bafm = llrm = NULL
             sMM = MM[id, !isMale]
             sSS = SS[id, !isMale]
@@ -265,6 +267,7 @@ genotypethis = function(savefiledir, MM, SS, hint, isMale, trans, chr,
         }
         n = sum(isMale)
         if (n > 1) {
+            # for male two groups
             confm = genom = vinom = bafm = llrm = NULL
             sMM = MM[id, isMale]
             sSS = SS[id, isMale]
@@ -334,8 +337,8 @@ genotypethis = function(savefiledir, MM, SS, hint, isMale, trans, chr,
         conf = geno = vino = baf = llr = matrix(-1, nn, n)
         n = sum(isMale)
         if (n > 1) {
-            geno1 = apply(cbind(MM[, isMale], SS[, isMale]), 1, function(x, trans, 
-                doCNV, n) {
+            # for male two groups
+            geno1 = apply(cbind(MM[, isMale], SS[, isMale]), 1, function(x, trans, doCNV, n) {
                 b = genotypeSexchr(x[1:n], x[(n + 1):(2 * n)], trans, doCNV)
                 c(b$geno, b$vino, b$conf, b$baf, b$llr)
             }, trans, doCNV, n)

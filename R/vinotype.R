@@ -117,6 +117,7 @@ vinotype = function(nm, ns, geno, doCNV) {
     }
     #=========== test 2 vs. 3
     if (ngeno == 3) {
+        # three groups; # lower BIC better fit.
         l1 = sum(geno == 1)
         l2 = sum(geno == 2)
         l3 = sum(geno == 3)
@@ -224,6 +225,7 @@ CNVinput = function(nm, ns, geno, mm, ms, ss, nsize, ngeno, iig) {
     if (ngeno == 2) {
         id = sum(iig)
         if (id == 4) {
+            # 1,3
             c1 = sqrt(ss[[1]][1, 1])
             c3 = sqrt(ss[[3]][1, 1])
             s1 = sqrt(ss[[1]][2, 2])
@@ -247,6 +249,7 @@ CNVinput = function(nm, ns, geno, mm, ms, ss, nsize, ngeno, iig) {
             }
         }
         if (id == 5) {
+            # 2,3
             c2 = sqrt(ss[[2]][1, 1])
             c3 = sqrt(ss[[3]][1, 1])
             s2 = sqrt(ss[[2]][2, 2])
@@ -270,6 +273,7 @@ CNVinput = function(nm, ns, geno, mm, ms, ss, nsize, ngeno, iig) {
             }
         }
         if (id == 3) {
+            # 1,2
             c1 = sqrt(ss[[1]][1, 1])
             c2 = sqrt(ss[[2]][1, 1])
             s1 = sqrt(ss[[1]][2, 2])
@@ -309,5 +313,3 @@ CNVinput = function(nm, ns, geno, mm, ms, ss, nsize, ngeno, iig) {
     }
     list(BAF = BAF, llr = llr)
 }
-
- 
