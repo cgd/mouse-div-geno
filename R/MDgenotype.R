@@ -11,6 +11,7 @@ MouseDivGenotype = function(allid, ABid, chrid, CGFLcorrection = NULL,
     reference = NULL, hint = NULL, trans = c("CCStrans", "MAtrans"), celnamefile = NULL, 
     mchr = c(1:19, "X", "Y", "M"), celfiledir, outfiledir, subset = FALSE, doCNV = FALSE, 
     exon1info = NULL, exon2info = NULL, exonoutfiledir, cnvoutfiledir, verbose = FALSE) {
+    
     library("affyio")
     library("preprocessCore")
     library("cluster")
@@ -76,25 +77,28 @@ MouseDivGenotype = function(allid, ABid, chrid, CGFLcorrection = NULL,
         allBint = y[Bid, 1, drop = FALSE]
         allAint <- subColSummarizeMedian(matrix(allAint, ncol = 1), SNPname)
         allBint <- subColSummarizeMedian(matrix(allBint, ncol = 1), SNPname)
-        if (is.element(trans, "CCStrans")) {
+        if (trans == "CCStrans") {
             # fixed K??
             res = ccstrans(2^allAint, 2^allBint)
             M = res$x
             S = res$y
         }
-        if (is.element(trans, "MAtrans")) {
+        else if (trans == "MAtrans") {
             # then prior??
             M = allAint - allBint
             S = (allAint + allBint)/2
+        }
+        else {
+            stop(paste("bad transformation argument:", trans))
         }
         
         # divide CEL file up into chromosome pieces
         for (chri in mchr1) {
             currRows <- which(chrid == chri)
-            if(length(currRows) == 0)
-            {
-                stop("Failed to find any probes on chromosome ", chri);
-            }
+#            if(length(currRows) == 0)
+#            {
+#                stop("Failed to find any probes on chromosome ", chri);
+#            }
             
             xname2 = paste(outfiledir, "/", gsub(".CEL", "CHR", filenames[i]), chri, sep = "", collapse = "")
             if(verbose)
