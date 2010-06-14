@@ -42,28 +42,45 @@ vinotype = function(nm, ns, geno, doCNV) {
     #=========== find centers
     iig = sort(unique(geno))
     ngeno = length(iig)
-    if (ngeno == 1) 
+    
+    # key ideas:
+    #   * get some kind of threshold which is mms to decide if there
+    #     is no chance of being vino
+    #   * if there are many vinos it will bring down the whole threshold
+    #   * often vino is near H rather than A or B
+    if (ngeno == 1) {
         mms = median(ns)
-    if (ngeno == 3) 
-        mms = min(tapply(ns[geno == 1 | geno == 3], geno[geno == 1 | geno == 3], 
-            median))
-    if (ngeno == 2) {
+    }
+    else if (ngeno == 3) {
+        # for 3 we can use median pair
+        mms = min(tapply(ns[geno == 1 | geno == 3], geno[geno == 1 | geno == 3], median))
+    }
+    else if (ngeno == 2) {
+        # for 2 group case we want to get rid of H's when calcing the MMS threshold
         k = tapply(nm, geno, median)
         g = match(geno, names(k[k < -0.3 | k > 0.3]))
-        if (sum(!is.na(g)) > 1) 
+        if (sum(!is.na(g)) > 1) {
             mms = min(tapply(ns[!is.na(g)], geno[!is.na(g)], median))
-        else mms = median(ns)
+        }
+        else {
+            mms = median(ns)
+        }
     }
     mm = ms = rep(0, 3)
     adata = cbind(nm, ns)
     nsize = length(geno)
     vino = rep(-1, nsize)
+    
+    # 2 indicates it's definitely not a vino
     vino[(ns > mms)] = 2
     vino1 = vino
     ss = list()
     m = matrix(0, 2, 2)
     lm = 0
+    
+    # iterate through the genotypes
     for (ik in iig) {
+        # count how many genos match the current genotype
         l = sum(geno == ik)
         if (l > 1) {
             nns = ns[geno == ik]
@@ -71,24 +88,36 @@ vinotype = function(nm, ns, geno, doCNV) {
             onn = order(nns)
             onns = nns[onn]
             onnm = nnm[onn]
+            
+            # th => which indices might be vinos
             th = which(onns < mms)
             if (length(th) > 0) {
                 th = max(th)
                 if (l > th) 
                   th = th + 1
+                
+                # calculates the difference between nearest ns's
                 donns = diff(onns)
+                
+                # when gap is big that's captured by boxplot's b$out
+                # using a big range (5) allows us to detect outliers
                 tb = boxplot(donns, range = 5, plot = FALSE)
                 if (sum(tb$out > 0.2) > 0) {
+                  # gap is big and > 0.2 (extreme cases)
                   tb$out = tb$out[tb$out > 0.2]
                   k = match(tb$out, donns)
                   k = k[k < th]
                   if (length(k) > 0) {
+                    # find them and mark them as vino here
                     vino[geno == 2 & ns <= onns[max(k)]] = 1
                   }
                 }
             }
             mm[ik] = median(nnm)
             ms[ik] = median(nns)
+            
+            # ss contains variance
+            # TODO more comment needed here to explain what's going on
             ssm = matrix(0, 2, 2)
             ssm[1, 1] = bivar(nnm)
             ssm[2, 2] = bivar(nns)
@@ -125,8 +154,12 @@ vinotype = function(nm, ns, geno, doCNV) {
         th = c(0.99, 0.95, 0.99)
         if (l1 > 1 & det(ss[[1]]) > 10^(-10)) {
             tmp = mahalanobis(adata[geno == 1, ], c(mm[1], ms[1]), ss[[1]])
+            
+            # dd1 gives (1 - prob) here
             dd1 = pchisq(tmp, df = 2)
             mdd[geno == 1] = dd1
+            
+            # vino1 only for aa group, (=2 means not a vino for sure)
             vino1[geno == 1][dd1 < th[1]] = 2
         }
         if (l2 > 1 & det(ss[[2]]) > 10^(-10)) {
@@ -168,13 +201,23 @@ vinotype = function(nm, ns, geno, doCNV) {
         mdd = pchisq(tmp, df = 2)
         vino1[mdd < 0.99] = 2
     }
+    
+    # vino is product of 2 probs. IE: assuming our 2D intensity plot, how far
+    # off of center are we in any direction
+    # (left, right and up all lead to high mdd)
+    # For vinos we are only interested in case where intensity is really low,
+    # so we assume intensity follows normal dist using the (==2) vals which we
+    # know are not vinos
     alld = 1 - pnorm(ns, mean = mean(ns[vino1 == 2]), sd = sd(ns[vino1 == 2]))
+    
     # vino = outlier with in each group & low intensity
     k = alld * mdd
     vino[(vino1 != 2 & k > 0.9999)] = 1
     ons = order(ns)
     sn = ns[ons]
     dsn = diff(sn)
+    
+    # if gap is really big give a vino flag
     if (any(dsn > 1.5)) {
         bdsn = dsn[dsn > 1.5]
         g = match(bdsn, dsn)
@@ -183,8 +226,12 @@ vinotype = function(nm, ns, geno, doCNV) {
         if (length(g) > 0) 
             vino[ns <= sn[max(g)]] = 1
     }
-    if (any(vino == 1) & any(vino == -1)) 
+    
+    if (any(vino == 1) & any(vino == -1)) {
+        # pick up remaining vinos using vdist clustering
         vino = vdist(nm/5, ns/(2 * (max(ns) - min(ns))), vino)
+    }
+    
     list(vino = vino, conf = mdd, BAF = BAF, llr = llr)
 }
 
