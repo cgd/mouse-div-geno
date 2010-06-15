@@ -46,7 +46,7 @@ MouseDivGenotype = function(allid, ABid, chrid, CGFLcorrection = NULL,
         filenames = tmp[isCel]
     }
     else {
-        filenames = read.table(celnamefile, header = TRUE)
+        filenames = read.delim(celnamefile, header = TRUE)
         if (ncol(filenames) > 1) 
             gender = filenames[, 2]
         filenames = filenames[, 1]
@@ -216,7 +216,7 @@ MouseDivGenotype = function(allid, ABid, chrid, CGFLcorrection = NULL,
             genotypethis(outfiledir, MMy, SSy, NULL, isMale, trans, "Y", doCNV)
     }
     if (doCNV) {
-        penCNVinput(chrid, mpos, exon1info, exon2info, celfiledir, filenames, outfiledir, exonoutfiledir, cnvoutfiledir, mchr)
+        pennCNVinput(chrid, mpos, exon1info, exon2info, celfiledir, filenames, outfiledir, exonoutfiledir, cnvoutfiledir, mchr)
     }
 }
 

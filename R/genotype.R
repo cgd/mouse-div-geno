@@ -16,7 +16,7 @@
 # nm = MM[1,]; ns = SS[1,]
 # geno = genotype(nm, ns, hint = NULL)
 #======================================================================
-genotype = function(nm, ns, hint1, trans, doCNV) {
+genotype = function(nm, ns, hint1, trans, doCNV = FALSE) {
     hint = rep(0, 3)
     hint[1] = max(nm)
     hint[3] = min(nm)
@@ -468,7 +468,7 @@ test123 = function(tscore2, tscore3, nm, tgeno2, tgeno3, rmid, thres, iig, nsize
     # calculates the difference between the 0.1 and 0.9 quantiles
     d1 = quantile(nm[tgeno3 == 1 & !rmid], 0.1) - quantile(nm[tgeno3 == 2 & !rmid], 0.9)
     d2 = quantile(nm[tgeno3 == 2 & !rmid], 0.1) - quantile(nm[tgeno3 == 3 & !rmid], 0.9)
-    if (((mscore2 - mscore3 <= 0.1) | mscore3 > 0.8) & (d1 > 0.1 & d2 > 0.1)) {
+    if (((mscore2 - mscore3 <= 0.15) | mscore3 > 0.8) & (d1 > 0.1 & d2 > 0.1)) {
         # three groups
         geno = tgeno3
     }

@@ -165,8 +165,7 @@ ccstrans = function(a, b, k = 4) {
 # This is the function to genotype and vinotype the array
 #
 #########################################################################
-genotypethis = function(savefiledir, MM, SS, hint, isMale, trans, chr, 
-    doCNV) {
+genotypethis = function(savefiledir, MM, SS, hint = NULL, isMale, trans, chr, doCNV = FALSE) {
     library(cluster)
     n = ncol(MM)
     nn = nrow(MM)

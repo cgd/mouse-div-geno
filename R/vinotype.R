@@ -38,10 +38,13 @@ bivar <- function(x) {
     bi <- top/botx
     bi
 }
-vinotype = function(nm, ns, geno, doCNV) {
+vinotype = function(nm, ns, geno, doCNV = FALSE) {
     #=========== find centers
     iig = sort(unique(geno))
     ngeno = length(iig)
+    
+    # identifies likely H's
+    rmid = nm >= -0.3 & nm <= 0.3 & ns < quantile(ns, 0.2)
     
     # key ideas:
     #   * get some kind of threshold which is mms to decide if there
@@ -49,22 +52,14 @@ vinotype = function(nm, ns, geno, doCNV) {
     #   * if there are many vinos it will bring down the whole threshold
     #   * often vino is near H rather than A or B
     if (ngeno == 1) {
-        mms = median(ns)
+        mms = median(ns[!rmid])
     }
     else if (ngeno == 3) {
         # for 3 we can use median pair
         mms = min(tapply(ns[geno == 1 | geno == 3], geno[geno == 1 | geno == 3], median))
     }
     else if (ngeno == 2) {
-        # for 2 group case we want to get rid of H's when calcing the MMS threshold
-        k = tapply(nm, geno, median)
-        g = match(geno, names(k[k < -0.3 | k > 0.3]))
-        if (sum(!is.na(g)) > 1) {
-            mms = min(tapply(ns[!is.na(g)], geno[!is.na(g)], median))
-        }
-        else {
-            mms = median(ns)
-        }
+        mms = min(tapply(ns[!rmid], geno[!rmid], median))
     }
     mm = ms = rep(0, 3)
     adata = cbind(nm, ns)
