@@ -203,7 +203,7 @@ genotype = function(nm, ns, hint1, trans, doCNV = FALSE) {
                 tgeno2 = vdist(adata[, 1], adata[, 2]/5, tgeno2)
             
             tscore2 = silhouette(match(tgeno2[!rmid], unique(tgeno2[!rmid])), dist(nm[!rmid]))
-            if(is.na(tscore2)) stop("Internal Error: silhouette score is NA")
+            if(any(is.na(tscore2))) stop("Internal Error: silhouette score is NA")
             
             if (istwo) {
                 # test if it's one group or two group

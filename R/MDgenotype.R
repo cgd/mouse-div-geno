@@ -95,10 +95,10 @@ MouseDivGenotype = function(allid, ABid, chrid, CGFLcorrection = NULL,
         # divide CEL file up into chromosome pieces
         for (chri in mchr1) {
             currRows <- which(chrid == chri)
-#            if(length(currRows) == 0)
-#            {
-#                stop("Failed to find any probes on chromosome ", chri);
-#            }
+            if(length(currRows) == 0)
+            {
+                stop("Failed to find any probes on chromosome ", chri);
+            }
             
             xname2 = paste(outfiledir, "/", gsub(".CEL", "CHR", filenames[i]), chri, sep = "", collapse = "")
             if(verbose)
@@ -219,5 +219,3 @@ MouseDivGenotype = function(allid, ABid, chrid, CGFLcorrection = NULL,
         pennCNVinput(chrid, mpos, exon1info, exon2info, celfiledir, filenames, outfiledir, exonoutfiledir, cnvoutfiledir, mchr)
     }
 }
-
- 
