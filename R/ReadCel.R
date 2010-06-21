@@ -409,3 +409,92 @@ genotypethis = function(savefiledir, MM, SS, hint = NULL, isMale, trans, chr, do
         }
     }
 } 
+
+# reads in the given CEL file, partitions it into groups defined by groupLevels
+# then breaks up those groups into chunk sizes no bigger than maxChunkSize
+# groups should be factors where
+normalizeCelFileByChr <- function(
+    celFileName,
+    probesetChunkSize,
+    verbose,
+    allid,
+    Aid,
+    Bid,
+    CGFLcorrection,
+    reference,
+    SNPname,
+    trans,
+    mchr1,
+    chrid)
+{
+    if(verbose) cat("Reading CEL file: ", celFileName, "\n", sep="")
+    
+    celData <- read.celfile(celFileName, intensity.means.only = TRUE)
+    y <- log2(as.matrix(celData[["INTENSITY"]][["MEAN"]][allid]))
+    if (length(CGFLcorrection) > 0)
+        # C+G and fragment length correction y
+        y = y + CGFLcorrection
+    if (length(reference) > 0) 
+        y <- normalize.quantiles.use.target(y, target = reference)
+    
+    # separate A alleles from B alleles
+    allAint = y[Aid, 1, drop = FALSE]
+    allBint = y[Bid, 1, drop = FALSE]
+    allAint <- subColSummarizeMedian(matrix(allAint, ncol = 1), SNPname)
+    allBint <- subColSummarizeMedian(matrix(allBint, ncol = 1), SNPname)
+    if (trans == "CCStrans") {
+        # fixed K??
+        res = ccstrans(2^allAint, 2^allBint)
+        M = res$x
+        S = res$y
+    }
+    else if (trans == "MAtrans") {
+        # then prior??
+        M = allAint - allBint
+        S = (allAint + allBint)/2
+    }
+    else {
+        stop(paste("bad transformation argument:", trans))
+    }
+    
+    # divide CEL file up into chromosome pieces
+    msList <- list()
+    for (chri in mchr1) {
+        currRows <- which(chrid == chri)
+        numCurrRows <- length(currRows)
+        if(numCurrRows == 0)
+        {
+            stop("Failed to find any probes on chromosome ", chri);
+        }
+        
+        msList[[as.character(chri)]]$M <- M
+        msList[[as.character(chri)]]$S <- S
+    }
+    
+    msList
+}
+
+chunkIndices <- function(to, by) {
+    chunks <- list()
+    chunkNumber <- 0
+    for(chunkStart in seq(from = 1, to = to, by = by))
+    {
+        chunkEnd <- chunkStart + by - 1
+        if(chunkEnd > to)
+        {
+            chunkEnd <- to
+        }
+        
+        chunkNumber <- chunkNumber + 1
+        chunks[[chunkNumber]] <- list(start=chunkStart, end=chunkEnd)
+    }
+    
+    chunks
+}
+
+chunkFileName <- function(baseDir, celFileName, chrName, chunk) {
+    fileBase <- sub("\\..*$", "", celFileName)
+    chunkFile <- paste(fileBase, "_", chunk$start, "-", chunk$end, sep="")
+    
+    file.path(baseDir, chunkFile)
+}
