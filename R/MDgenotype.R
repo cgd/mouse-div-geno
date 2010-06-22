@@ -7,15 +7,20 @@
 # This is the main function to genotype the Mouse Diversity Array.
 #
 #########################################################################
+
+#TODO REMOVE ME KEITH!!!
+library("snow")
+
+library("affyio")
+library("preprocessCore")
+library("cluster")
+#library("time")
+
 MouseDivGenotype = function(allid, ABid, chrid, CGFLcorrection = NULL, 
     reference = NULL, hint = NULL, trans = c("CCStrans", "MAtrans"), celnamefile = NULL, 
     mchr = c(1:19, "X", "Y", "M"), celfiledir, outfiledir, subset = FALSE, doCNV = FALSE, 
-    exon1info = NULL, exon2info = NULL, exonoutfiledir, cnvoutfiledir, verbose = FALSE) {
-    
-    library("affyio")
-    library("preprocessCore")
-    library("cluster")
-    #library("time")
+    exon1info = NULL, exon2info = NULL, exonoutfiledir, cnvoutfiledir, verbose = FALSE,
+    cluster = NULL, probesetChunkSize=1000) {
     
     trans = match.arg(trans)
     if (missing(celfiledir)) 
@@ -53,64 +58,82 @@ MouseDivGenotype = function(allid, ABid, chrid, CGFLcorrection = NULL,
     }
     nfile = length(filenames)
     
-    # read individual files
+    # make sure that the chromosome vector is not numeric
+    mchr <- as.character(mchr)
+    
+    # we need both X and Y to determine sex so if the caller asks for either
+    # then we need to read both
     iiy = !is.na(match("Y", mchr))
     iix = !is.na(match("X", mchr))
     mchr1 = mchr
     if (iiy | iix) 
         mchr1 = unique(c(mchr, "X", "Y"))
     
-    # iter through CEL files
-    for (i in 1:nfile) {
-        if(verbose) cat("Reading and normalizing CEL file: ", filenames[i], "\n", sep="")
-        
-        y = as.matrix(read.celfile(as.character(filenames[i]), intensity.means.only = TRUE)[["INTENSITY"]][["MEAN"]][allid])
-        y = log2(y)
-        if (length(CGFLcorrection) > 0)
-            # C+G and fragment length correction y
-            y = y + CGFLcorrection
-        if (length(reference) > 0) 
-            y <- normalize.quantiles.use.target(y, target = reference)
-        
-        # separate a alleles from be alleles
-        allAint = y[Aid, 1, drop = FALSE]
-        allBint = y[Bid, 1, drop = FALSE]
-        allAint <- subColSummarizeMedian(matrix(allAint, ncol = 1), SNPname)
-        allBint <- subColSummarizeMedian(matrix(allBint, ncol = 1), SNPname)
-        if (trans == "CCStrans") {
-            # fixed K??
-            res = ccstrans(2^allAint, 2^allBint)
-            M = res$x
-            S = res$y
+    # figure out how many chunks there will be per chromosome
+    chrChunks <- list()
+    chrCount <- length(mchr1)
+    for(i in 1 : chrCount)
+    {
+        currChr <- mchr1[[i]]
+        chrProbesetCount <- sum(chrid == currChr)
+        chrChunks[[currChr]] <- chunkIndices(chrProbesetCount, probesetChunkSize)
+    }
+    
+    # loop through all the CELL files. We need to read and normalize the CEL
+    # file data and save it to file in chunks no bigger than probesetChunkSize
+    for(celfile in filenames)
+    {
+        # wrapping this up as a local function def
+        # allows us to avoid the normalization work unless it's necessary
+        makeMsList <- function()
+        {
+            normalizeCelFileByChr(
+                celfile,
+                probesetChunkSize,
+                verbose,
+                allid,
+                Aid,
+                Bid,
+                CGFLcorrection,
+                reference,
+                SNPname,
+                trans,
+                mchr1,
+                chrid)
         }
-        else if (trans == "MAtrans") {
-            # then prior??
-            M = allAint - allBint
-            S = (allAint + allBint)/2
-        }
-        else {
-            stop(paste("bad transformation argument:", trans))
-        }
+        msList <- NULL
         
-        # divide CEL file up into chromosome pieces
-        for (chri in mchr1) {
-            currRows <- which(chrid == chri)
-            if(length(currRows) == 0)
-            {
-                stop("Failed to find any probes on chromosome ", chri);
-            }
+        for(i in 1 : chrCount)
+        {
+            currChr <- mchr1[[i]]
             
-            xname2 = paste(outfiledir, "/", gsub(".CEL", "CHR", filenames[i]), chri, sep = "", collapse = "")
-            if(verbose)
+            for(chunkIndex in 1 : length(chrChunks[[currChr]]))
             {
-                cat("Saving ", length(currRows),
-                    " probes in chromosome ", chri, " to ", xname2, "\n", sep="")
+                chunkFile <- chunkFileName(outfiledir, celfile, currChr, probesetChunkSize, chunkIndex)
+                if(!file.exists(chunkFile))
+                {
+                    # if we haven't yet normalized the CEL file we'll have to
+                    # do that now
+                    if(is.null(msList))
+                    {
+                        msList <- makeMsList()
+                    }
+                    
+                    cat("writing to ", chunkFile, "\n", sep="")
+                    
+                    chunk <- chrChunks[[currChr]][[chunkIndex]]
+                    indices <- chunk$start : chunk$end
+                    mChunk <- msList[[i]]$M[indices]
+                    sChunk <- msList[[i]]$S[indices]
+                    
+                    save(mChunk, sChunk, file = chunkFile)
+                }
             }
-            
-            MM1 = M[currRows, ]
-            SS1 = S[currRows, ]
-            save(MM1, SS1, file = xname2)
         }
+        
+        msList <- NULL
+        
+        firstCelFile <- FALSE
     }
     
     # combine all sampels and genotype by chromosomes
@@ -119,40 +142,52 @@ MouseDivGenotype = function(allid, ABid, chrid, CGFLcorrection = NULL,
     ii = match(mchr1, mchr)
     mchr1 = mchr1[!is.na(ii)]
     for (chri in mchr1) {
-        if(verbose) cat("geno/vinotyping chromosome ", chri, "\n", sep="")
+        #for(chunk in chrChunks[[currChr]])
+        for(chunkIndex in 1 : length(chrChunks[[chrif]]))
+        {
+            chunk <- chrChunks[[chri]][[chunkIndex]]
+            if(verbose) {
+                cat("geno/vinotyping chromosome ", chri,
+                    " from probeset #", chunk$start,
+                    " to probeset #", chunk$end, "\n", sep="")
+            }
+            
+            #startTime <- getTime()
         
-        #startTime <- getTime()
-    
-        # paste the chromosomes together for genotyping
-        MM = SS = NULL
-        for (i in 1:nfile) {
-            xname1 = paste(outfiledir, "/", gsub(".CEL", "CHR", filenames[i]), chri, sep = "", collapse = "")
-            # origa,origb
-            load(xname1)
-            MM = cbind(MM, MM1)
-            SS = cbind(SS, SS1)
-            rm(MM1, SS1)
-            file.remove(xname1)
+            # paste the chromosomes together for genotyping
+            MM = SS = NULL
+            for (i in 1:nfile) {
+                chunkFile <- chunkFileName(outfiledir, filenames[i], chri, probesetChunkSize, chunkIndex)
+                load(chunkFile)
+                MM = cbind(MM, mChunk)
+                SS = cbind(SS, sChunk)
+                rm(mChunk, sChunk)
+            }
+            
+            # TODO reduce the number of samples we're taking based on the
+            #      chunk size
+            if (!is.na(match(chri, c(1:19)))) 
+                autoint = c(autoint, mean(SS[sample(c(1:nrow(SS)), 100), ]))
+            colnames(MM) <- filenames
+            colnames(SS) <- filenames
+            
+            isMale = rep(TRUE, ncol(MM))
+            
+            chunkIndices <- chunk$start : chunk$end
+            if (length(hint) == 0)
+                hint1 = NULL
+            else
+                hint1 = hint[[chri]][chunkIndices]
+            
+            #cat("time it took us to get to genotypethis\n")
+            #timeReport(startTime)
+            
+            #startTime <- getTime()
+            genos <- genotypeAutosomeChunk(MM, SS, hint1, isMale, trans, doCNV)
+            
+            #cat("time it took us to complete genotypethis\n")
+            #timeReport(startTime)
         }
-        if (!is.na(match(chri, c(1:19)))) 
-            autoint = c(autoint, mean(SS[sample(c(1:nrow(SS)), 100), ]))
-        xname = paste(outfiledir, "/rawdataMMchr", chri, sep = "", collapse = "")
-        colnames(MM) = colnames(SS) = filenames
-        save(MM, file = xname)
-        xname = paste(outfiledir, "/rawdataSSchr", chri, sep = "", collapse = "")
-        save(SS, file = xname)
-        isMale = rep(TRUE, ncol(MM))
-        if (length(hint) == 0) 
-            hint1 = NULL
-        else
-            hint1 = hint[[chri]]
-        #cat("time it took us to get to genotypethis\n")
-        #timeReport(startTime)
-        
-        #startTime <- getTime()
-        genotypethis(outfiledir, MM, SS, hint1, isMale, trans, chri, doCNV)
-        #cat("time it took us to complete genotypethis\n")
-        #timeReport(startTime)
     }
     
     if (iix | iiy) {
@@ -164,7 +199,6 @@ MouseDivGenotype = function(allid, ABid, chrid, CGFLcorrection = NULL,
             MM = cbind(MM, MM1)
             SS = cbind(SS, SS1)
             rm(MM1, SS1)
-            file.remove(xname1)
         }
         intY = apply(SS, 2, mean)
         if (iiy) {
@@ -183,7 +217,6 @@ MouseDivGenotype = function(allid, ABid, chrid, CGFLcorrection = NULL,
             MM = cbind(MM, MM1)
             SS = cbind(SS, SS1)
             rm(MM1, SS1)
-            file.remove(xname1)
         }
         intX = apply(SS, 2, mean)
         if (iix) {

@@ -18,6 +18,8 @@
 # output : isMale = computed gender
 #
 #########################################################################
+library("cluster")
+
 ReadCelFile = function(celfiledir, outfiledir, allid, ABid, chrid, CGFLcorrection = NULL, 
     reference = NULL, trans = c("CCStrans", "MAtrans"), celnamefile = NULL, subset = FALSE) {
     library(affyio)
@@ -127,6 +129,7 @@ ReadCelFile = function(celfiledir, outfiledir, allid, ABid, chrid, CGFLcorrectio
     isMale
 }
 computegender = function(intX, intY, autoint) {
+    # todo learn about constant used here
     if (length(autoint) < 1) 
         autoint = 7.362069
     n = length(intX)
@@ -156,6 +159,56 @@ ccstrans = function(a, b, k = 4) {
     list(x = x, y = y)
 }
 
+genotypeAutosomeChunk <- function(ms, ss, hint, isMale, trans, doCNV)
+{
+    numArrays <- ncol(ms)
+    numProbesets <- nrow(ms)
+    
+    if(ncol(ss) != numArrays)
+    {
+        stop("Internal error: ms column count should match ss column count")
+    }
+    
+    if(length(hint) == 0)
+    {
+        hint <- rep(0, numProbesets)
+    }
+    
+    # geno/vinotype each of the probesets in this chunk and
+    # append the results to the chunkResult data frame
+    chunkResult <- data.frame()
+    for(probesetIndex in 1 : numProbesets)
+    {
+        currVals <- genotype(
+            ms[probesetIndex, ],
+            ss[probesetIndex, ],
+            hint[probesetIndex],
+            trans,
+            doCNV)
+        
+        if(doCNV)
+        {
+            currRow <- data.frame(
+                geno = currVals$geno,
+                vino = currVals$vino,
+                conf = currVals$conf,
+                baf = currVals$baf,
+                llr = currVals$llr)
+        }
+        else
+        {
+            currRow <- data.frame(
+                geno = currVals$geno,
+                vino = currVals$vino,
+                conf = currVals$conf)
+        }
+        
+        chunkResult <- rbind(chunkResult, currRow)
+    }
+    
+    chunkResult
+}
+
 #########################################################################
 #
 # genotypethis.R
@@ -166,7 +219,6 @@ ccstrans = function(a, b, k = 4) {
 #
 #########################################################################
 genotypethis = function(savefiledir, MM, SS, hint = NULL, isMale, trans, chr, doCNV = FALSE) {
-    library(cluster)
     n = ncol(MM)
     nn = nrow(MM)
     if (length(hint) == 0) 
@@ -188,6 +240,8 @@ genotypethis = function(savefiledir, MM, SS, hint = NULL, isMale, trans, chr, do
             #startTime <- getTime()
             
             tmp = sp[iter]:ep[iter]
+            
+            # applies the genotype function to all of the probes in this chunk
             genom = apply(cbind(MM[tmp, ], SS[tmp, ], hint[tmp]), 1, function(x, 
                 trans, doCNV, n) {
                 b = genotype(x[1:n], x[(n + 1):(2 * n)], x[(2 * n + 1):(2 * n + 1)], 
@@ -427,7 +481,7 @@ normalizeCelFileByChr <- function(
     mchr1,
     chrid)
 {
-    if(verbose) cat("Reading CEL file: ", celFileName, "\n", sep="")
+    if(verbose) cat("Reading and normalizing CEL file: ", celFileName, "\n", sep="")
     
     celData <- read.celfile(celFileName, intensity.means.only = TRUE)
     y <- log2(as.matrix(celData[["INTENSITY"]][["MEAN"]][allid]))
@@ -467,8 +521,8 @@ normalizeCelFileByChr <- function(
             stop("Failed to find any probes on chromosome ", chri);
         }
         
-        msList[[as.character(chri)]]$M <- M
-        msList[[as.character(chri)]]$S <- S
+        msList[[chri]]$M <- M[currRows]
+        msList[[chri]]$S <- S[currRows]
     }
     
     msList
@@ -492,9 +546,9 @@ chunkIndices <- function(to, by) {
     chunks
 }
 
-chunkFileName <- function(baseDir, celFileName, chrName, chunk) {
+chunkFileName <- function(baseDir, celFileName, chrName, chunkSize, chunkIndex) {
     fileBase <- sub("\\..*$", "", celFileName)
-    chunkFile <- paste(fileBase, "_", chunk$start, "-", chunk$end, sep="")
+    chunkFile <- paste(fileBase, "-", chrName, "-", chunkSize, "-", chunkIndex, ".RData", sep="")
     
     file.path(baseDir, chunkFile)
 }
