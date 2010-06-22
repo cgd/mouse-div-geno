@@ -143,7 +143,7 @@ MouseDivGenotype = function(allid, ABid, chrid, CGFLcorrection = NULL,
     mchr1 = mchr1[!is.na(ii)]
     for (chri in mchr1) {
         #for(chunk in chrChunks[[currChr]])
-        for(chunkIndex in 1 : length(chrChunks[[chrif]]))
+        for(chunkIndex in 1 : length(chrChunks[[chri]]))
         {
             chunk <- chrChunks[[chri]][[chunkIndex]]
             if(verbose) {
