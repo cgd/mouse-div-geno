@@ -171,8 +171,6 @@ MouseDivGenotype = function(allid, ABid, chrid, CGFLcorrection = NULL,
             colnames(MM) <- filenames
             colnames(SS) <- filenames
             
-            isMale = rep(TRUE, ncol(MM))
-            
             chunkIndices <- chunk$start : chunk$end
             if (length(hint) == 0)
                 hint1 = NULL
@@ -191,7 +189,6 @@ MouseDivGenotype = function(allid, ABid, chrid, CGFLcorrection = NULL,
                     ms = MM,
                     ss = SS,
                     hint = hint1,
-                    isMale = isMale,
                     trans = trans,
                     doCNV = doCNV)
                 if(length(argLists) == length(cluster) || chunkIndex == length(chrChunks[[chri]]))
@@ -204,7 +201,7 @@ MouseDivGenotype = function(allid, ABid, chrid, CGFLcorrection = NULL,
             }
             else
             {
-                genotypeAutosomeChunk(MM, SS, hint1, isMale, trans, doCNV)
+                genotypeAutosomeChunk(MM, SS, hint1, trans, doCNV)
             }
             
             #cat("time it took us to complete genotypethis\n")
@@ -284,7 +281,6 @@ applyGenotypeAutosomeChunk <- function(argList)
         argList$ms,
         argList$ss,
         argList$hint,
-        argList$isMale,
         argList$trans,
         argList$doCNV)
 }

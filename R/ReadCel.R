@@ -159,7 +159,7 @@ ccstrans = function(a, b, k = 4) {
     list(x = x, y = y)
 }
 
-genotypeAutosomeChunk <- function(ms, ss, hint, isMale, trans, doCNV)
+genotypeAutosomeChunk <- function(ms, ss, hint, trans, doCNV)
 {
     numArrays <- ncol(ms)
     numProbesets <- nrow(ms)
