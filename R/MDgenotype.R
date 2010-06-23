@@ -119,8 +119,6 @@ MouseDivGenotype = function(allid, ABid, chrid, CGFLcorrection = NULL,
                         msList <- makeMsList()
                     }
                     
-                    cat("writing to ", chunkFile, "\n", sep="")
-                    
                     chunk <- chrChunks[[currChr]][[chunkIndex]]
                     indices <- chunk$start : chunk$end
                     mChunk <- msList[[i]]$M[indices]
@@ -141,8 +139,10 @@ MouseDivGenotype = function(allid, ABid, chrid, CGFLcorrection = NULL,
     mchr1 = c(1:19, "M")
     ii = match(mchr1, mchr)
     mchr1 = mchr1[!is.na(ii)]
+    
+    # TODO we're discarding the genotyping results from this loop. Return them instead
     for (chri in mchr1) {
-        #for(chunk in chrChunks[[currChr]])
+        argLists <- list()
         for(chunkIndex in 1 : length(chrChunks[[chri]]))
         {
             chunk <- chrChunks[[chri]][[chunkIndex]]
@@ -183,11 +183,34 @@ MouseDivGenotype = function(allid, ABid, chrid, CGFLcorrection = NULL,
             #timeReport(startTime)
             
             #startTime <- getTime()
-            genos <- genotypeAutosomeChunk(MM, SS, hint1, isMale, trans, doCNV)
+            if(length(cluster) >= 2)
+            {
+                # the arg list is used to accumulate arguments until we're
+                # ready to execute them in parallel
+                argLists[[length(argLists) + 1]] <- list(
+                    ms = MM,
+                    ss = SS,
+                    hint = hint1,
+                    isMale = isMale,
+                    trans = trans,
+                    doCNV = doCNV)
+                if(length(argLists) == length(cluster) || chunkIndex == length(chrChunks[[chri]]))
+                {
+                    # parallel apply using snow then reset the arg list
+                    parLapply(cluster, argLists, applyGenotypeAutosomeChunk)
+                    
+                    argLists <- list()
+                }
+            }
+            else
+            {
+                genotypeAutosomeChunk(MM, SS, hint1, isMale, trans, doCNV)
+            }
             
             #cat("time it took us to complete genotypethis\n")
             #timeReport(startTime)
         }
+        rm(argLists)
     }
     
     if (iix | iiy) {
@@ -251,4 +274,17 @@ MouseDivGenotype = function(allid, ABid, chrid, CGFLcorrection = NULL,
     if (doCNV) {
         pennCNVinput(chrid, mpos, exon1info, exon2info, celfiledir, filenames, outfiledir, exonoutfiledir, cnvoutfiledir, mchr)
     }
+}
+
+# the purpose of this function is to allow us to bundle up all of the arguments
+# into an argument list so that we can use the lapply function on it
+applyGenotypeAutosomeChunk <- function(argList)
+{
+    genotypeAutosomeChunk(
+        argList$ms,
+        argList$ss,
+        argList$hint,
+        argList$isMale,
+        argList$trans,
+        argList$doCNV)
 }
