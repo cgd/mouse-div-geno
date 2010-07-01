@@ -336,8 +336,8 @@ genotype = function(nm, ns, hint1, trans, doCNV = FALSE) {
     list(geno = geno, vino = vino, conf = conf, baf = baf, llr = llr)
 }
 
-# genotyping for the X chromosome (we only need to consider 2 groups here)
-genotypeSexchr = function(nm, ns, trans, doCNV) {
+# genotyping for probesets that we know are homozygous a priori
+genotypeHomozygous <- function(nm, ns, trans, doCNV) {
     nsize = length(nm)
     hint = c(max(nm), min(nm))
     

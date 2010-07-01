@@ -44,8 +44,7 @@ ReadCelFile = function(celfiledir, outfiledir, allid, ABid, chrid, CGFLcorrectio
     gender = NULL
     if (length(celnamefile) == 0) {
         tmp = dir()
-        isCel = apply(matrix(tmp, ncol = 1), 1, function(x) length(grep(".CEL", x)) > 
-            0)
+        isCel = apply(matrix(tmp, ncol = 1), 1, function(x) length(grep(".CEL", x)) > 0)
         filenames = tmp[isCel]
     }
     else {
@@ -128,45 +127,84 @@ ReadCelFile = function(celfiledir, outfiledir, allid, ABid, chrid, CGFLcorrectio
     }
     isMale
 }
-computegender = function(intX, intY, autoint) {
-    # todo learn about constant used here
-    if (length(autoint) < 1) 
-        autoint = 7.362069
-    n = length(intX)
-    gender = kmeans(cbind(intY, intX), 2)$cluster
-    y1 = mean(intY[gender == 1])
-    y2 = mean(intY[gender == 2])
-    if (y1 > y2) {
-        if (y2 >= min(autoint)) 
-            isMale = rep(TRUE, n)
-        else isMale = gender == 1
+
+inferGender <- function(
+    meanIntensityXPerArray,
+    meanIntensityYPerArray,
+    meanIntensityPerAutosome)
+{
+    genderClust <- kmeans(cbind(meanIntensityYPerArray, meanIntensityXPerArray), 2)$cluster
+    yMean1 <- mean(meanIntensityYPerArray[genderClust == 1])
+    yMean2 <- mean(meanIntensityYPerArray[genderClust == 2])
+    
+    # we expect that the cluster with a more intense Y chromosome will be males
+    if(yMean1 > yMean2)
+    {
+        maleClust <- 1
+        yMeanMale <- yMean1
+        yMeanFemale <- yMean2
     }
-    else {
-        if (y1 >= min(autoint)) 
-            isMale = rep(TRUE, n)
-        else isMale = gender == 2
+    else
+    {
+        maleClust <- 2
+        yMeanMale <- yMean2
+        yMeanFemale <- yMean1
     }
-    if (abs(y1 - y2) < 0.1) {
-        if (y1 > min(autoint)) 
-            isMale = rep(TRUE, n)
-        else isMale = rep(FALSE, n)
+    
+    if(yMeanFemale > min(meanIntensityPerAutosome))
+    {
+        # if the y intensity of the samples grouped as female is greater than
+        # the smallest autosome mean intensity we infer that there are no
+        # female samples
+        isMale <- rep(TRUE, length())
     }
+    else
+    {
+        isMale <- genderClust == maleClust
+    }
+    
     isMale
 }
+
 ccstrans = function(a, b, k = 4) {
     x = asinh(k * (a - b)/(a + b))/asinh(k)
     y = (log2(a) + log2(b))/2
     list(x = x, y = y)
 }
 
-genotypeAutosomeChunk <- function(ms, ss, hint, trans, doCNV)
+genotypeAnyChrChunk <- function(chr, ms, ss, hint, trans, doCNV, isMale)
+{
+    if(chr == "X")
+    {
+        genotypeXChromosomeChunk(ms, ss, hint, trans, doCNV, isMale)
+    }
+    else if(chr == "Y")
+    {
+        genotypeYChromosomeChunk(ms, ss, hint, trans, doCNV, isMale)
+    }
+    else if(chr == "M")
+    {
+        genotypeHomozygousChunk(ms, ss, trans, doCNV)
+    }
+    else
+    {
+        # chr is an autosome
+        genotypeChunk(ms, ss, hint, trans, doCNV)
+    }
+}
+
+# for genotyping probeset "chunks" (where ms and ss rows map to probesets and
+# columns map to arrays (CEL files). This function is useful for genotyping
+# autosomes and other sections of the genome where it is possible to have 3
+# genotyping outcomes. Otherwise use genotypeHomozygousChunk
+genotypeChunk <- function(ms, ss, hint, trans, doCNV)
 {
     numArrays <- ncol(ms)
     numProbesets <- nrow(ms)
     
-    if(ncol(ss) != numArrays)
+    if(ncol(ss) != numArrays || nrow(ss) != numProbesets)
     {
-        stop("Internal error: ms column count should match ss column count")
+        stop("Internal error: ms matrix dimensions should match ss matrix dimensions")
     }
     
     if(length(hint) == 0)
@@ -175,294 +213,205 @@ genotypeAutosomeChunk <- function(ms, ss, hint, trans, doCNV)
     }
     
     # geno/vinotype each of the probesets in this chunk and
-    # append the results to the chunkResult data frame
-    chunkResult <- data.frame()
+    # append the results to our list of matrices
+    chunkResult <- list(geno = NULL, vino = NULL, conf = NULL, baf = NULL, llr = NULL)
     for(probesetIndex in 1 : numProbesets)
     {
+        # TODO genotype sometimes returns results with colnames and sometimes
+        #      not. try to understand why this is happening
         currVals <- genotype(
             ms[probesetIndex, ],
             ss[probesetIndex, ],
             hint[probesetIndex],
             trans,
             doCNV)
-        
-        if(doCNV)
-        {
-            currRow <- data.frame(
-                geno = currVals$geno,
-                vino = currVals$vino,
-                conf = currVals$conf,
-                baf = currVals$baf,
-                llr = currVals$llr)
-        }
-        else
-        {
-            currRow <- data.frame(
-                geno = currVals$geno,
-                vino = currVals$vino,
-                conf = currVals$conf)
-        }
-        
-        chunkResult <- rbind(chunkResult, currRow)
+        chunkResult <- mapply(rbind, chunkResult, currVals, SIMPLIFY = FALSE)
     }
     
+    # TODO restore rownames and colnames to chunk result
     chunkResult
 }
 
-#########################################################################
-#
-# genotypethis.R
-#
-# Part of the MouseDivGenotype package
-#
-# This is the function to genotype and vinotype the array
-#
-#########################################################################
-genotypethis = function(savefiledir, MM, SS, hint = NULL, isMale, trans, chr, doCNV = FALSE) {
-    n = ncol(MM)
-    nn = nrow(MM)
-    if (length(hint) == 0) 
-        hint = rep(0, nn)
-    if (missing(savefiledir)) 
-        savefiledir = getwd()
+# for genotyping probeset "chunks" (where ms and ss rows map to probesets and
+# columns map to arrays (CEL files). This function is useful for genotyping
+# the parts of the genome where you do not expect to observe heterozygous
+# alleles
+genotypeHomozygousChunk <- function(ms, ss, trans, doCNV)
+{
+    numArrays <- ncol(ms)
+    numProbesets <- nrow(ms)
     
-    autosome = match(chr, c(1:19))
-    if (!is.na(autosome)) {
-        #cat("in autosome part of genotype this\n")
-        
-        # process in blocks of 2000 to balance efficiency and memory use
-        conf = geno = vino = baf = llr = NULL
-        sp = seq(1, nn, 2000)
-        lls = length(sp)
-        ep = c(sp[2:lls] - 1, nn)
-        for (iter in 1:lls) {
-            #cat("timing iteration ", iter, "\n", sep="")
-            #startTime <- getTime()
-            
-            tmp = sp[iter]:ep[iter]
-            
-            # applies the genotype function to all of the probes in this chunk
-            genom = apply(cbind(MM[tmp, ], SS[tmp, ], hint[tmp]), 1, function(x, 
-                trans, doCNV, n) {
-                b = genotype(x[1:n], x[(n + 1):(2 * n)], x[(2 * n + 1):(2 * n + 1)], 
-                  trans, doCNV)
-                c(b$geno, b$vino, b$conf, b$baf, b$llr)
-            }, trans, doCNV, n)
-            genom = t(genom)
-            conf = rbind(conf, genom[, c((2 * n + 1):(3 * n))])
-            vino = rbind(vino, genom[, c((n + 1):(2 * n))])
-            geno = rbind(geno, genom[, c(1:n)])
-            if (doCNV) {
-                baf = rbind(baf, genom[, c((3 * n + 1):(4 * n))])
-                llr = rbind(llr, genom[, c((4 * n + 1):(5 * n))])
-            }
-            
-            #timeReport(startTime)
-        }
-        rownames(geno) = rownames(conf) = rownames(vino) = rownames(MM)
-        colnames(geno) = colnames(conf) = colnames(vino) = colnames(MM)
-        xname = paste(savefiledir, "/genodata", chr, sep = "", collapse = "")
-        save(geno, file = xname)
-        xname = paste(savefiledir, "/vinodata", chr, sep = "", collapse = "")
-        save(vino, file = xname)
-        xname = paste(savefiledir, "/confdata", chr, sep = "", collapse = "")
-        save(conf, file = xname)
-        if (doCNV) {
-            rownames(baf) = rownames(llr) = rownames(MM)
-            colnames(baf) = colnames(llr) = colnames(MM)
-            xname = paste(savefiledir, "/baf", chr, sep = "", collapse = "")
-            save(baf, file = xname)
-            xname = paste(savefiledir, "/llr", chr, sep = "", collapse = "")
-            save(llr, file = xname)
-        }
+    if(ncol(ss) != numArrays || nrow(ss) != numProbesets)
+    {
+        stop("Internal error: ms matrix dimensions should match ss matrix dimensions")
     }
     
-    chrX = match(chr, "X")
-    if (!is.na(chrX)) {
-        conf = geno = vino = baf = llr = matrix(0, nn, n)
-        pseudoautosomalID = c("JAX00723347", "JAX00723349", "JAX00723350", "JAX00723351", 
-            "JAX00187253", "JAX00723353", "JAX00723354", "JAX00723355", "JAX00723356", 
-            "JAX00723358", "JAX00723359", "JAX00723360", "JAX00723361", "JAX00723364", 
-            "JAX00723365", "JAX00723366", "JAX00723367", "JAX00723368", "JAX00723369", 
-            "JAX00723370", "JAX00187255", "JAX00187256", "JAX00725011", "JAX00725012", 
-            "JAX00723371", "JAX00723372")
-        pid = match(pseudoautosomalID, rownames(MM))
-        pid = pid[!is.na(pid)]
-        lp = length(pid)
-        id = c(1:nn)
-        if (lp > 0) 
-            id = setdiff(c(1:nn), pid)
-        sp = seq(1, length(id), 2000)
-        lls = length(sp)
-        ep = c(sp[2:lls] - 1, length(id))
-        n = sum(!isMale)
-        if (n > 1) {
-            # for female three groups
-            confm = genom = vinom = bafm = llrm = NULL
-            sMM = MM[id, !isMale]
-            sSS = SS[id, !isMale]
-            shint = hint[id]
-            for (iter in 1:lls) {
-                tmp = sp[iter]:ep[iter]
-                genom1 = apply(cbind(sMM[tmp, ], sSS[tmp, ], shint[tmp]), 1, function(x, 
-                  trans, doCNV, n) {
-                  b = genotype(x[1:n], x[(n + 1):(2 * n)], x[(2 * n + 1):(2 * n + 
-                    1)], trans, doCNV)
-                  c(b$geno, b$vino, b$conf, b$baf, b$llr)
-                }, trans, doCNV, n)
-                genom1 = t(genom1)
-                confm = rbind(confm, genom1[, c((2 * n + 1):(3 * n))])
-                vinom = rbind(vinom, genom1[, c((n + 1):(2 * n))])
-                genom = rbind(genom, genom1[, c(1:n)])
-                if (doCNV) {
-                  bafm = rbind(bafm, genom1[, c((3 * n + 1):(4 * n))])
-                  llrm = rbind(llrm, genom1[, c((4 * n + 1):(5 * n))])
-                }
-            }
-            conf[id, !isMale] = confm
-            vino[id, !isMale] = vinom
-            geno[id, !isMale] = genom
-            if (doCNV) {
-                baf[id, !isMale] = bafm
-                llr[id, !isMale] = llrm
-            }
-        }
-        n = sum(isMale)
-        if (n > 1) {
-            # for male two groups
-            confm = genom = vinom = bafm = llrm = NULL
-            sMM = MM[id, isMale]
-            sSS = SS[id, isMale]
-            for (iter in 1:lls) {
-                tmp = sp[iter]:ep[iter]
-                genom1 = apply(cbind(sMM[tmp, ], sSS[tmp, ]), 1, function(x, trans, 
-                  doCNV, n) {
-                  b = genotypeSexchr(x[1:n], x[(n + 1):(2 * n)], trans, doCNV)
-                  c(b$geno, b$vino, b$conf, b$baf, b$llr)
-                }, trans, doCNV, n)
-                genom1 = t(genom1)
-                confm = rbind(confm, genom1[, c((2 * n + 1):(3 * n))])
-                vinom = rbind(vinom, genom1[, c((n + 1):(2 * n))])
-                genom = rbind(genom, genom1[, c(1:n)])
-                if (doCNV) {
-                  bafm = rbind(bafm, genom1[, c((3 * n + 1):(4 * n))])
-                  llrm = rbind(llrm, genom1[, c((4 * n + 1):(5 * n))])
-                }
-            }
-            conf[id, isMale] = confm
-            vino[id, isMale] = vinom
-            geno[id, isMale] = genom
-            if (doCNV) {
-                baf[id, isMale] = bafm
-                llr[id, isMale] = llrm
-            }
-        }
-        n = ncol(MM)
-        if (lp > 1) {
-            confm = genom = vinom = bafm = llrm = NULL
-            genom = apply(cbind(MM[pid, ], SS[pid, ], hint[pid]), 1, function(x, 
-                trans, doCNV, n) {
-                b = genotype(x[1:n], x[(n + 1):(2 * n)], x[(2 * n + 1):(2 * n + 1)], 
-                  trans, doCNV)
-                c(b$geno, b$vino, b$conf, b$baf, b$llr)
-            }, trans, doCNV, n)
-            genom = t(genom)
-            conf[pid, ] = genom[, c((2 * n + 1):(3 * n))]
-            vino[pid, ] = genom[, c((n + 1):(2 * n))]
-            geno[pid, ] = genom[, c(1:n)]
-            if (doCNV) {
-                baf[pid, ] = genom[, c((3 * n + 1):(4 * n))]
-                llr[pid, ] = genom[, c((4 * n + 1):(5 * n))]
+    # geno/vinotype each of the probesets in this chunk and
+    # append the results to our list of matrices
+    chunkResult <- list(geno = NULL, vino = NULL, conf = NULL, baf = NULL, llr = NULL)
+    for(probesetIndex in 1 : numProbesets)
+    {
+        currVals <- genotypeHomozygous(
+            ms[probesetIndex, ],
+            ss[probesetIndex, ],
+            trans,
+            doCNV)
+        chunkResult <- mapply(rbind, chunkResult, currVals, SIMPLIFY = FALSE)
+    }
+    
+    # TODO restore rownames to chunk result
+    chunkResult
+}
+
+genotypeXChromosomeChunk <- function(ms, ss, hint, trans, doCNV, isMale)
+{
+    numArrays <- ncol(ms)
+    numProbesets <- nrow(ms)
+    
+    if(ncol(ss) != numArrays || nrow(ss) != numProbesets)
+    {
+        stop("Internal error: ms matrix dimensions should match ss matrix dimensions")
+    }
+    
+    if(length(hint) == 0)
+    {
+        hint <- rep(0, numProbesets)
+    }
+    
+    # TODO need to make pseudoautosomal IDs a parameter somehow. Also think
+    #      whether or not rownames is a robust way to do the matching
+    
+    # the probesets in the pseudo autosomal region should be genotyped as if
+    # they come from an autosome
+    pseudoautosomalID <- c(
+        "JAX00723347", "JAX00723349", "JAX00723350", "JAX00723351", 
+        "JAX00187253", "JAX00723353", "JAX00723354", "JAX00723355", "JAX00723356", 
+        "JAX00723358", "JAX00723359", "JAX00723360", "JAX00723361", "JAX00723364", 
+        "JAX00723365", "JAX00723366", "JAX00723367", "JAX00723368", "JAX00723369", 
+        "JAX00723370", "JAX00187255", "JAX00187256", "JAX00725011", "JAX00725012", 
+        "JAX00723371", "JAX00723372")
+    # TODO it seems that rownames(ms) is NULL. fix that
+    parIndices <- which(pseudoautosomalID %in% rownames(ms))
+    #parIndices <- parIndices[!is.na(parIndices)]
+    
+    # we'll call the X probesets that aren't in the PAR "normal"
+    normalIndices <- 1 : numProbesets
+    if(length(parIndices) >= 1)
+    {
+        normalIndices <- setdiff(normalIndices, parIndices)
+    }
+    
+    maleColumns <- which(isMale)
+    femaleColumns <- which(!isMale)
+    
+    initializeNamesIfMissing <- function(matrixList, itemNames)
+    {
+        for(itemName in itemNames)
+        {
+            if(!(itemName %in% names(matrixList)))
+            {
+                matrixList[[itemName]] <- matrix(nrow = numProbesets, ncol = numArrays)
             }
         }
         
-        rownames(geno) = rownames(conf) = rownames(vino) = rownames(MM)
-        colnames(geno) = colnames(conf) = colnames(vino) = colnames(MM)
-        xname = paste(savefiledir, "/genodataX", sep = "", collapse = "")
-        save(geno, file = xname)
-        xname = paste(savefiledir, "/vinodataX", sep = "", collapse = "")
-        save(vino, file = xname)
-        xname = paste(savefiledir, "/confdataX", sep = "", collapse = "")
-        save(conf, file = xname)
-        if (doCNV) {
-            rownames(baf) = rownames(llr) = rownames(MM)
-            colnames(baf) = colnames(llr) = colnames(MM)
-            xname = paste(savefiledir, "/bafX", sep = "", collapse = "")
-            save(baf, file = xname)
-            xname = paste(savefiledir, "/llrX", sep = "", collapse = "")
-            save(llr, file = xname)
-        }
+        matrixList
     }
+    results <- list()
     
-    chrY = match(chr, "Y")
-    if (!is.na(chrY)) {
-        conf = geno = vino = baf = llr = matrix(-1, nn, n)
-        n = sum(isMale)
-        if (n > 1) {
-            # for male two groups
-            geno1 = apply(cbind(MM[, isMale], SS[, isMale]), 1, function(x, trans, doCNV, n) {
-                b = genotypeSexchr(x[1:n], x[(n + 1):(2 * n)], trans, doCNV)
-                c(b$geno, b$vino, b$conf, b$baf, b$llr)
-            }, trans, doCNV, n)
-            geno1 = t(geno1)
-            conf[, isMale] = geno1[, c((2 * n + 1):(3 * n))]
-            vino[, isMale] = geno1[, c((n + 1):(2 * n))]
-            geno[, isMale] = geno1[, c(1:n)]
-            if (doCNV) {
-                baf[, isMale] = geno1[, c((3 * n + 1):(4 * n))]
-                llr[, isMale] = geno1[, c((4 * n + 1):(5 * n))]
-            }
-        }
-        rownames(geno) = rownames(conf) = rownames(vino) = rownames(MM)
-        colnames(geno) = colnames(conf) = colnames(vino) = colnames(MM)
-        xname = paste(savefiledir, "/genodataY", sep = "", collapse = "")
-        save(geno, file = xname)
-        xname = paste(savefiledir, "/vinodataY", sep = "", collapse = "")
-        save(vino, file = xname)
-        xname = paste(savefiledir, "/confdataY", sep = "", collapse = "")
-        save(conf, file = xname)
-        if (doCNV) {
-            rownames(baf) = rownames(llr) = rownames(MM)
-            colnames(baf) = colnames(llr) = colnames(MM)
-            xname = paste(savefiledir, "/bafY", sep = "", collapse = "")
-            save(baf, file = xname)
-            xname = paste(savefiledir, "/llrY", sep = "", collapse = "")
-            save(llr, file = xname)
-        }
-    }
-    
-    chrM = match(chr, "M")
-    if (!is.na(chrM)) {
-        conf = geno = vino = baf = llr = matrix(0, nn, n)
-        geno1 = apply(cbind(MM, SS), 1, function(x, trans, doCNV, n) {
-            b = genotypeSexchr(x[1:n], x[(n + 1):(2 * n)], trans, doCNV)
-            c(b$geno, b$vino, b$conf, b$baf, b$llr)
-        }, trans, doCNV, n)
-        geno1 = t(geno1)
-        conf = geno1[, c((2 * n + 1):(3 * n))]
-        vino = geno1[, c((n + 1):(2 * n))]
-        geno = geno1[, c(1:n)]
+    # we can treat the females like autosomes for the purposes of genotyping
+    if(length(femaleColumns) >= 2) # TODO what if it is equal to 1? still OK i guess?
+    {
+        normalFemaleMs <- ms[normalIndices, femaleColumns, drop = FALSE]
+        normalFemaleSs <- ss[normalIndices, femaleColumns, drop = FALSE]
+        normalHint <- hint[normalIndices]
         
-        rownames(geno) = rownames(conf) = rownames(vino) = rownames(MM)
-        colnames(geno) = colnames(conf) = colnames(vino) = colnames(MM)
-        xname = paste(savefiledir, "/genodataM", sep = "", collapse = "")
-        save(geno, file = xname)
-        xname = paste(savefiledir, "/vinodataM", sep = "", collapse = "")
-        save(vino, file = xname)
-        xname = paste(savefiledir, "/confdataM", sep = "", collapse = "")
-        save(conf, file = xname)
-        if (doCNV) {
-            baf = geno1[, c((3 * n + 1):(4 * n))]
-            llr = geno1[, c((4 * n + 1):(5 * n))]
-            rownames(baf) = rownames(llr) = rownames(MM)
-            colnames(baf) = colnames(llr) = colnames(MM)
-            xname = paste(savefiledir, "/bafM", sep = "", collapse = "")
-            save(baf, file = xname)
-            xname = paste(savefiledir, "/llrM", sep = "", collapse = "")
-            save(llr, file = xname)
+        # we are going to treat the female probesets just like autosomes for
+        # the purposes of geno/vinotyping
+        normalFemaleResult <- genotypeChunk(
+            normalFemaleMs,
+            normalFemaleSs,
+            normalHint,
+            trans,
+            doCNV)
+        results <- initializeNamesIfMissing(results, names(normalFemaleResult))
+        for(itemName in names(normalFemaleResult))
+        {
+            results[[itemName]][normalIndices, femaleColumns] <-
+                normalFemaleResult[[itemName]]
         }
     }
-} 
+    
+    # the non-PAR male probesets will get genotyped as homozygous
+    if(length(maleColumns) >= 2) # TODO what if it is equal to 1? what should we do then??
+    {
+        normalMaleMs <- ms[normalIndices, maleColumns, drop = FALSE]
+        normalMaleSs <- ss[normalIndices, maleColumns, drop = FALSE]
+        
+        normalMaleResult <- genotypeHomozygousChunk(
+            normalMaleMs,
+            normalMaleSs,
+            trans,
+            doCNV)
+        results <- initializeNamesIfMissing(results, names(normalMaleResult))
+        for(itemName in names(normalMaleResult))
+        {
+            results[[itemName]][normalIndices, maleColumns] <-
+                normalMaleResult[[itemName]]
+        }
+    }
+    
+    # the PAR probesets will be treated as autosomes whether they're male or female
+    if(length(parIndices) >= 1)
+    {
+        parMs <- ms[parIndices, , drop = FALSE]
+        parSs <- ss[parIndices, , drop = FALSE]
+        parHint <- hint[parIndices]
+        
+        parResult <- genotypeChunk(
+            parMs,
+            parSs,
+            parHint,
+            trans,
+            doCNV)
+        results <- initializeNamesIfMissing(results, names(parResult))
+        for(itemName in names(parResult))
+        {
+            results[parIndices, ] <- parResult
+        }
+    }
+    
+    results
+}
+
+genotypeYChromosomeChunk <- function(ms, ss, hint, trans, doCNV, isMale)
+{
+    numArrays <- ncol(ms)
+    numProbesets <- nrow(ms)
+    
+    if(ncol(ss) != numArrays || nrow(ss) != numProbesets)
+    {
+        stop("Internal error: ms matrix dimensions should match ss matrix dimensions")
+    }
+    
+    maleColumns <- which(isMale)
+    
+    maleMs <- ms[, maleColumns, drop = FALSE]
+    maleSs <- ss[, maleColumns, drop = FALSE]
+    maleResult <- genotypeHomozygousChunk(maleMs, maleSs, trans, doCNV)
+    
+    # TODO using NA for invalid values here. make sure that's consistent with
+    #      the rest of the code
+    
+    # fill in the female columns using NA so that the dimensions of the
+    # input data match the dimensions of the output data
+    fillInNAFemaleCols <- function(maleMatrix)
+    {
+        allMatrix <- matrix(nrow = numProbesets, ncol = numArrays)
+        allMatrix[, maleColumns] <- maleMatrix
+        allMatrix
+    }
+    lapply(maleResult, fillInNAFemaleCols)
+}
 
 # reads in the given CEL file, partitions it into groups defined by groupLevels
 # then breaks up those groups into chunk sizes no bigger than maxChunkSize
