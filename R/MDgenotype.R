@@ -19,18 +19,13 @@ library("cluster")
 MouseDivGenotype = function(allid, ABid, chrid, CGFLcorrection = NULL, 
     reference = NULL, hint = NULL, trans = c("CCStrans", "MAtrans"), celnamefile = NULL, 
     mchr = c(1:19, "X", "Y", "M"), celfiledir, outfiledir, subset = FALSE, doCNV = FALSE, 
-    exon1info = NULL, exon2info = NULL, exonoutfiledir, cnvoutfiledir, verbose = FALSE,
-    cluster = NULL, probesetChunkSize=1000) {
+    verbose = FALSE, cluster = NULL, probesetChunkSize=1000) {
     
     trans = match.arg(trans)
     if (missing(celfiledir)) 
         celfiledir = getwd()
     if (missing(outfiledir)) 
         outfiledir = getwd()
-    if (missing(exonoutfiledir)) 
-        exonoutfiledir = getwd()
-    if (missing(cnvoutfiledir)) 
-        cnvoutfiledir = getwd()
     if (missing(allid) | missing(ABid)) 
         stop("No CDF file information")
     SNPname = ABid$SNPname
@@ -38,11 +33,14 @@ MouseDivGenotype = function(allid, ABid, chrid, CGFLcorrection = NULL,
     Bid = ABid$allBid
     rm(ABid)
     mpos = chrid$mpos
+    
+    # TODO this should be handled by which param is passed in
     if (subset) 
         chrid = chrid$schrid
     else
         chrid = chrid$chrid
     
+    # TODO we shouldn't be setting the working dir
     setwd(celfiledir)
     
     # TODO rework this section as:
@@ -68,6 +66,9 @@ MouseDivGenotype = function(allid, ABid, chrid, CGFLcorrection = NULL,
             gender <- toupper(filenames[, 2])
             isMale <- gender == "MALE"
             isFemale <- gender == "FEMALE"
+            
+            # TODO in old code there was fallback to using vdist for gender
+            #      inference. Ask Hyuna about the vdist fallback
             if(sum(isMale) + sum(isFemale) != nrow(filenames))
             {
                 isMale <- NULL
@@ -308,75 +309,8 @@ MouseDivGenotype = function(allid, ABid, chrid, CGFLcorrection = NULL,
         }
         rm(argLists)
     }
-
-#    if (iix | iiy) {
-#        MM = SS = NULL
-#        for (i in 1:nfile) {
-#            xname1 = paste(outfiledir, "/", gsub(".CEL", "CHR", filenames[i]), "Y", sep = "", collapse = "")
-#            # origa,origb
-#            load(xname1)
-#            MM = cbind(MM, MM1)
-#            SS = cbind(SS, SS1)
-#            rm(MM1, SS1)
-#        }
-#        intY = apply(SS, 2, mean)
-#        if (iiy) {
-#            xname = paste(outfiledir, "/rawdataMMchrY", sep = "", collapse = "")
-#            colnames(MM) = colnames(SS) = filenames
-#            save(MM, file = xname)
-#            xname = paste(outfiledir, "/rawdataSSchrY", sep = "", collapse = "")
-#            save(SS, file = xname)
-#            MMy = MM
-#            SSy = SS
-#        }
-#        MM = SS = NULL
-#        for (i in 1:nfile) {
-#            xname1 = paste(outfiledir, "/", gsub(".CEL", "CHR", filenames[i]), "X", sep = "", collapse = "")
-#            load(xname1)
-#            MM = cbind(MM, MM1)
-#            SS = cbind(SS, SS1)
-#            rm(MM1, SS1)
-#        }
-#        intX = apply(SS, 2, mean)
-#        if (iix) {
-#            xname = paste(outfiledir, "/rawdataMMchrX", sep = "", collapse = "")
-#            colnames(MM) = colnames(SS) = filenames
-#            save(MM, file = xname)
-#            xname = paste(outfiledir, "/rawdataSSchrX", sep = "", collapse = "")
-#            save(SS, file = xname)
-#        }
-#        # compute the gender
-#        if (length(gender) < nfile) 
-#            isMale = computegender(intX, intY, autoint)
-#        else {
-#            gender1 = rep(-1, nfile)
-#            gender1[gender == "male"] = 1
-#            gender1[gender == "female"] = 2
-#            # TODO I think that this "if" is a bug, i think length should be sum
-#            if (length(gender1 == 1) > 1 & length(gender1 == 2) > 1) {
-#                # TODO ask Hyuna about the vdist logic here
-#                gender = vdist(intY, intX, gender1)
-#                isMale = gender == 1
-#            }
-#            else isMale = computegender(intX, intY, autoint)
-#        }
-#        if (iix) {
-#            if (length(hint) == 0) 
-#                hint1 = NULL
-#            else hint1 = hint[[20]]
-#            genotypethis(outfiledir, MM, SS, hint1, isMale, trans, "X", doCNV)
-#        }
-#        if (iiy) 
-#            genotypethis(outfiledir, MMy, SSy, NULL, isMale, trans, "Y", doCNV)
-#    }
     
-    if(doCNV)
-    {
-        # TODO need a way to accumulate PENN CNV stuff too
-        pennCNVinput(
-            chrid, mpos, exon1info, exon2info, celfiledir, filenames,
-            outfiledir, exonoutfiledir, cnvoutfiledir, mchr)
-    }
+    chrResults
 }
 
 # this apply function is defined to take a list in order to allow us to take
