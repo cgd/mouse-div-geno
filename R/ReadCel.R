@@ -3,20 +3,6 @@
 #
 # Part of the MouseDivGenotype package
 #
-# This is the function to read .CEL files and normalize/transform the data, and save the normalized intensity by chromosomes.
-# It also computes gender, if needed.
-# input : dir - directory that .CEL files stored.
-#         outfiledir - directory that you want to save normalized log2 intensity. File saves by chromosomes.
-#         allid - index file indicating SNP position (download from cgd.jax.org)
-#         ABid - A and B allele position and name (download from cgd.jax.org)
-#         CGFLcorrection - C+G in 25 mer flanking sequences and restriction enzyme fragment length correction coefficients.
-#         reference - targer reference distribution used for quantile normalization.
-#         trans - two possible transformation, i.e. CCS and MA transformation
-#         celnamefile - name of file containing .CEL files that you want to read. First column should be .CEL name and
-#            second column (optional) should be gender information. The file must have a column header.
-#
-# output : isMale = computed gender
-#
 #########################################################################
 library("cluster")
 
