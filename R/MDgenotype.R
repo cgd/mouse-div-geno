@@ -18,7 +18,7 @@ library("cluster")
 
 MouseDivGenotype = function(allid, ABid, chrid, CGFLcorrection = NULL, 
     reference = NULL, hint = NULL, trans = c("CCStrans", "MAtrans"), celnamefile = NULL, 
-    mchr = c(1:19, "X", "Y", "M"), celfiledir, outfiledir, subset = FALSE, doCNV = FALSE, 
+    mchr = c(1:19, "X", "Y", "M"), celfiledir, outfiledir, subset = FALSE, 
     verbose = FALSE, cluster = NULL, probesetChunkSize=1000) {
     
     trans = match.arg(trans)
@@ -260,7 +260,6 @@ MouseDivGenotype = function(allid, ABid, chrid, CGFLcorrection = NULL,
                     ss = SS,
                     hint = hint[[chri]][chunkIndices],
                     trans = trans,
-                    doCNV = doCNV,
                     isMale = isMale)
                 if(length(argLists) >= length(cluster) || chunkIndex == length(chrChunks[[chri]]))
                 {
@@ -291,7 +290,6 @@ MouseDivGenotype = function(allid, ABid, chrid, CGFLcorrection = NULL,
                     ss = SS,
                     hint = hint[[chri]][chunkIndices],
                     trans = trans,
-                    doCNV = doCNV,
                     isMale = isMale)
                 if(length(chrResults[[chri]]) == 0)
                 {
@@ -323,6 +321,5 @@ applyGenotypeAnyChrChunk <- function(argList)
         argList$ss,
         argList$hint,
         argList$trans,
-        argList$doCNV,
         argList$isMale)
 }

@@ -50,24 +50,24 @@ ccstrans = function(a, b, k = 4) {
     list(x = x, y = y)
 }
 
-genotypeAnyChrChunk <- function(chr, ms, ss, hint, trans, doCNV, isMale)
+genotypeAnyChrChunk <- function(chr, ms, ss, hint, trans, isMale)
 {
     if(chr == "X")
     {
-        genotypeXChromosomeChunk(ms, ss, hint, trans, doCNV, isMale)
+        genotypeXChromosomeChunk(ms, ss, hint, trans, isMale)
     }
     else if(chr == "Y")
     {
-        genotypeYChromosomeChunk(ms, ss, hint, trans, doCNV, isMale)
+        genotypeYChromosomeChunk(ms, ss, hint, trans, isMale)
     }
     else if(chr == "M")
     {
-        genotypeHomozygousChunk(ms, ss, trans, doCNV)
+        genotypeHomozygousChunk(ms, ss, trans)
     }
     else
     {
         # chr is an autosome
-        genotypeChunk(ms, ss, hint, trans, doCNV)
+        genotypeChunk(ms, ss, hint, trans)
     }
 }
 
@@ -75,7 +75,7 @@ genotypeAnyChrChunk <- function(chr, ms, ss, hint, trans, doCNV, isMale)
 # columns map to arrays (CEL files). This function is useful for genotyping
 # autosomes and other sections of the genome where it is possible to have 3
 # genotyping outcomes. Otherwise use genotypeHomozygousChunk
-genotypeChunk <- function(ms, ss, hint, trans, doCNV)
+genotypeChunk <- function(ms, ss, hint, trans)
 {
     numArrays <- ncol(ms)
     numProbesets <- nrow(ms)
@@ -92,7 +92,7 @@ genotypeChunk <- function(ms, ss, hint, trans, doCNV)
     
     # geno/vinotype each of the probesets in this chunk and
     # append the results to our list of matrices
-    chunkResult <- list(geno = NULL, vino = NULL, conf = NULL, baf = NULL, llr = NULL)
+    chunkResult <- list(geno = NULL, vino = NULL, conf = NULL)
     for(probesetIndex in 1 : numProbesets)
     {
         # TODO genotype sometimes returns results with colnames and sometimes
@@ -101,8 +101,7 @@ genotypeChunk <- function(ms, ss, hint, trans, doCNV)
             ms[probesetIndex, ],
             ss[probesetIndex, ],
             hint[probesetIndex],
-            trans,
-            doCNV)
+            trans)
         chunkResult <- mapply(rbind, chunkResult, currVals, SIMPLIFY = FALSE)
     }
     
@@ -114,7 +113,7 @@ genotypeChunk <- function(ms, ss, hint, trans, doCNV)
 # columns map to arrays (CEL files). This function is useful for genotyping
 # the parts of the genome where you do not expect to observe heterozygous
 # alleles
-genotypeHomozygousChunk <- function(ms, ss, trans, doCNV)
+genotypeHomozygousChunk <- function(ms, ss, trans)
 {
     numArrays <- ncol(ms)
     numProbesets <- nrow(ms)
@@ -126,14 +125,13 @@ genotypeHomozygousChunk <- function(ms, ss, trans, doCNV)
     
     # geno/vinotype each of the probesets in this chunk and
     # append the results to our list of matrices
-    chunkResult <- list(geno = NULL, vino = NULL, conf = NULL, baf = NULL, llr = NULL)
+    chunkResult <- list(geno = NULL, vino = NULL, conf = NULL)
     for(probesetIndex in 1 : numProbesets)
     {
         currVals <- genotypeHomozygous(
             ms[probesetIndex, ],
             ss[probesetIndex, ],
-            trans,
-            doCNV)
+            trans)
         chunkResult <- mapply(rbind, chunkResult, currVals, SIMPLIFY = FALSE)
     }
     
@@ -141,7 +139,7 @@ genotypeHomozygousChunk <- function(ms, ss, trans, doCNV)
     chunkResult
 }
 
-genotypeXChromosomeChunk <- function(ms, ss, hint, trans, doCNV, isMale)
+genotypeXChromosomeChunk <- function(ms, ss, hint, trans, isMale)
 {
     numArrays <- ncol(ms)
     numProbesets <- nrow(ms)
@@ -209,8 +207,7 @@ genotypeXChromosomeChunk <- function(ms, ss, hint, trans, doCNV, isMale)
             normalFemaleMs,
             normalFemaleSs,
             normalHint,
-            trans,
-            doCNV)
+            trans)
         results <- initializeNamesIfMissing(results, names(normalFemaleResult))
         for(itemName in names(normalFemaleResult))
         {
@@ -228,8 +225,7 @@ genotypeXChromosomeChunk <- function(ms, ss, hint, trans, doCNV, isMale)
         normalMaleResult <- genotypeHomozygousChunk(
             normalMaleMs,
             normalMaleSs,
-            trans,
-            doCNV)
+            trans)
         results <- initializeNamesIfMissing(results, names(normalMaleResult))
         for(itemName in names(normalMaleResult))
         {
@@ -249,8 +245,7 @@ genotypeXChromosomeChunk <- function(ms, ss, hint, trans, doCNV, isMale)
             parMs,
             parSs,
             parHint,
-            trans,
-            doCNV)
+            trans)
         results <- initializeNamesIfMissing(results, names(parResult))
         for(itemName in names(parResult))
         {
@@ -261,7 +256,7 @@ genotypeXChromosomeChunk <- function(ms, ss, hint, trans, doCNV, isMale)
     results
 }
 
-genotypeYChromosomeChunk <- function(ms, ss, hint, trans, doCNV, isMale)
+genotypeYChromosomeChunk <- function(ms, ss, hint, trans, isMale)
 {
     numArrays <- ncol(ms)
     numProbesets <- nrow(ms)
@@ -275,7 +270,7 @@ genotypeYChromosomeChunk <- function(ms, ss, hint, trans, doCNV, isMale)
     
     maleMs <- ms[, maleColumns, drop = FALSE]
     maleSs <- ss[, maleColumns, drop = FALSE]
-    maleResult <- genotypeHomozygousChunk(maleMs, maleSs, trans, doCNV)
+    maleResult <- genotypeHomozygousChunk(maleMs, maleSs, trans)
     
     # TODO using NA for invalid values here. make sure that's consistent with
     #      the rest of the code

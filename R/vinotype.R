@@ -38,7 +38,7 @@ bivar <- function(x) {
     bi <- top/botx
     bi
 }
-vinotype = function(nm, ns, geno, doCNV = FALSE) {
+vinotype = function(nm, ns, geno) {
     #=========== find centers
     iig = sort(unique(geno))
     ngeno = length(iig)
@@ -133,12 +133,7 @@ vinotype = function(nm, ns, geno, doCNV = FALSE) {
             ss[[ik]] = m
         else ss[[ik]] = ss[[ik]] * 0.5 + m * 0.5
     }
-    BAF = llr = rep(0, nsize)
-    if (doCNV) {
-        cnvinputs = CNVinput(nm, ns, geno, mm, ms, ss, nsize, ngeno, iig)
-        BAF = cnvinputs$BAF
-        llr = cnvinputs$llr
-    }
+    
     #=========== test 2 vs. 3
     if (ngeno == 3) {
         # three groups; # lower BIC better fit.
@@ -227,131 +222,5 @@ vinotype = function(nm, ns, geno, doCNV = FALSE) {
         vino = vdist(nm/5, ns/(2 * (max(ns) - min(ns))), vino)
     }
     
-    list(vino = vino, conf = mdd, BAF = BAF, llr = llr)
-}
-
-CNVinput = function(nm, ns, geno, mm, ms, ss, nsize, ngeno, iig) {
-    BAF = llr = rep(0, nsize)
-    if (ngeno == 3) {
-        c1 = sqrt(ss[[1]][1, 1])
-        c2 = sqrt(ss[[2]][1, 1])
-        c3 = sqrt(ss[[3]][1, 1])
-        s1 = sqrt(ss[[1]][2, 2])
-        s2 = sqrt(ss[[2]][2, 2])
-        s3 = sqrt(ss[[3]][2, 2])
-        tmp = nm >= mm[1]
-        if (any(tmp)) {
-            BAF[tmp] = 0
-            llr[tmp] = log2(ns[tmp]/ns[1])
-        }
-        tmp = nm < mm[1] & nm > mm[2]
-        if (any(tmp)) {
-            k1 = (mm[1] - nm[tmp])/c1
-            k2 = (nm[tmp] - mm[2])/c2
-            BAF[tmp] = 0.5 * k1/(k1 + k2)
-            llr[tmp] = log2(ns[tmp]/((k2 * ns[1] + k1 * ns[2])/(k1 + k2)))
-        }
-        tmp = nm <= mm[2] & nm > mm[3]
-        if (any(tmp)) {
-            k1 = (mm[2] - nm[tmp])/c2
-            k2 = (nm[tmp] - mm[3])/c3
-            BAF[tmp] = 0.5 + 0.5 * k1/(k1 + k2)
-            llr[tmp] = log2(ns[tmp]/((k2 * ns[2] + k1 * ns[3])/(k1 + k2)))
-        }
-        tmp = nm <= mm[3]
-        if (any(tmp)) {
-            BAF[tmp] = 1
-            llr[tmp] = log2(ns[tmp]/ns[3])
-        }
-    }
-    if (ngeno == 2) {
-        id = sum(iig)
-        if (id == 4) {
-            # 1,3
-            c1 = sqrt(ss[[1]][1, 1])
-            c3 = sqrt(ss[[3]][1, 1])
-            s1 = sqrt(ss[[1]][2, 2])
-            s3 = sqrt(ss[[3]][2, 2])
-            tmp = nm >= mm[1]
-            if (any(tmp)) {
-                BAF[tmp] = 0
-                llr[tmp] = log2(ns[tmp]/ns[1])
-            }
-            tmp = nm < mm[1] & nm > mm[3]
-            if (any(tmp)) {
-                k1 = (mm[1] - nm[tmp])/c1
-                k3 = (nm[tmp] - mm[3])/c3
-                BAF[tmp] = k1/(k1 + k3)
-                llr[tmp] = log2(ns[tmp]/((k3 * ns[1] + k1 * ns[3])/(k1 + k3)))
-            }
-            tmp = nm <= mm[3]
-            if (any(tmp)) {
-                BAF[tmp] = 1
-                llr[tmp] = log2(ns[tmp]/ns[3])
-            }
-        }
-        if (id == 5) {
-            # 2,3
-            c2 = sqrt(ss[[2]][1, 1])
-            c3 = sqrt(ss[[3]][1, 1])
-            s2 = sqrt(ss[[2]][2, 2])
-            s3 = sqrt(ss[[3]][2, 2])
-            tmp = nm >= mm[2]
-            if (any(tmp)) {
-                BAF[tmp] = 0.5
-                llr[tmp] = log2(ns[tmp]/ns[2])
-            }
-            tmp = nm < mm[2] & nm > mm[3]
-            if (any(tmp)) {
-                k2 = (mm[2] - nm[tmp])/c2
-                k3 = (nm[tmp] - mm[3])/c3
-                BAF[tmp] = 0.5 + 0.5 * k2/(k2 + k3)
-                llr[tmp] = log2(ns[tmp]/((k3 * ns[2] + k2 * ns[3])/(k2 + k3)))
-            }
-            tmp = nm <= mm[3]
-            if (any(tmp)) {
-                BAF[tmp] = 1
-                llr[tmp] = log2(ns[tmp]/ns[3])
-            }
-        }
-        if (id == 3) {
-            # 1,2
-            c1 = sqrt(ss[[1]][1, 1])
-            c2 = sqrt(ss[[2]][1, 1])
-            s1 = sqrt(ss[[1]][2, 2])
-            s2 = sqrt(ss[[2]][2, 2])
-            tmp = nm >= mm[1]
-            if (any(tmp)) {
-                BAF[tmp] = 0
-                llr[tmp] = log2(ns[tmp]/ns[1])
-            }
-            tmp = nm < mm[1] & nm > mm[2]
-            if (any(tmp)) {
-                k1 = (mm[1] - nm[tmp])/c1
-                k2 = (nm[tmp] - mm[2])/c2
-                BAF[tmp] = 0.5 * k1/(k1 + k2)
-                llr[tmp] = log2(ns[tmp]/((k1 * ns[2] + k2 * ns[1])/(k1 + k2)))
-            }
-            tmp = nm <= mm[2]
-            if (any(tmp)) {
-                BAF[tmp] = 0.5
-                llr[tmp] = log2(ns[tmp]/ns[2])
-            }
-        }
-    }
-    if (ngeno == 1) {
-        if (iig == 1) {
-            BAF = rep(0, nsize)
-            llr = log2(ns/ns[1])
-        }
-        if (iig == 2) {
-            BAF = rep(0.5, nsize)
-            llr = log2(ns/ns[2])
-        }
-        if (iig == 3) {
-            BAF = rep(1, nsize)
-            llr = log2(ns/ns[3])
-        }
-    }
-    list(BAF = BAF, llr = llr)
+    list(vino = vino, conf = mdd)
 }

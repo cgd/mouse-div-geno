@@ -16,7 +16,7 @@
 # nm = MM[1,]; ns = SS[1,]
 # geno = genotype(nm, ns, hint = NULL)
 #======================================================================
-genotype = function(nm, ns, hint1, trans, doCNV = FALSE) {
+genotype = function(nm, ns, hint1, trans) {
     hint = rep(0, 3)
     hint[1] = max(nm)
     hint[3] = min(nm)
@@ -45,37 +45,29 @@ genotype = function(nm, ns, hint1, trans, doCNV = FALSE) {
     #================================================ obvious one group SNPs
     if (all(nm[!rmid] < thres[1])) {
         geno = rep(3, nsize)
-        v1 = vinotype(nm, ns, geno, doCNV)
+        v1 = vinotype(nm, ns, geno)
         vino = v1$vino
         conf = v1$conf
-        baf = v1$BAF
-        llr = v1$llr
     }
     else if (all(nm[!rmid] > thres[6])) {
         geno = rep(1, nsize)
-        v1 = vinotype(nm, ns, geno, doCNV)
+        v1 = vinotype(nm, ns, geno)
         vino = v1$vino
         conf = v1$conf
-        baf = v1$BAF
-        llr = v1$llr
     }
     else if (all(nm[!rmid] >= thres[3] & nm[!rmid] <= thres[4])) {
         geno = rep(2, nsize)
-        v1 = vinotype(nm, ns, geno, doCNV)
+        v1 = vinotype(nm, ns, geno)
         vino = v1$vino
         conf = v1$conf
-        baf = v1$BAF
-        llr = v1$llr
     }
     else if (all(nm[!rmid] <= thres[2] | nm[!rmid] >= thres[5])) {
         # 1,3
         geno = rep(1, nsize)
         geno[nm < 0] = 3
-        v1 = vinotype(nm, ns, geno, doCNV)
+        v1 = vinotype(nm, ns, geno)
         vino = v1$vino
         conf = v1$conf
-        baf = v1$BAF
-        llr = v1$llr
     }
     else {
         #cat("timing section 1\n")
@@ -190,11 +182,9 @@ genotype = function(nm, ns, hint1, trans, doCNV = FALSE) {
                 geno = rep(3, nsize)
             else geno = rep(2, nsize)
             if (istwo) {
-                v1 = vinotype(nm, ns, geno, doCNV)
+                v1 = vinotype(nm, ns, geno)
                 vino = v1$vino
                 conf = v1$conf
-                baf = v1$BAF
-                llr = v1$llr
             }
         }
         else {
@@ -208,11 +198,9 @@ genotype = function(nm, ns, hint1, trans, doCNV = FALSE) {
             if (istwo) {
                 # test if it's one group or two group
                 geno = test12(tscore2, nm, tgeno2, rmid, thres, iig, nsize)
-                v1 = vinotype(nm, ns, geno, doCNV)
+                v1 = vinotype(nm, ns, geno)
                 vino = v1$vino
                 conf = v1$conf
-                baf = v1$BAF
-                llr = v1$llr
             }
         }
         #cat(proc.time()[3] - startTime, "\n")
@@ -281,11 +269,9 @@ genotype = function(nm, ns, hint1, trans, doCNV = FALSE) {
                 # we need to fall back on the 2 vs 1 group test
                 if (!isone) 
                   geno = test12(tscore2, nm, tgeno2, rmid, thres, iig, nsize)
-                v1 = vinotype(nm, ns, geno, doCNV)
+                v1 = vinotype(nm, ns, geno)
                 vino = v1$vino
                 conf = v1$conf
-                baf = v1$BAF
-                llr = v1$llr
             }
             else {
                 out[out1 < out] = out1[out1 < out]
@@ -297,11 +283,9 @@ genotype = function(nm, ns, hint1, trans, doCNV = FALSE) {
                     # we need to fall back on the 2 vs 1 group test
                   if (!isone) 
                     geno = test12(tscore2, nm, tgeno2, rmid, thres, iig, nsize)
-                  v1 = vinotype(nm, ns, geno, doCNV)
+                  v1 = vinotype(nm, ns, geno)
                   vino = v1$vino
                   conf = v1$conf
-                  baf = v1$BAF
-                  llr = v1$llr
                 }
                 else {
                   # at this point the 3 group scenario is still possible
@@ -313,19 +297,15 @@ genotype = function(nm, ns, hint1, trans, doCNV = FALSE) {
                   tscore3 = silhouette(match(tgeno3[!rmid], unique(tgeno3[!rmid])), dist(nm[!rmid]))
                   if (isone) {
                     geno = test13(tscore3, nm, tgeno3, rmid, geno)
-                    v1 = vinotype(nm, ns, geno, doCNV)
+                    v1 = vinotype(nm, ns, geno)
                     vino = v1$vino
                     conf = v1$conf
-                    baf = v1$BAF
-                    llr = v1$llr
                   }
                   else {
                     geno = test123(tscore2, tscore3, nm, tgeno2, tgeno3, rmid, thres, iig, nsize)
-                    v1 = vinotype(nm, ns, geno, doCNV)
+                    v1 = vinotype(nm, ns, geno)
                     vino = v1$vino
                     conf = v1$conf
-                    baf = v1$BAF
-                    llr = v1$llr
                   }
                 }
             }
@@ -333,11 +313,11 @@ genotype = function(nm, ns, hint1, trans, doCNV = FALSE) {
         #cat(proc.time()[3] - startTime, "\n")
         #cat("##############################\n")
     }
-    list(geno = geno, vino = vino, conf = conf, baf = baf, llr = llr)
+    list(geno = geno, vino = vino, conf = conf)
 }
 
 # genotyping for probesets that we know are homozygous a priori
-genotypeHomozygous <- function(nm, ns, trans, doCNV) {
+genotypeHomozygous <- function(nm, ns, trans) {
     nsize = length(nm)
     hint = c(max(nm), min(nm))
     
@@ -351,29 +331,23 @@ genotypeHomozygous <- function(nm, ns, trans, doCNV) {
     
     if (all(nm[!rmid] < thres[3])) {
         geno = rep(3, nsize)
-        v1 = vinotype(nm, ns, geno, doCNV)
+        v1 = vinotype(nm, ns, geno)
         vino = v1$vino
         conf = v1$conf
-        baf = v1$BAF
-        llr = v1$llr
     }
     else if (all(nm[!rmid] > thres[4])) {
         geno = rep(1, nsize)
-        v1 = vinotype(nm, ns, geno, doCNV)
+        v1 = vinotype(nm, ns, geno)
         vino = v1$vino
         conf = v1$conf
-        baf = v1$BAF
-        llr = v1$llr
     }
     else if (all(nm[!rmid] <= thres[3] | nm[!rmid] >= thres[4])) {
         # 1,3
         geno = rep(1, nsize)
         geno[nm < 0] = 3
-        v1 = vinotype(nm, ns, geno, doCNV)
+        v1 = vinotype(nm, ns, geno)
         vino = v1$vino
         conf = v1$conf
-        baf = v1$BAF
-        llr = v1$llr
     }
     else {
         adata = cbind(nm, ns/(max(ns) - min(ns)))
@@ -419,11 +393,9 @@ genotypeHomozygous <- function(nm, ns, trans, doCNV) {
             geno = rep(1, nsize)
             if (mm < 0) 
                 geno = rep(3, nsize)
-            v1 = vinotype(nm, ns, geno, doCNV)
+            v1 = vinotype(nm, ns, geno)
             vino = v1$vino
             conf = v1$conf
-            baf = v1$BAF
-            llr = v1$llr
         }
         else {
             if (any(geno == -1)) 
@@ -435,14 +407,12 @@ genotypeHomozygous <- function(nm, ns, trans, doCNV) {
                 geno[geno == 1] = 3
                 geno[geno == 2] = 1
             }
-            v1 = vinotype(nm, ns, geno, doCNV)
+            v1 = vinotype(nm, ns, geno)
             vino = v1$vino
             conf = v1$conf
-            baf = v1$BAF
-            llr = v1$llr
         }
     }
-    list(geno = geno, vino = vino, conf = conf, baf = baf, llr = llr)
+    list(geno = geno, vino = vino, conf = conf)
 }
 
 # test three groups (the tscore parameters are silhoutte scores)
