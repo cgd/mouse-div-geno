@@ -302,7 +302,7 @@ MouseDivGenotype = function(allid, ABid, chrid, CGFLcorrection = NULL,
                 rm(chunkResult)
             }
             
-            #cat("time it took us to complete genotypethis\n")
+            #cat("time it took us to genotype the current chunk:\n")
             #timeReport(startTime)
         }
         rm(argLists)
