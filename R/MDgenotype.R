@@ -8,12 +8,6 @@
 #
 #########################################################################
 
-#TODO REMOVE ME KEITH!!!
-library("snow")
-
-library("affyio")
-library("preprocessCore")
-library("cluster")
 #library("time")
 
 MouseDivGenotype = function(allid, ABid, chrid, CGFLcorrection = NULL, 
@@ -28,6 +22,12 @@ MouseDivGenotype = function(allid, ABid, chrid, CGFLcorrection = NULL,
         outfiledir = getwd()
     if (missing(allid) | missing(ABid)) 
         stop("No CDF file information")
+    
+    if(length(cluster) >= 1 && !require("snow"))
+    {
+        stop("failed to load the snow library")
+    }
+    
     SNPname = ABid$SNPname
     Aid = ABid$allAid
     Bid = ABid$allBid

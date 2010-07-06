@@ -1,0 +1,5 @@
+#useDynLib(MouseDivGeno)
+
+import(affyio, preprocessCore, cluster)
+
+exportPattern("^[^\\.]")

@@ -4,7 +4,6 @@
 # Part of the MouseDivGenotype package
 #
 #########################################################################
-library("cluster")
 
 inferGender <- function(
     meanIntensityXPerArray,

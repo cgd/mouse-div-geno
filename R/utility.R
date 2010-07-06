@@ -7,7 +7,6 @@ plotSNP = function(nm, ns, geno, vino, main = "", xlab = "Contrast", ylab = "Ave
 }
 
 imageplot = function(filename, plotname = "imageplot.jpg") {
-    library(affyio)
     my <- as.matrix(read.celfile(filename, intensity.means.only = TRUE)[["INTENSITY"]][["MEAN"]][1:6892960])
     # y[ypos+1,xpos+1] 2572 * 2680
     y = matrix(log2(my), byrow = T, ncol = 2680)
@@ -18,8 +17,6 @@ imageplot = function(filename, plotname = "imageplot.jpg") {
 
 densityplot = function(filenames, allid, ABid, type = c("Average", "MatchedSet"), 
     plotname = "densityplot.jpg") {
-    library(affyio)
-    library("preprocessCore")
     SNPname = ABid$SNPname
     Aid = ABid$allAid
     Bid = ABid$allBid
