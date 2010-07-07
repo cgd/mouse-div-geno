@@ -1,4 +1,4 @@
-#useDynLib(MouseDivGeno)
+useDynLib(MouseDivGeno, calc_expectation_two_genos_from_r)
 
 import(affyio, preprocessCore, cluster)
 

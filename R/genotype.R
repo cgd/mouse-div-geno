@@ -573,7 +573,7 @@ M.step3 <- function(T, data) {
     list(tau = tau, mu1 = mu1, mu2 = mu2, mu3 = mu3, sigma1 = sigma1, sigma2 = sigma2, sigma3 = sigma3)
 }
 
-E.step2 <- function(theta, data) {
+E.step2.using_r <- function(theta, data) {
     i1 = i2 = rep(0, length(data))
     if (theta$tau[1] > 0) 
         i1 = theta$tau[1] * dnorm(data, mean = theta$mu1, sd = sqrt(theta$sigma1))
@@ -581,6 +581,23 @@ E.step2 <- function(theta, data) {
         i2 = theta$tau[2] * dnorm(data, mean = theta$mu2, sd = sqrt(theta$sigma2))
     t(apply(cbind(i1, i2), 1, function(x) x/sum(x)))
 }
+
+E.step2.using_c <- function(theta, data) {
+    data_len <- length(data)
+    c_call <- .C(
+        name = calc_expectation_two_genos_from_r,
+        as.double(data),
+        as.integer(data_len),
+        as.double(theta$tau),
+        as.double(theta$mu1),
+        as.double(theta$mu2),
+        as.double(theta$sigma1),
+        as.double(theta$sigma2),
+        result = matrix(0.0, nrow = data_len, ncol = 2))
+    c_call$result
+}
+
+E.step2 <- E.step2.using_c
 
 M.step2 <- function(T, data) {
     mu1 = mu2 = sigma1 = sigma2 = NA
