@@ -544,7 +544,7 @@ vdist = function(ta, tb, t2) {
     t2
 }
 
-E.step3 <- function(theta, data) {
+E.step3.using_r <- function(theta, data) {
     i1 = i2 = i3 = rep(0, length(data))
     if (theta$tau[1] > 0) 
         i1 = theta$tau[1] * dnorm(data, mean = theta$mu1, sd = sqrt(theta$sigma1))
@@ -555,7 +555,27 @@ E.step3 <- function(theta, data) {
     t(apply(cbind(i1, i2, i3), 1, function(x) x/sum(x)))
 }
 
-M.step3 <- function(T, data) {
+E.step3.using_c <- function(theta, data) {
+    data_len <- length(data)
+    c_call <- .C(
+        name = calc_expectation_three_genos_from_r,
+        as.double(data),
+        as.integer(data_len),
+        as.double(theta$tau),
+        as.double(theta$mu1),
+        as.double(theta$mu2),
+        as.double(theta$mu3),
+        as.double(theta$sigma1),
+        as.double(theta$sigma2),
+        as.double(theta$sigma3),
+        expectation_matrix = matrix(0.0, nrow = data_len, ncol = 3))
+    
+    c_call$expectation_matrix
+}
+
+E.step3 <- E.step3.using_c
+
+M.step3.using_r <- function(T, data) {
     mu1 = mu2 = mu3 = sigma1 = sigma2 = sigma3 = NA
     tau = apply(T, 2, mean)
     if (tau[1] > 0) {
@@ -572,6 +592,29 @@ M.step3 <- function(T, data) {
     }
     list(tau = tau, mu1 = mu1, mu2 = mu2, mu3 = mu3, sigma1 = sigma1, sigma2 = sigma2, sigma3 = sigma3)
 }
+
+M.step3.using_c <- function(T, data)
+{
+    data_len <- length(data)
+    c_call <- .C(
+        name = maximimize_expectation_three_genos_from_r,
+        T,
+        data,
+        as.integer(data_len),
+        taus = c(0.0, 0.0, 0.0),
+        mus = c(0.0, 0.0, 0.0),
+        sigmas = c(0.0, 0.0, 0.0))
+    list(
+        tau = c_call$taus,
+        mu1 = c_call$mus[1],
+        mu2 = c_call$mus[2],
+        mu3 = c_call$mus[3],
+        sigma1 = c_call$sigmas[1],
+        sigma2 = c_call$sigmas[2],
+        sigma3 = c_call$sigmas[3])
+}
+
+M.step3 <- M.step3.using_c
 
 E.step2.using_r <- function(theta, data) {
     i1 = i2 = rep(0, length(data))
@@ -593,13 +636,33 @@ E.step2.using_c <- function(theta, data) {
         as.double(theta$mu2),
         as.double(theta$sigma1),
         as.double(theta$sigma2),
-        result = matrix(0.0, nrow = data_len, ncol = 2))
-    c_call$result
+        expectation_matrix = matrix(0.0, nrow = data_len, ncol = 2))
+    
+    c_call$expectation_matrix
 }
 
 E.step2 <- E.step2.using_c
 
-M.step2 <- function(T, data) {
+M.step2.using_c <- function(T, data)
+{
+    data_len <- length(data)
+    c_call <- .C(
+        name = maximimize_expectation_two_genos_from_r,
+        T,
+        data,
+        as.integer(data_len),
+        taus = c(0.0, 0.0),
+        mus = c(0.0, 0.0),
+        sigmas = c(0.0, 0.0))
+    list(
+        tau = c_call$taus,
+        mu1 = c_call$mus[1],
+        mu2 = c_call$mus[2],
+        sigma1 = c_call$sigmas[1],
+        sigma2 = c_call$sigmas[2])
+}
+
+M.step2.using_r <- function(T, data) {
     mu1 = mu2 = sigma1 = sigma2 = NA
     tau = apply(T, 2, mean)
     if (tau[1] > 0) {
@@ -612,4 +675,5 @@ M.step2 <- function(T, data) {
     }
     list(tau = tau, mu1 = mu1, mu2 = mu2, sigma1 = sigma1, sigma2 = sigma2)
 }
- 
+
+M.step2 <- M.step2.using_c

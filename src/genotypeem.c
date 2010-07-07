@@ -70,12 +70,12 @@ void calc_expectation(
 void calc_expectation_two_genos_from_r(
     double *data_vec,
     int *data_len,
-    double *tau_1_and_2,
+    double *taus,
     double *mu1,
     double *mu2,
     double *sigma1,
     double *sigma2,
-    double *return_expectation_matrix)
+    double *expectation_matrix)
 {
     double mus[2] = {*mu1, *mu2};
     double sigmas[2] = {*sigma1, *sigma2};
@@ -84,10 +84,48 @@ void calc_expectation_two_genos_from_r(
         data_vec,
         *data_len,
         2,
-        tau_1_and_2,
+        taus,
         mus,
         sigmas,
-        return_expectation_matrix);
+        expectation_matrix);
+}
+
+void calc_expectation_three_genos_from_r(
+    double *data_vec,
+    int *data_len,
+    double *taus,
+    double *mu1,
+    double *mu2,
+    double *mu3,
+    double *sigma1,
+    double *sigma2,
+    double *sigma3,
+    double *expectation_matrix)
+{
+    double mus[3] = {*mu1, *mu2, *mu3};
+    double sigmas[3] = {*sigma1, *sigma2, *sigma3};
+    
+    calc_expectation(
+        data_vec,
+        *data_len,
+        3,
+        taus,
+        mus,
+        sigmas,
+        expectation_matrix);
+}
+
+double weighted_mean(double *data, double *weights, int len)
+{
+    double sum_of_weighted_data = 0.0;
+    double sum_of_weights = 0.0;
+    for(int i = 0; i < len; i++)
+    {
+        sum_of_weighted_data += data[i] * weights[i];
+        sum_of_weights += weights[i];
+    }
+    
+    return sum_of_weighted_data / sum_of_weights;
 }
 
 /**
@@ -104,4 +142,105 @@ double self_crossprod(double vec[], int len)
     }
     
     return result;
+}
+
+/**
+ * calculates the weighted variance of the given data
+ * @param data  the data that we are calculating the variance for
+ */
+double weighted_variance(double *data, double *weights, int len)
+{
+    
+    double sum_of_weights = 0.0;
+    for(int i = 0; i < len; i++)
+    {
+        sum_of_weights += weights[i];
+    }
+    
+    double scaled_weights[len];
+    double sqrt_scaled_weights[len];
+    double sum_sq_scaled_weights = 0.0;
+    double weighted_sum = 0.0;
+    for(int i = 0; i < len; i++)
+    {
+        double curr_scaled_weight = weights[i] / sum_of_weights;
+        scaled_weights[i] = curr_scaled_weight;
+        
+        weighted_sum += curr_scaled_weight * data[i];
+        sum_sq_scaled_weights += curr_scaled_weight * curr_scaled_weight;
+    }
+    
+    double xs[len];
+    for(int i = 0; i < len; i++)
+    {
+        xs[i] = sqrt(scaled_weights[i]) * (data[i] - weighted_sum);
+    }
+    
+    return self_crossprod(xs, len) / (1.0 - sum_sq_scaled_weights);
+}
+
+void maximimize_expectation(
+    double *expectation_matrix,
+    double *data_vec,
+    int data_len,
+    int geno_count,
+    double *taus,
+    double *mus,
+    double *sigmas)
+{
+    for(int geno_index = 0; geno_index < geno_count; geno_index++)
+    {
+        taus[geno_index] = 0.0;
+        for(int data_index = 0; data_index < data_len; data_index++)
+        {
+            taus[geno_index] += expectation_matrix[data_index + geno_index * data_len];
+        }
+        taus[geno_index] /= data_len;
+        
+        mus[geno_index] = weighted_mean(
+            data_vec,
+            expectation_matrix + geno_index * data_len,
+            data_len);
+        
+        sigmas[geno_index] = weighted_variance(
+            data_vec,
+            expectation_matrix + geno_index * data_len,
+            data_len);
+    }
+}
+
+void maximimize_expectation_two_genos_from_r(
+    double *expectation_matrix,
+    double *data_vec,
+    int *data_len,
+    double *taus,
+    double *mus,
+    double *sigmas)
+{
+    maximimize_expectation(
+        expectation_matrix,
+        data_vec,
+        *data_len,
+        2,
+        taus,
+        mus,
+        sigmas);
+}
+
+void maximimize_expectation_three_genos_from_r(
+    double *expectation_matrix,
+    double *data_vec,
+    int *data_len,
+    double *taus,
+    double *mus,
+    double *sigmas)
+{
+    maximimize_expectation(
+        expectation_matrix,
+        data_vec,
+        *data_len,
+        3,
+        taus,
+        mus,
+        sigmas);
 }
