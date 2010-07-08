@@ -8,12 +8,11 @@
 #
 #########################################################################
 
-#library("time")
-
 MouseDivGenotype = function(allid, ABid, chrid, CGFLcorrection = NULL, 
     reference = NULL, hint = NULL, trans = c("CCStrans", "MAtrans"), celnamefile = NULL, 
     mchr = c(1:19, "X", "Y", "M"), celfiledir, outfiledir, subset = FALSE, 
     verbose = FALSE, cluster = NULL, probesetChunkSize=1000) {
+    #library("time")
     
     trans = match.arg(trans)
     if (missing(celfiledir)) 
