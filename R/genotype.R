@@ -666,28 +666,60 @@ test12 = function(tscore2, nm, tgeno, rmid, thres, iig, nsize) {
 
 # vdist performs hierarchical clustering (our fallback function when we are
 # left with unassigned genotypes)
-vdist = function(ta, tb, t2) {
+vdist.using_r = function(ta, tb, t2) {
+    # the list of unassigned geno indices
     la = which(t2 == -1)
+    
+    # the number of unassigned genos
     l = length(la)
+    
+    # dta is a symetrix matrix where each cell measures the euclidian distance
+    # two rows in the matrix. For example,
+    # sqrt((ta[1] - ta[3]) ^ 2 + (tb[1] - tb[3]) ^ 2) == dta[1, 3] == dta[3, 1]
     dta = as.matrix(dist(cbind(ta, tb)))
     diag(dta) = 1000
     while (l > 0) {
+        # t3 contains all valid genotypes
         t3 = t2[t2 != -1]
+        
+        # tmp is the distance matrix where the rows are from unassigned genos
+        # and the the cols are from assigned genos
         tmp = dta[la, t2 != -1]
         if (l == 1) {
+            # if there is only 1 unassigned genotype assign it to the
+            # nearest valid genotype
             t2[la] = t3[which(min(tmp) == tmp)[1]]
         }
         else {
+            # id is the index from tmp with the smallest distance
             id = which(tmp == min(tmp))[1]
+            
+            # iid is the tmp row of the unassigned geno with the smallest distance
             iid = id%%l
             iid[iid == 0] = l
+            
+            # la[iid] recovers the index of the nearest unassigned geno which
+            # we then assign it to the nearest genotype
             t2[la[iid]] = t3[which(tmp[iid, ] == min(tmp[iid, ]))[1]]
         }
+        
         la = which(t2 == -1)
         l = length(la)
     }
     t2
 }
+
+vdist.using_c = function(ta, tb, t2) {
+    c_call <- .C(
+        name = vdist_from_r,
+        vectors_length = as.integer(length(t2)),
+        ta = as.double(ta),
+        tb = as.double(tb),
+        t2 = as.integer(t2))
+    c_call$t2
+}
+
+vdist <- vdist.using_c
 
 E.step3.using_r <- function(theta, data) {
     i1 = i2 = i3 = rep(0, length(data))
