@@ -94,56 +94,57 @@ genotype = function(nm, ns, hint1, trans) {
         nsize = length(nm)
         #======== test 2 ====== based on one dimension at this time rather than two
         # Start with priors
-        otheta1 = theta1 = list(
-                tau = c(0.5, 0.5),
-                mu1 = hint[1],
-                mu2 = hint[3],
-                sigma1 = 0.01,
-                sigma2 = 0.01)
-        ok = TRUE
-        delta = 0.001
-        imax = 50
-        iter = 0
-        
-        #cat(proc.time()[3] - startTime, "\n")
-        #cat("iterating\n")
-        #startTime <- proc.time()[3]
-        
-        while (ok & iter <= imax) {
-            iter = iter + 1
-            
-            # probability that belongs to group 1 vs prob group 2
-            # T matrix is # samples x 2 groups
-            T <- E.step2(theta1, nm[!rmid])
-            T[is.na(T)] = 0.5
-            theta1 <- M.step2(T, nm[!rmid])
-            ok1 = TRUE
-            
-            # Determines the stopping condition of EM algo.
-            # There are two groups so if 1st group mean is stable but the 2nd is
-            # not we will keep iterating until both means are stable
-            # 
-            # tau is the overall probability of how many are in group1 vs group 2
-            # the mean will be na if tau_1 <=0 or tau2 <=0
-            if (theta1$tau[1] > 0) 
-                ok1 = ok1 * (abs(theta1$mu1[1] - otheta1$mu1[1]) < delta)
-            if (theta1$tau[2] > 0) 
-                ok1 = ok1 * (abs(theta1$mu2[1] - otheta1$mu2[1]) < delta)
-            if (ok1 | is.na(theta1$sigma1) | is.na(theta1$sigma2) | is.infinite(theta1$sigma1) | is.infinite(theta1$sigma2)) 
-                ok = FALSE
-            if (ok) {
-                m = (theta1$sigma1 + theta1$sigma2)/2
-                theta1$sigma1 = 0.5 * theta1$sigma1 + 0.5 * m
-                theta1$sigma2 = 0.5 * theta1$sigma2 + 0.5 * m
-            }
-            otheta1 = theta1
-        }
+#        otheta1 = theta1 = list(
+#                tau = c(0.5, 0.5),
+#                mu1 = hint[1],
+#                mu2 = hint[3],
+#                sigma1 = 0.01,
+#                sigma2 = 0.01)
+#        ok = TRUE
+#        delta = 0.001
+#        imax = 50
+#        iter = 0
+#        
+#        #cat(proc.time()[3] - startTime, "\n")
+#        #cat("iterating\n")
+#        #startTime <- proc.time()[3]
+#        
+#        while (ok & iter <= imax) {
+#            iter = iter + 1
+#            
+#            # probability that belongs to group 1 vs prob group 2
+#            # T matrix is # samples x 2 groups
+#            T <- E.step2(theta1, nm[!rmid])
+#            T[is.na(T)] = 0.5
+#            theta1 <- M.step2(T, nm[!rmid])
+#            ok1 = TRUE
+#            
+#            # Determines the stopping condition of EM algo.
+#            # There are two groups so if 1st group mean is stable but the 2nd is
+#            # not we will keep iterating until both means are stable
+#            # 
+#            # tau is the overall probability of how many are in group1 vs group 2
+#            # the mean will be na if tau_1 <=0 or tau2 <=0
+#            if (theta1$tau[1] > 0) 
+#                ok1 = ok1 * (abs(theta1$mu1[1] - otheta1$mu1[1]) < delta)
+#            if (theta1$tau[2] > 0) 
+#                ok1 = ok1 * (abs(theta1$mu2[1] - otheta1$mu2[1]) < delta)
+#            if (ok1 | is.na(theta1$sigma1) | is.na(theta1$sigma2) | is.infinite(theta1$sigma1) | is.infinite(theta1$sigma2)) 
+#                ok = FALSE
+#            if (ok) {
+#                m = (theta1$sigma1 + theta1$sigma2)/2
+#                theta1$sigma1 = 0.5 * theta1$sigma1 + 0.5 * m
+#                theta1$sigma2 = 0.5 * theta1$sigma2 + 0.5 * m
+#            }
+#            otheta1 = theta1
+#        }
         #cat(proc.time()[3] - startTime, "\n")
         
         #cat("OK done iterating now prepping of ielse\n")
         #startTime <- proc.time()[3]
         
-        T = round(T, 4)
+        emResult <- em2Genos(c(hint[1], hint[3]), nm[!rmid])
+        T = round(emResult$T, 4)
         tgeno2 = rep(-1, nsize)
         geno2 = rep(-1, lnrmid)
         
@@ -151,7 +152,7 @@ genotype = function(nm, ns, hint1, trans) {
         #       (bigger number gets group)
         #       also make sure that T is big enough (don't just pick the biggest)
         #       value is 1,2 or 2,1
-        ig = order(theta1$tau, decreasing = TRUE)
+        ig = order(emResult$tau, decreasing = TRUE)
         
         # if 2nd grp is bigger ii is 2, otherwise 1
         ii = ig[1]
@@ -189,7 +190,7 @@ genotype = function(nm, ns, hint1, trans) {
         }
         else {
             if (any(tgeno2 == -1))
-                # use vdist to give membership
+                # use vdist to give membership (TODO why divided by 5)
                 tgeno2 = vdist(adata[, 1], adata[, 2]/5, tgeno2)
             
             tscore2 = silhouette(match(tgeno2[!rmid], unique(tgeno2[!rmid])), dist(nm[!rmid]))
@@ -210,45 +211,43 @@ genotype = function(nm, ns, hint1, trans) {
         
         if (!istwo) {
             #======== test 3
-            otheta1 = theta1 = list(tau = c(1/3, 1/3, 1/3), mu1 = hint[1], mu2 = hint[2], mu3 = hint[3], sigma1 = 0.1, sigma2 = 0.1, sigma3 = 0.1)
-            ok = TRUE
-            delta = 0.001
-            imax = 50
-            iter = 0
-            while (ok & iter <= imax) {
-                iter = iter + 1
-                
-                # T is a matrix of # samples x 3 groups
-                T <- E.step3(theta1, nm[!rmid])
-                T[is.na(T)] = 1/3
-                theta1 <- M.step3(T, nm[!rmid])
-                ok1 = TRUE
-                
-                # determines the stopping condition of EM algo (analogous to
-                # the two group version)
-                if (theta1$tau[1] > 0) 
-                  ok1 = ok1 * (abs(theta1$mu1[1] - otheta1$mu1[1]) < delta)
-                if (theta1$tau[2] > 0) 
-                  ok1 = ok1 * (abs(theta1$mu2[1] - otheta1$mu2[1]) < delta)
-                if (theta1$tau[3] > 0) 
-                  ok1 = ok1 * (abs(theta1$mu3[1] - otheta1$mu3[1]) < delta)
-                if (ok1 | is.na(theta1$sigma1) | is.na(theta1$sigma2) | is.na(theta1$sigma3) | 
-                  is.infinite(theta1$sigma1) | is.infinite(theta1$sigma2) | is.infinite(theta1$sigma3)) 
-                  ok = FALSE
-                if (ok) {
-                  m = (theta1$sigma1 + theta1$sigma2 + theta1$sigma3)/3
-                  theta1$sigma1 = 0.5 * theta1$sigma1 + 0.5 * m
-                  theta1$sigma2 = 0.5 * theta1$sigma2 + 0.5 * m
-                  theta1$sigma3 = 0.5 * theta1$sigma3 + 0.5 * m
-                }
-                otheta1 = theta1
-            }
-            T = round(T, 4)
+#            otheta1 = theta1 = list(tau = c(1/3, 1/3, 1/3), mu1 = hint[1], mu2 = hint[2], mu3 = hint[3], sigma1 = 0.1, sigma2 = 0.1, sigma3 = 0.1)
+#            ok = TRUE
+#            delta = 0.001
+#            imax = 50
+#            iter = 0
+#            while (ok & iter <= imax) {
+#                iter = iter + 1
+#                
+#                # T is a matrix of # samples x 3 groups
+#                T <- E.step3(theta1, nm[!rmid])
+#                T[is.na(T)] = 1/3
+#                theta1 <- M.step3(T, nm[!rmid])
+#                ok1 = TRUE
+#                
+#                # determines the stopping condition of EM algo (analogous to
+#                # the two group version)
+#                ok <-
+#                    ((theta1$tau[1] > 0 && abs(theta1$mu1[1] - otheta1$mu1[1]) >= delta) ||
+#                     (theta1$tau[2] > 0 && abs(theta1$mu2[1] - otheta1$mu2[1]) >= delta) ||
+#                     (theta1$tau[3] > 0 && abs(theta1$mu3[1] - otheta1$mu3[1]) >= delta)) &&
+#                    (!is.na(theta1$sigma1) && !is.na(theta1$sigma2) && !is.na(theta1$sigma3) &&
+#                     !is.infinite(theta1$sigma1) && !is.infinite(theta1$sigma2) && !is.infinite(theta1$sigma3))
+#                if (ok) {
+#                  m = (theta1$sigma1 + theta1$sigma2 + theta1$sigma3)/3
+#                  theta1$sigma1 = 0.5 * theta1$sigma1 + 0.5 * m
+#                  theta1$sigma2 = 0.5 * theta1$sigma2 + 0.5 * m
+#                  theta1$sigma3 = 0.5 * theta1$sigma3 + 0.5 * m
+#                }
+#                otheta1 = theta1
+#            }
+            emResult <- em3Genos(hint, nm[!rmid])
+            T = round(emResult$T, 4)
             tgeno3 = rep(-1, nsize)
             geno3 = rep(-1, lnrmid)
             
             # create the 3x3 mm matrix and sort by decreasing tau
-            ig = order(theta1$tau, decreasing = TRUE)
+            ig = order(emResult$tau, decreasing = TRUE)
             mm = matrix(c(3, 2, 1, 1, 3, 2, 1, 2, 3), nrow = 3, byrow = TRUE)
             mm = mm[ig, ]
             
@@ -316,6 +315,145 @@ genotype = function(nm, ns, hint1, trans) {
     list(geno = geno, vino = vino, conf = conf)
 }
 
+# Run the EM algorithm for 3 genotypes
+em3Genos.using_r <- function(hint, nmSubset)
+{
+    # TODO ask hyuna why sigma is 0.1 for three genotypes and 0.01 for two
+    otheta1 <- list(
+        tau = c(1/3, 1/3, 1/3),
+        mu1 = hint[1],
+        mu2 = hint[2],
+        mu3 = hint[3],
+        sigma1 = 0.1,
+        sigma2 = 0.1,
+        sigma3 = 0.1)
+    theta1 <- otheta1
+    
+    ok = TRUE
+    delta = 0.001
+    imax = 50
+    iter = 0
+    while (ok & iter <= imax) {
+        iter = iter + 1
+        
+        # T is a matrix of # samples x 3 groups
+        T <- E.step3(theta1, nmSubset)
+        T[is.na(T)] = 1/3
+        theta1 <- M.step3(T, nmSubset)
+        ok1 = TRUE
+        
+        # determines the stopping condition of EM algo (analogous to
+        # the two group version)
+        ok <-
+            ((theta1$tau[1] > 0 && abs(theta1$mu1[1] - otheta1$mu1[1]) >= delta) ||
+             (theta1$tau[2] > 0 && abs(theta1$mu2[1] - otheta1$mu2[1]) >= delta) ||
+             (theta1$tau[3] > 0 && abs(theta1$mu3[1] - otheta1$mu3[1]) >= delta)) &&
+            (!is.na(theta1$sigma1) && !is.na(theta1$sigma2) &&
+             !is.na(theta1$sigma3) && !is.infinite(theta1$sigma1) &&
+             !is.infinite(theta1$sigma2) && !is.infinite(theta1$sigma3))
+        if (ok) {
+            m = (theta1$sigma1 + theta1$sigma2 + theta1$sigma3)/3
+            theta1$sigma1 = 0.5 * theta1$sigma1 + 0.5 * m
+            theta1$sigma2 = 0.5 * theta1$sigma2 + 0.5 * m
+            theta1$sigma3 = 0.5 * theta1$sigma3 + 0.5 * m
+        }
+        otheta1 = theta1
+    }
+    
+    # TODO rename T so it doesn't overlap with the TRUE constant
+    list(T = T, tau = theta1$tau)
+}
+
+em3Genos.using_c <- function(hint, nmSubset)
+{
+    sample_count <- as.integer(length(nmSubset))
+    geno_count <- as.integer(3)
+    
+    c_call <- .C(
+        name = run_em_from_r,
+        init_sigma = as.double(0.1),
+        mus = as.double(hint),
+        expectation_matrix = matrix(0.0, nrow = sample_count, ncol = geno_count),
+        data_vec = as.double(nmSubset),
+        taus = rep(as.double(1/3), 3),
+        sample_count = sample_count,
+        geno_count = geno_count)
+    
+    list(T = c_call$expectation_matrix, tau = c_call$taus)
+}
+
+em3Genos <- em3Genos.using_c
+
+em2Genos.using_r <- function(hint, nmSubset)
+{
+    # Start with priors
+    otheta1 = theta1 = list(
+        tau = c(0.5, 0.5),
+        mu1 = hint[1],
+        mu2 = hint[2],
+        sigma1 = 0.01,
+        sigma2 = 0.01)
+    ok = TRUE
+    delta = 0.001
+    imax = 50
+    iter = 0
+    
+    #cat(proc.time()[3] - startTime, "\n")
+    #cat("iterating\n")
+    #startTime <- proc.time()[3]
+    
+    while (ok & iter <= imax) {
+        iter = iter + 1
+        
+        # probability that belongs to group 1 vs prob group 2
+        # T matrix is # samples x 2 groups
+        T <- E.step2(theta1, nmSubset)
+        T[is.na(T)] = 0.5
+        theta1 <- M.step2(T, nmSubset)
+        ok1 = TRUE
+        
+        # Determines the stopping condition of EM algo.
+        # There are two groups so if 1st group mean is stable but the 2nd is
+        # not we will keep iterating until both means are stable
+        # 
+        # tau is the overall probability of how many are in group1 vs group 2
+        # the mean will be na if tau_1 <=0 or tau2 <=0
+        ok <-
+            ((theta1$tau[1] > 0 && abs(theta1$mu1[1] - otheta1$mu1[1]) >= delta) ||
+             (theta1$tau[2] > 0 && abs(theta1$mu2[1] - otheta1$mu2[1]) >= delta)) &&
+            (!is.na(theta1$sigma1) && !is.na(theta1$sigma2) &&
+             !is.infinite(theta1$sigma1) && !is.infinite(theta1$sigma2))
+        if (ok) {
+            m = (theta1$sigma1 + theta1$sigma2)/2
+            theta1$sigma1 = 0.5 * theta1$sigma1 + 0.5 * m
+            theta1$sigma2 = 0.5 * theta1$sigma2 + 0.5 * m
+        }
+        otheta1 = theta1
+    }
+    
+    list(T = T, tau = theta1$tau)
+}
+
+em2Genos.using_c <- function(hint, nmSubset)
+{
+    sample_count <- as.integer(length(nmSubset))
+    geno_count <- as.integer(2)
+    
+    c_call <- .C(
+        name = run_em_from_r,
+        init_sigma = as.double(0.01),
+        mus = as.double(hint),
+        expectation_matrix = matrix(0.0, nrow = sample_count, ncol = geno_count),
+        data_vec = as.double(nmSubset),
+        taus = rep(as.double(1/2), 2),
+        sample_count = sample_count,
+        geno_count = geno_count)
+    
+    list(T = c_call$expectation_matrix, tau = c_call$taus)
+}
+
+em2Genos <- em2Genos.using_c
+
 # genotyping for probesets that we know are homozygous a priori
 genotypeHomozygous <- function(nm, ns, trans) {
     nsize = length(nm)
@@ -352,34 +490,40 @@ genotypeHomozygous <- function(nm, ns, trans) {
     else {
         adata = cbind(nm, ns/(max(ns) - min(ns)))
         #======== test 2
-        otheta1 = theta1 = list(tau = c(0.5, 0.5), mu1 = hint[1], mu2 = hint[2], sigma1 = 0.01, sigma2 = 0.01)
-        ok = TRUE
-        delta = 0.001
-        imax = 50
-        iter = 0
-        while (ok & iter <= imax) {
-            iter = iter + 1
-            T <- E.step2(theta1, nm[!rmid])
-            T[is.na(T)] = 0.5
-            theta1 <- M.step2(T, nm[!rmid])
-            ok1 = TRUE
-            if (theta1$tau[1] > 0) 
-                ok1 = ok1 * (abs(theta1$mu1[1] - otheta1$mu1[1]) < delta)
-            if (theta1$tau[2] > 0) 
-                ok1 = ok1 * (abs(theta1$mu2[1] - otheta1$mu2[1]) < delta)
-            if (ok1 | is.na(theta1$sigma1) | is.na(theta1$sigma2) | is.infinite(theta1$sigma1) | is.infinite(theta1$sigma2)) 
-                ok = FALSE
-            if (ok) {
-                m = (theta1$sigma1 + theta1$sigma2)/2
-                theta1$sigma1 = 0.5 * theta1$sigma1 + 0.5 * m
-                theta1$sigma2 = 0.5 * theta1$sigma2 + 0.5 * m
-            }
-            otheta1 = theta1
-        }
-        T = round(T, 4)
+#        otheta1 = theta1 = list(
+#            tau = c(0.5, 0.5),
+#            mu1 = hint[1],
+#            mu2 = hint[2],
+#            sigma1 = 0.01,
+#            sigma2 = 0.01)
+#        ok = TRUE
+#        delta = 0.001
+#        imax = 50
+#        iter = 0
+#        while (ok & iter <= imax) {
+#            iter = iter + 1
+#            T <- E.step2(theta1, nm[!rmid])
+#            T[is.na(T)] = 0.5
+#            theta1 <- M.step2(T, nm[!rmid])
+#            ok1 = TRUE
+#            if (theta1$tau[1] > 0) 
+#                ok1 = ok1 * (abs(theta1$mu1[1] - otheta1$mu1[1]) < delta)
+#            if (theta1$tau[2] > 0) 
+#                ok1 = ok1 * (abs(theta1$mu2[1] - otheta1$mu2[1]) < delta)
+#            if (ok1 | is.na(theta1$sigma1) | is.na(theta1$sigma2) | is.infinite(theta1$sigma1) | is.infinite(theta1$sigma2)) 
+#                ok = FALSE
+#            if (ok) {
+#                m = (theta1$sigma1 + theta1$sigma2)/2
+#                theta1$sigma1 = 0.5 * theta1$sigma1 + 0.5 * m
+#                theta1$sigma2 = 0.5 * theta1$sigma2 + 0.5 * m
+#            }
+#            otheta1 = theta1
+#        }
+        emResult <- em2Genos(hint, nm[!rmid])
+        T = round(emResult$T, 4)
         geno = rep(-1, nsize)
         geno2 = rep(-1, lnrmid)
-        ig = order(theta1$tau, decreasing = TRUE)
+        ig = order(emResult$tau, decreasing = TRUE)
         ii = ig[1]
         geno2[T[, ii] >= median(T[T[, ig[2]] < 0.5, ii])] = ii
         ii = ig[2]
@@ -398,7 +542,8 @@ genotypeHomozygous <- function(nm, ns, trans) {
             conf = v1$conf
         }
         else {
-            if (any(geno == -1)) 
+            if (any(geno == -1))
+                # TODO why divided by 2?
                 geno = vdist(adata[, 1], adata[, 2]/2, geno)
             keepthis = tapply(nm, geno, mean)
             if (keepthis[1] > keepthis[2]) 
@@ -597,7 +742,7 @@ M.step3.using_c <- function(T, data)
 {
     data_len <- length(data)
     c_call <- .C(
-        name = maximimize_expectation_three_genos_from_r,
+        name = maximize_expectation_three_genos_from_r,
         T,
         data,
         as.integer(data_len),
@@ -647,7 +792,7 @@ M.step2.using_c <- function(T, data)
 {
     data_len <- length(data)
     c_call <- .C(
-        name = maximimize_expectation_two_genos_from_r,
+        name = maximize_expectation_two_genos_from_r,
         T,
         data,
         as.integer(data_len),
