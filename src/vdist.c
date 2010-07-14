@@ -53,9 +53,6 @@ void free_euclidian_distances(int vectors_length, double **dist_triangle)
  */
 double symmetric_get(double **lower_triangle, int i1, int i2)
 {
-    //printf("i1 = %i, i2 = %i\n", i1, i2);
-    //fflush(stdout);
-    
     // it is not valid to ask for something along the diagonal
     assert(i1 != i2 && i1 >= 0 && i2 >= 0);
     
@@ -113,12 +110,11 @@ void vdist(int vectors_length, double vec_data1[], double vec_data2[], int genot
     for( ; assigned_geno_count < vectors_length; assigned_geno_count++)
     {
         int unassigned_geno_count = vectors_length - assigned_geno_count;
-        //printf("unassigned_geno_count = %i\n", unassigned_geno_count);
         
         int min_assigned_index = assigned_geno_indices[0];
         int min_unassigned_index_index = 0;
         int min_unassigned_index = unassigned_geno_indices[min_unassigned_index_index];
-        int min_dist = symmetric_get(dist_triangle, min_assigned_index, min_unassigned_index);
+        double min_dist = symmetric_get(dist_triangle, min_assigned_index, min_unassigned_index);
         
         for(int unassigned_index_index = 0; unassigned_index_index < unassigned_geno_count; unassigned_index_index++)
         {
