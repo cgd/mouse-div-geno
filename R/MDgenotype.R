@@ -22,7 +22,8 @@ MouseDivGenotype = function(allid, ABid, chrid, CGFLcorrection = NULL,
     if (missing(allid) | missing(ABid)) 
         stop("No CDF file information")
     
-    if(length(cluster) >= 1 && !require("snow"))
+    # we only need the snow library if the cluster is non-null
+    if(!is.null(cluster) && !require("snow"))
     {
         stop("failed to load the snow library")
     }
