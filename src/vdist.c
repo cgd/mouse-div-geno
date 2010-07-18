@@ -49,7 +49,7 @@ void free_euclidian_distances(int vectors_length, double **dist_triangle)
 /**
  * this function allows you to treat lower_triangle as a symetric matrix rather
  * than a triangle (so you can swap i1 and i2 and should get the same result).
- * It is not leagal to ask for a number along the diagonal (where i1 == i2).
+ * It is not legal to ask for a number along the diagonal (where i1 == i2).
  */
 double symmetric_get(double **lower_triangle, int i1, int i2)
 {
