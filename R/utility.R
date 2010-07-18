@@ -56,3 +56,40 @@ densityplot = function(filenames, allid, ABid, type = c("Average", "MatchedSet")
     }
     dev.off()
 } 
+
+createAppendResultsToCSVFunction <- function(fileName)
+{
+    unlink(fileName)
+    
+    function(snpProbesetInfoChunk, genotypingResultsChunk)
+    {
+        # the genotyping results are a list of matrices right now. We need
+        # to bind everything together into a single matrix.
+        fileExists <- file.exists(fileName)
+        if(!fileExists)
+        {
+            # start by ensuring that column names are unique and meaningful if
+            # we're working on a new file
+            for(currName in names(genotypingResultsChunk))
+            {
+                colnames(genotypingResultsChunk[[currName]]) <-
+                    paste(currName, colnames(genotypingResultsChunk[[currName]]), sep = "_")
+            }
+        }
+        
+        uberMatrix <- snpProbesetInfoChunk
+        for(currMat in genotypingResultsChunk)
+        {
+        	uberMatrix <- cbind(uberMatrix, currMat)
+        }
+        
+        write.table(
+            uberMatrix,
+            file = fileName,
+            append = fileExists,
+            sep = ",",
+            row.names = FALSE,
+            col.names = !fileExists,
+            qmethod = "double")
+    }
+}

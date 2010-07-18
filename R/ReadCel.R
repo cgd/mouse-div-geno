@@ -49,11 +49,11 @@ ccstrans = function(a, b, k = 4) {
     list(x = x, y = y)
 }
 
-genotypeAnyChrChunk <- function(chr, ms, ss, hint, trans, isMale)
+genotypeAnyChrChunk <- function(chr, ms, ss, hint, parIndices, trans, isMale)
 {
     if(chr == "X")
     {
-        genotypeXChromosomeChunk(ms, ss, hint, trans, isMale)
+        genotypeXChromosomeChunk(ms, ss, hint, parIndices, trans, isMale)
     }
     else if(chr == "Y")
     {
@@ -138,7 +138,7 @@ genotypeHomozygousChunk <- function(ms, ss, trans)
     chunkResult
 }
 
-genotypeXChromosomeChunk <- function(ms, ss, hint, trans, isMale)
+genotypeXChromosomeChunk <- function(ms, ss, hint, parIndices, trans, isMale)
 {
     numArrays <- ncol(ms)
     numProbesets <- nrow(ms)
@@ -152,22 +152,6 @@ genotypeXChromosomeChunk <- function(ms, ss, hint, trans, isMale)
     {
         hint <- rep(0, numProbesets)
     }
-    
-    # TODO need to make pseudoautosomal IDs a parameter somehow. Also think
-    #      whether or not rownames is a robust way to do the matching
-    
-    # the probesets in the pseudo autosomal region should be genotyped as if
-    # they come from an autosome
-    pseudoautosomalID <- c(
-        "JAX00723347", "JAX00723349", "JAX00723350", "JAX00723351", 
-        "JAX00187253", "JAX00723353", "JAX00723354", "JAX00723355", "JAX00723356", 
-        "JAX00723358", "JAX00723359", "JAX00723360", "JAX00723361", "JAX00723364", 
-        "JAX00723365", "JAX00723366", "JAX00723367", "JAX00723368", "JAX00723369", 
-        "JAX00723370", "JAX00187255", "JAX00187256", "JAX00725011", "JAX00725012", 
-        "JAX00723371", "JAX00723372")
-    # TODO it seems that rownames(ms) is NULL. fix that
-    parIndices <- which(pseudoautosomalID %in% rownames(ms))
-    #parIndices <- parIndices[!is.na(parIndices)]
     
     # we'll call the X probesets that aren't in the PAR "normal"
     normalIndices <- 1 : numProbesets
@@ -248,7 +232,7 @@ genotypeXChromosomeChunk <- function(ms, ss, hint, trans, isMale)
         results <- initializeNamesIfMissing(results, names(parResult))
         for(itemName in names(parResult))
         {
-            results[parIndices, ] <- parResult
+            results[[itemName]][parIndices, ] <- parResult[[itemName]]
         }
     }
     
@@ -292,31 +276,40 @@ normalizeCelFileByChr <- function(
     celFileName,
     probesetChunkSize,
     verbose,
-    allid,
-    Aid,
-    Bid,
-    CGFLcorrection,
-    reference,
-    SNPname,
-    trans,
-    mchr1,
-    chrid)
+    snpProbeInfo,
+    snpProbesetInfo,
+    allChr,
+    referenceDistribution,
+    trans)
 {
     if(verbose) cat("Reading and normalizing CEL file: ", celFileName, "\n", sep="")
     
     celData <- read.celfile(celFileName, intensity.means.only = TRUE)
-    y <- log2(as.matrix(celData[["INTENSITY"]][["MEAN"]][allid]))
-    if (length(CGFLcorrection) > 0)
+    y <- log2(as.matrix(celData[["INTENSITY"]][["MEAN"]][snpProbeInfo$probeIndex]))
+    if (length(snpProbeInfo$correction) > 0)
         # C+G and fragment length correction y
-        y = y + CGFLcorrection
-    if (length(reference) > 0) 
-        y <- normalize.quantiles.use.target(y, target = reference)
+        y <- y + snpProbeInfo$correction
+    if (length(referenceDistribution) > 0)
+        y <- normalize.quantiles.use.target(y, target = referenceDistribution)
     
-    # separate A alleles from B alleles
-    allAint = y[Aid, 1, drop = FALSE]
-    allBint = y[Bid, 1, drop = FALSE]
-    allAint <- subColSummarizeMedian(matrix(allAint, ncol = 1), SNPname)
-    allBint <- subColSummarizeMedian(matrix(allBint, ncol = 1), SNPname)
+    # separate A alleles from B alleles and summarize to the probeset level
+    allAint = y[snpProbeInfo$isAAllele, 1, drop = FALSE]
+    allBint = y[!snpProbeInfo$isAAllele, 1, drop = FALSE]
+    allAint <- subColSummarizeMedian(
+        matrix(allAint, ncol = 1),
+        snpProbeInfo$snpId[snpProbeInfo$isAAllele])
+    allBint <- subColSummarizeMedian(
+        matrix(allBint, ncol = 1),
+        snpProbeInfo$snpId[!snpProbeInfo$isAAllele])
+    
+    aSnpIds <- rownames(allAint)
+    bSnpIds <- rownames(allBint)
+    if(!all(aSnpIds == bSnpIds))
+    {
+        stop("The SNP IDs for the A alleles should match up with the SNP IDs ",
+             "for the B alleles but they do not.")
+    }
+    
     if (trans == "CCStrans") {
         # fixed K??
         res = ccstrans(2^allAint, 2^allBint)
@@ -334,8 +327,12 @@ normalizeCelFileByChr <- function(
     
     # divide CEL file up into chromosome pieces
     msList <- list()
-    for (chri in mchr1) {
-        currRows <- which(chrid == chri)
+    for (chri in allChr) {
+        #currRows <- which(chrid == chri)
+        currChrSnps <- snpProbesetInfo$snpId[snpProbesetInfo$chrId == chri]
+        currRows <- match(currChrSnps, aSnpIds)
+        currRows <- currRows[!is.na(currRows)]
+        
         numCurrRows <- length(currRows)
         if(numCurrRows == 0)
         {
@@ -367,9 +364,16 @@ chunkIndices <- function(to, by) {
     chunks
 }
 
-chunkFileName <- function(baseDir, celFileName, chrName, chunkSize, chunkIndex) {
-    fileBase <- sub("\\..*$", "", celFileName)
+# TODO we need more parameters to make sure this is really meaningfully unique
+chunkFileName <- function(baseDir, celFileName, chrName, chunkSize, chunkIndex)
+{
+    fileBase <- fileBaseWithoutExtension(celFileName)
     chunkFile <- paste(fileBase, "-", chrName, "-", chunkSize, "-", chunkIndex, ".RData", sep="")
     
     file.path(baseDir, chunkFile)
+}
+
+fileBaseWithoutExtension <- function(celFileName)
+{
+    sub("\\.[^\\.]*$", "", basename(celFileName))
 }

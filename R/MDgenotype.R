@@ -8,19 +8,42 @@
 #
 #########################################################################
 
-MouseDivGenotype = function(allid, ABid, chrid, CGFLcorrection = NULL, 
-    reference = NULL, hint = NULL, trans = c("CCStrans", "MAtrans"), celnamefile = NULL, 
-    mchr = c(1:19, "X", "Y", "M"), celfiledir, outfiledir, subset = FALSE, 
-    verbose = FALSE, cluster = NULL, probesetChunkSize=1000) {
+MouseDivGenotype = function(
+    snpProbeInfo, snpProbesetInfo, referenceDistribution = NULL,
+    transformMethod = c("CCStrans", "MAtrans"), celFiles = getwd(),
+    mchr = c(1:19, "X", "Y", "M"), cacheDir = tempdir(),
+    verbose = FALSE, cluster = NULL, probesetChunkSize=1000,
+    processResultsFunction = createAppendResultsToCSVFunction("genoResults.csv")) {
     #library("time")
     
-    trans = match.arg(trans)
-    if (missing(celfiledir)) 
-        celfiledir = getwd()
-    if (missing(outfiledir)) 
-        outfiledir = getwd()
-    if (missing(allid) | missing(ABid)) 
-        stop("No CDF file information")
+    transformMethod = match.arg(transformMethod)
+    if(!inherits(snpProbeInfo, "data.frame") ||
+       !all(c("probeIndex", "isAAllele", "snpId") %in% names(snpProbeInfo)))
+    {
+        stop("You must supply a \"snpProbeInfo\" data frame parameter which has ",
+             "at a minimum the \"probeIndex\", \"isAAllele\" and \"snpId\"",
+             "components. Please see the help documentation for more details.")
+    }
+    
+    if(!inherits(snpProbesetInfo, "data.frame") ||
+       !all(c("snpId", "chrId") %in% names(snpProbesetInfo)))
+    {
+        stop("You must supply a \"snpProbesetInfo\" data frame parameter which has ",
+             "at a minimum the \"snpId\" and \"chrId\" ",
+             "components. Please see the help documentation for more details.")
+    }
+    
+    # it is an error if isInPAR is set to TRUE in a non-X chromosome
+    if(!is.null(snpProbesetInfo$isInPAR))
+    {
+        parChrs <- unique(snpProbesetInfo$chrId[snpProbesetInfo$isInPar])
+        if(!all(parChrs == "X"))
+        {
+            stop("snpProbesetInfo$isInPar should only ever be TRUE on the \"X\" ",
+                 "chromosome, but TRUE isInPar values were found on chromosomes: ",
+                 paste(parChrs, collapse=", "))
+        }
+    }
     
     # we only need the snow library if the cluster is non-null
     if(!is.null(cluster) && !require("snow"))
@@ -28,45 +51,16 @@ MouseDivGenotype = function(allid, ABid, chrid, CGFLcorrection = NULL,
         stop("failed to load the snow library")
     }
     
-    SNPname = ABid$SNPname
-    Aid = ABid$allAid
-    Bid = ABid$allBid
-    rm(ABid)
-    mpos = chrid$mpos
-    
-    # TODO this should be handled by which param is passed in
-    if (subset) 
-        chrid = chrid$schrid
-    else
-        chrid = chrid$chrid
-    
-    # TODO we shouldn't be setting the working dir
-    setwd(celfiledir)
-    
-    # TODO rework this section as:
-    #       - rename celnamefile to celfiles
-    #       - if celfiles is a vector of strings it is treated as a .CEL filename list
-    #       - if celfiles is a data.frame it is assumed to have isMale and file
-    #         factors
-    #       - if celfiles is a single string it is treated as a dir of CEL files
     isMale <- NULL
-    if(length(celnamefile) == 0)
+    filenames <- NULL
+    if(is.data.frame(celFiles) || is.matrix(celFiles))
     {
-        # since no celnamefile is provided assume all CEL files come from the
-        # working directory
-        tmp = dir()
-        isCel = apply(matrix(tmp, ncol = 1), 1, function(x) length(grep(".CEL", x)) > 0)
-        filenames = tmp[isCel]
-    }
-    else
-    {
-        filenames <- read.delim(celnamefile, header = TRUE)
-        if(ncol(filenames) > 1)
+        if(ncol(celFiles) >= 2)
         {
-            gender <- toupper(filenames[, 2])
-            isMale <- gender == "MALE"
-            isFemale <- gender == "FEMALE"
-            
+            gender <- toupper(celFiles[, 2])
+            isMale <- gender == "MALE" | gender == "M"
+            isFemale <- gender == "FEMALE" | gender == "F"
+
             # TODO in old code there was fallback to using vdist for gender
             #      inference. Ask Hyuna about the vdist fallback
             if(sum(isMale) + sum(isFemale) != nrow(filenames))
@@ -75,16 +69,55 @@ MouseDivGenotype = function(allid, ABid, chrid, CGFLcorrection = NULL,
                 isFemale <- NULL
             }
         }
-        
-        filenames <- filenames[, 1]
+        filenames <- celFiles[1, ]
     }
-    nfile = length(filenames)
+    else if(is.character(celFiles))
+    {
+        # a simple function that will return all CEL file in a dir if given a
+        # dir argument, or a single CEL file if that is what it's given
+        celExpander <- function(name)
+        {
+            retVal <- c()
+            if(!file.exists(name))
+            {
+                stop("failed to find file named \"", name, "\"")
+            }
+            else if(file.info(name)$isdir)
+            {
+                # if it's a dir expand it to all CEL file contents
+                fileListing <- dir(name, full.names = TRUE)
+                retVal <- fileListing[grep("*.CEL$", toupper(fileListing))]
+            }
+            else if(grep("*.CEL$", toupper(name)))
+            {
+                retVal <- name
+            }
+            
+            retVal
+        }
+        
+        filenames <- unlist(lapply(celFiles, celExpander))
+    }
+    else
+    {
+        stop("expected celFiles to be one of the following: ",
+             "a matrix/data frame where the ",
+             "first column contains CEL file names and the second column ",
+             "contains CEL file gender (\"male\" or \"female\"), the name of ",
+             "a directory containing CEL files, or a vector of CEL file names");
+    }
+    
+    nfile <- length(filenames)
+    if(nfile <= 1)
+    {
+        stop("Cannot successfully genotype with less than two CEL files")
+    }
     
     # make sure that the chromosome vector is not numeric
     # TODO is toupper the right thing to do here?
     mchr <- toupper(as.character(mchr))
     
-    allChr <- unique(chrid)
+    allChr <- unique(snpProbesetInfo$chrId)
     allAutosomes <- setdiff(allChr, c("X", "Y", "M"))
     
     # we must infer gender if we don't yet have it and we need to
@@ -107,7 +140,7 @@ MouseDivGenotype = function(allid, ABid, chrid, CGFLcorrection = NULL,
     chrChunks <- list()
     for(currChr in allChr)
     {
-        chrProbesetCount <- sum(chrid == currChr)
+        chrProbesetCount <- sum(snpProbesetInfo$chrId == currChr)
         chrChunks[[currChr]] <- chunkIndices(chrProbesetCount, probesetChunkSize)
     }
     
@@ -123,15 +156,11 @@ MouseDivGenotype = function(allid, ABid, chrid, CGFLcorrection = NULL,
                 celfile,
                 probesetChunkSize,
                 verbose,
-                allid,
-                Aid,
-                Bid,
-                CGFLcorrection,
-                reference,
-                SNPname,
-                trans,
+                snpProbeInfo,
+                snpProbesetInfo,
                 allChr,
-                chrid)
+                referenceDistribution,
+                transformMethod)
         }
         msList <- NULL
         
@@ -139,7 +168,7 @@ MouseDivGenotype = function(allid, ABid, chrid, CGFLcorrection = NULL,
         {
             for(chunkIndex in 1 : length(chrChunks[[currChr]]))
             {
-                chunkFile <- chunkFileName(outfiledir, celfile, currChr, probesetChunkSize, chunkIndex)
+                chunkFile <- chunkFileName(cacheDir, celfile, currChr, probesetChunkSize, chunkIndex)
                 chunkFileAlreadyExists <- file.exists(chunkFile)
                 if(!chunkFileAlreadyExists)
                 {
@@ -163,7 +192,7 @@ MouseDivGenotype = function(allid, ABid, chrid, CGFLcorrection = NULL,
                     if(chunkFileAlreadyExists)
                     {
                         # we need to bring sChunk into scope
-                        # TODO this is loading mChunk to which is unnecessary
+                        # TODO this is loading mChunk too which is unnecessary
                         #      if we save m and s to different files we can
                         #      avoid this
                         load(file = chunkFile)
@@ -199,12 +228,12 @@ MouseDivGenotype = function(allid, ABid, chrid, CGFLcorrection = NULL,
         # we want to take the mean
         probesetCountPerAutosome <- sapply(
             allAutosomes,
-            function(currChr) {sum(chrid == currChr)})
+            function(currChr) {sum(snpProbesetInfo$chrId == currChr)})
         
         meanIntensityPerAutosome <-
             meanIntensityPerAutosome / probesetCountPerAutosome
-        meanIntensityXPerArray <- meanIntensityXPerArray / sum(chrid == "X")
-        meanIntensityYPerArray <- meanIntensityYPerArray / sum(chrid == "Y")
+        meanIntensityXPerArray <- meanIntensityXPerArray / sum(snpProbesetInfo$chrId == "X")
+        meanIntensityYPerArray <- meanIntensityYPerArray / sum(snpProbesetInfo$chrId == "Y")
         
         isMale <- inferGender(
             meanIntensityXPerArray,
@@ -217,8 +246,22 @@ MouseDivGenotype = function(allid, ABid, chrid, CGFLcorrection = NULL,
     #      write the results to file
     chrResults <- list()
     for (chri in mchr) {
+        chrIndices <- which(snpProbesetInfo$chrId == chri)
         argLists <- list()
         chrResults[[chri]] <- list()
+        
+        # pull out the hints for this chromosome (if they exist)
+        chrHint <- NULL
+        if(!is.null(snpProbesetInfo$snpHetHint))
+        {
+            chrHint <- snpProbesetInfo$snpHetHint[chrIndices]
+        }
+        
+        chrPAR <- logical(0)
+        if(!is.null(snpProbesetInfo$isInPAR))
+        {
+            chrPAR <- snpProbesetInfo$isInPAR[chrIndices]
+        }
         
         for(chunkIndex in 1 : length(chrChunks[[chri]]))
         {
@@ -235,7 +278,7 @@ MouseDivGenotype = function(allid, ABid, chrid, CGFLcorrection = NULL,
             MM <- NULL
             SS <- NULL
             for (i in 1:nfile) {
-                chunkFile <- chunkFileName(outfiledir, filenames[i], chri, probesetChunkSize, chunkIndex)
+                chunkFile <- chunkFileName(cacheDir, filenames[i], chri, probesetChunkSize, chunkIndex)
                 load(chunkFile)
                 MM <- cbind(MM, mChunk)
                 SS <- cbind(SS, sChunk)
@@ -249,7 +292,7 @@ MouseDivGenotype = function(allid, ABid, chrid, CGFLcorrection = NULL,
             #timeReport(startTime)
             
             #startTime <- getTime()
-            chunkIndices <- chunk$start : chunk$end
+            chunkRange <- chunk$start : chunk$end
             if(length(cluster) >= 1)
             {
                 # the arg list is used to accumulate arguments until we're
@@ -258,22 +301,43 @@ MouseDivGenotype = function(allid, ABid, chrid, CGFLcorrection = NULL,
                     chr = chri,
                     ms = MM,
                     ss = SS,
-                    hint = hint[[chri]][chunkIndices],
-                    trans = trans,
+                    hint = chrHint[chunkRange],
+                    parIndices = which(chrPAR[chunkRange]),
+                    trans = transformMethod,
                     isMale = isMale)
                 if(length(argLists) >= length(cluster) || chunkIndex == length(chrChunks[[chri]]))
                 {
                     # parallel apply using snow then reset the arg list
                     chunkResultsList <- parLapply(cluster, argLists, applyGenotypeAnyChrChunk)
-                    for(chunkResult in chunkResultsList)
+                    for(i in 1 : length(chunkResultsList))
                     {
-                        if(length(chrResults[[chri]]) == 0)
+                        chunkResult <- chunkResultsList[[i]]
+                        if(is.null(processResultsFunction))
                         {
-                            chrResults[[chri]] <- chunkResult
+                            # we only accumulate results if there is no function
+                            if(length(chrResults[[chri]]) == 0)
+                            {
+                                chrResults[[chri]] <- chunkResult
+                            }
+                            else
+                            {
+                                chrResults[[chri]] <- mapply(rbind, chrResults[[chri]], chunkResult, SIMPLIFY = FALSE)
+                            }
                         }
                         else
                         {
-                            chrResults[[chri]] <- mapply(rbind, chrResults[[chri]], chunkResult, SIMPLIFY = FALSE)
+                            # this is a bit tricky, but we need to grab the chunk object
+                            # that matches up correctly with the chunk result that
+                            # we are iterating over
+                            clustChunk <- chrChunks[[chri]][[chunkIndex - (length(chunkResultsList) - i)]]
+                            clustChunkRange <- clustChunk$start : clustChunk$end
+                            chunkProbesetInfo <- snpProbesetInfo[chrIndices[clustChunkRange], ]
+                            
+                            for(k in 1 : length(chunkResult))
+                            {
+                                colnames(chunkResult[[k]]) <- fileBaseWithoutExtension(filenames)
+                            }
+                            processResultsFunction(chunkProbesetInfo, chunkResult)
                         }
                     }
                     rm(chunkResult)
@@ -288,16 +352,31 @@ MouseDivGenotype = function(allid, ABid, chrid, CGFLcorrection = NULL,
                     chr = chri,
                     ms = MM,
                     ss = SS,
-                    hint = hint[[chri]][chunkIndices],
-                    trans = trans,
+                    hint = chrHint[chunkRange],
+                    parIndices = which(chrPAR[chunkRange]),
+                    trans = transformMethod,
                     isMale = isMale)
-                if(length(chrResults[[chri]]) == 0)
+                if(is.null(processResultsFunction))
                 {
-                    chrResults[[chri]] <- chunkResult
+                    # we only accumulate results if there is no function
+                    if(length(chrResults[[chri]]) == 0)
+                    {
+                        chrResults[[chri]] <- chunkResult
+                    }
+                    else
+                    {
+                        chrResults[[chri]] <- mapply(rbind, chrResults[[chri]], chunkResult, SIMPLIFY = FALSE)
+                    }
                 }
                 else
                 {
-                    chrResults[[chri]] <- mapply(rbind, chrResults[[chri]], chunkResult, SIMPLIFY = FALSE)
+                    chunkProbesetInfo <- snpProbesetInfo[chrIndices[chunkRange], ]
+                    
+                    for(k in 1 : length(chunkResult))
+                    {
+                        colnames(chunkResult[[k]]) <- fileBaseWithoutExtension(filenames)
+                    }
+                    processResultsFunction(chunkProbesetInfo, chunkResult)
                 }
                 rm(chunkResult)
             }
@@ -306,6 +385,13 @@ MouseDivGenotype = function(allid, ABid, chrid, CGFLcorrection = NULL,
             #timeReport(startTime)
         }
         rm(argLists)
+    }
+    
+    # if the user asked us to use a function to process the results that means
+    # we have not accumulated any results to return
+    if(!is.null(processResultsFunction))
+    {
+        chrResults <- NULL
     }
     
     chrResults
@@ -320,6 +406,7 @@ applyGenotypeAnyChrChunk <- function(argList)
         argList$ms,
         argList$ss,
         argList$hint,
+        argList$parIndices,
         argList$trans,
         argList$isMale)
 }
