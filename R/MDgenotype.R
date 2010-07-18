@@ -11,9 +11,9 @@
 MouseDivGenotype = function(
     snpProbeInfo, snpProbesetInfo, referenceDistribution = NULL,
     transformMethod = c("CCStrans", "MAtrans"), celFiles = getwd(),
-    mchr = c(1:19, "X", "Y", "M"), cacheDir = tempdir(),
+    chromosomes = c(1:19, "X", "Y", "M"), cacheDir = tempdir(),
     verbose = FALSE, cluster = NULL, probesetChunkSize=1000,
-    processResultsFunction = createAppendResultsToCSVFunction("genoResults.csv")) {
+    processResultsFunction = NULL) {
     #library("time")
     
     transformMethod = match.arg(transformMethod)
@@ -115,14 +115,14 @@ MouseDivGenotype = function(
     
     # make sure that the chromosome vector is not numeric
     # TODO is toupper the right thing to do here?
-    mchr <- toupper(as.character(mchr))
+    chromosomes <- toupper(as.character(chromosomes))
     
     allChr <- unique(snpProbesetInfo$chrId)
     allAutosomes <- setdiff(allChr, c("X", "Y", "M"))
     
     # we must infer gender if we don't yet have it and we need to
     # genotype either sex chromosome
-    genderInferenceRequired <- is.null(isMale) && any(c("X", "Y") %in% mchr)
+    genderInferenceRequired <- is.null(isMale) && any(c("X", "Y") %in% chromosomes)
     if(genderInferenceRequired)
     {
         # in order to be able to infer gender we'll need per-array
@@ -245,7 +245,7 @@ MouseDivGenotype = function(
     #      we optionally include a function argument that allows the user to
     #      write the results to file
     chrResults <- list()
-    for (chri in mchr) {
+    for (chri in chromosomes) {
         chrIndices <- which(snpProbesetInfo$chrId == chri)
         argLists <- list()
         chrResults[[chri]] <- list()
