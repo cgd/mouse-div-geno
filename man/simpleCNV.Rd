@@ -4,7 +4,7 @@
 
 \title{Identify copy number variance.}
 
-\description{This function is to identify copy number variance using a reference sample. It uses \code{simpleCNVdata} to get the intensities from SNP and exon, and \code{simpleCNVsummary} which uses {\tt HiddenMarkov}, a Hidden Markov Model R package, to identify copy number gain or loss by comparing a sample and a reference sample.}
+\description{This function is to identify copy number variance using a reference sample. It uses \code{simpleCNVdata} to get the intensities from SNP and exon, and \code{simpleCNVsummary} which uses \pkg{HiddenMarkov}, a Hidden Markov Model R package, to identify copy number gain or loss by comparing a sample and a reference sample.}
 
 \usage{simpleCNP(allid, ABid, chrid, CGFLcorrection, reference, exon1info, exon2info, celfiledir, filenames, 
 cnvoutfiledir, mchr, stname, refsample) }
@@ -21,8 +21,8 @@ cnvoutfiledir, mchr, stname, refsample) }
   \item{filenames}{A vector of .CEL file names.}
   \item{cnvoutfiledir}{Path to the directory in which all intensities from SNP, exon1 and exon2 are saved. Default is the current directory.}
    \item{mchr}{Index of chromosomes that you want to genotype}
-   \item{stname}{Strain names corresponding to the .CEL files listed in the {\tt filenames}. If it is not specified, .CEL file names are used.}
-  \item{refsample}{.CEL file name (must be one of .CEL files listed in the {\tt filenames}) of reference strain to which every other sample is compared. }
+   \item{stname}{Strain names corresponding to the .CEL files listed in the \code{filenames}. If it is not specified, .CEL file names are used.}
+  \item{refsample}{.CEL file name (must be one of .CEL files listed in the \code{filenames}) of reference strain to which every other sample is compared. }
 }
 \value{
   It saves intensities from SNP, exon1 and exon2 by chromosomes, HMM states (copy number gain = 1 and loss = 3 compared to the reference strain), and summary files only showing copy number variance region. The summary table shows the name of strain, status (gain or loss), start and end position of CNV, number of total, SNP, exon1 and exon2 probe sets in that region, mean intensity of the  reference and a sample. 
