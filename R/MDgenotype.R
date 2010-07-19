@@ -9,7 +9,7 @@
 #########################################################################
 
 MouseDivGenotype = function(
-    snpProbeInfo, snpProbesetInfo, referenceDistribution = NULL,
+    snpProbeInfo, snpInfo, referenceDistribution = NULL,
     transformMethod = c("CCStrans", "MAtrans"), celFiles = getwd(),
     chromosomes = c(1:19, "X", "Y", "M"), cacheDir = tempdir(),
     verbose = FALSE, cluster = NULL, probesetChunkSize=1000,
@@ -25,21 +25,21 @@ MouseDivGenotype = function(
              "components. Please see the help documentation for more details.")
     }
     
-    if(!inherits(snpProbesetInfo, "data.frame") ||
-       !all(c("snpId", "chrId") %in% names(snpProbesetInfo)))
+    if(!inherits(snpInfo, "data.frame") ||
+       !all(c("snpId", "chrId") %in% names(snpInfo)))
     {
-        stop("You must supply a \"snpProbesetInfo\" data frame parameter which has ",
+        stop("You must supply a \"snpInfo\" data frame parameter which has ",
              "at a minimum the \"snpId\" and \"chrId\" ",
              "components. Please see the help documentation for more details.")
     }
     
     # it is an error if isInPAR is set to TRUE in a non-X chromosome
-    if(!is.null(snpProbesetInfo$isInPAR))
+    if(!is.null(snpInfo$isInPAR))
     {
-        parChrs <- unique(snpProbesetInfo$chrId[snpProbesetInfo$isInPar])
+        parChrs <- unique(snpInfo$chrId[snpInfo$isInPar])
         if(!all(parChrs == "X"))
         {
-            stop("snpProbesetInfo$isInPar should only ever be TRUE on the \"X\" ",
+            stop("snpInfo$isInPar should only ever be TRUE on the \"X\" ",
                  "chromosome, but TRUE isInPar values were found on chromosomes: ",
                  paste(parChrs, collapse=", "))
         }
@@ -117,7 +117,7 @@ MouseDivGenotype = function(
     # TODO is toupper the right thing to do here?
     chromosomes <- toupper(as.character(chromosomes))
     
-    allChr <- unique(snpProbesetInfo$chrId)
+    allChr <- unique(snpInfo$chrId)
     allAutosomes <- setdiff(allChr, c("X", "Y", "M"))
     
     # we must infer gender if we don't yet have it and we need to
@@ -140,7 +140,7 @@ MouseDivGenotype = function(
     chrChunks <- list()
     for(currChr in allChr)
     {
-        chrProbesetCount <- sum(snpProbesetInfo$chrId == currChr)
+        chrProbesetCount <- sum(snpInfo$chrId == currChr)
         chrChunks[[currChr]] <- chunkIndices(chrProbesetCount, probesetChunkSize)
     }
     
@@ -157,7 +157,7 @@ MouseDivGenotype = function(
                 probesetChunkSize,
                 verbose,
                 snpProbeInfo,
-                snpProbesetInfo,
+                snpInfo,
                 allChr,
                 referenceDistribution,
                 transformMethod)
@@ -228,12 +228,12 @@ MouseDivGenotype = function(
         # we want to take the mean
         probesetCountPerAutosome <- sapply(
             allAutosomes,
-            function(currChr) {sum(snpProbesetInfo$chrId == currChr)})
+            function(currChr) {sum(snpInfo$chrId == currChr)})
         
         meanIntensityPerAutosome <-
             meanIntensityPerAutosome / probesetCountPerAutosome
-        meanIntensityXPerArray <- meanIntensityXPerArray / sum(snpProbesetInfo$chrId == "X")
-        meanIntensityYPerArray <- meanIntensityYPerArray / sum(snpProbesetInfo$chrId == "Y")
+        meanIntensityXPerArray <- meanIntensityXPerArray / sum(snpInfo$chrId == "X")
+        meanIntensityYPerArray <- meanIntensityYPerArray / sum(snpInfo$chrId == "Y")
         
         isMale <- inferGender(
             meanIntensityXPerArray,
@@ -246,21 +246,21 @@ MouseDivGenotype = function(
     #      write the results to file
     chrResults <- list()
     for (chri in chromosomes) {
-        chrIndices <- which(snpProbesetInfo$chrId == chri)
+        chrIndices <- which(snpInfo$chrId == chri)
         argLists <- list()
         chrResults[[chri]] <- list()
         
         # pull out the hints for this chromosome (if they exist)
         chrHint <- NULL
-        if(!is.null(snpProbesetInfo$snpHetHint))
+        if(!is.null(snpInfo$snpHetHint))
         {
-            chrHint <- snpProbesetInfo$snpHetHint[chrIndices]
+            chrHint <- snpInfo$snpHetHint[chrIndices]
         }
         
         chrPAR <- logical(0)
-        if(!is.null(snpProbesetInfo$isInPAR))
+        if(!is.null(snpInfo$isInPAR))
         {
-            chrPAR <- snpProbesetInfo$isInPAR[chrIndices]
+            chrPAR <- snpInfo$isInPAR[chrIndices]
         }
         
         for(chunkIndex in 1 : length(chrChunks[[chri]]))
@@ -331,7 +331,7 @@ MouseDivGenotype = function(
                             # we are iterating over
                             clustChunk <- chrChunks[[chri]][[chunkIndex - (length(chunkResultsList) - i)]]
                             clustChunkRange <- clustChunk$start : clustChunk$end
-                            chunkProbesetInfo <- snpProbesetInfo[chrIndices[clustChunkRange], ]
+                            chunkProbesetInfo <- snpInfo[chrIndices[clustChunkRange], ]
                             
                             for(k in 1 : length(chunkResult))
                             {
@@ -370,7 +370,7 @@ MouseDivGenotype = function(
                 }
                 else
                 {
-                    chunkProbesetInfo <- snpProbesetInfo[chrIndices[chunkRange], ]
+                    chunkProbesetInfo <- snpInfo[chrIndices[chunkRange], ]
                     
                     for(k in 1 : length(chunkResult))
                     {
