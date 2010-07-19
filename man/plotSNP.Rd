@@ -62,6 +62,5 @@ plotSNP(nm, ns, geno, vino, main='', xlab='Contrast', ylab = 'Average Intensity'
   plotSNP(MM[1,], SS[1,], geno[1,], vino[1,])
   }
 }
-}
 
 \keyword{plot}
