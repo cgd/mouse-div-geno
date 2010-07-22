@@ -111,22 +111,32 @@ vinotype = function(nm, ns, geno) {
             mm[ik] = median(nnm)
             ms[ik] = median(nns)
             
-            # ss contains variance
-            # TODO more comment needed here to explain what's going on
+            # ss[[ik]] becomes the covariance matrix for the current genotype's
+            # nm and ns values
             ssm = matrix(0, 2, 2)
             ssm[1, 1] = bivar(nnm)
             ssm[2, 2] = bivar(nns)
             ssm[1, 2] = ssm[2, 1] = bicov(nnm, nns)
             ss[[ik]] = ssm
+            
+            # sum the covariances as m (we will later make this an average
             m = m + ss[[ik]]
             lm = lm + 1
         }
         else {
             mm[ik] = nm[geno == ik]
             ms[ik] = ns[geno == ik]
+            
+            # NA is a placeholder that we will later fill with the average
+            # covariance
             ss[[ik]] = NA
         }
     }
+    
+    # here we set genotypes where there is only 1 value (the NA's) to the
+    # average covariance. For the genotypes that had more than 1 value we
+    # give equal weight to the average covariance and the genotype specific
+    # covariance
     m = m/lm
     for (ik in iig) {
         if (is.na(ss[ik])) 
