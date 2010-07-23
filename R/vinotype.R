@@ -152,7 +152,7 @@ vinotype = function(nm, ns, geno) {
             vino1[geno == 3][dd3 < th[3]] = 2
         }
     }
-    if (ngeno == 2) {
+    else if (ngeno == 2) {
         l1 = sum(geno == iig[1])
         l2 = sum(geno == iig[2])
         mdd = rep(0, nsize)
@@ -173,7 +173,7 @@ vinotype = function(nm, ns, geno) {
             vino1[geno == iig[2]][dd2 < th[2]] = 2
         }
     }
-    if (ngeno == 1) {
+    else if (ngeno == 1) {
         tmp = mahalanobis(adata, c(mm[iig[1]], ms[iig[1]]), ss[[iig[1]]])
         mdd = pchisq(tmp, df = 2)
         vino1[mdd < 0.99] = 2

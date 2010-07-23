@@ -1,4 +1,4 @@
-pennCNVinput = function(chrid, mpos, exon1info, exon2info, celfiledir, 
+pennCNVinput <- function(chrid, mpos, exon1info, exon2info, celfiledir, 
     filenames, snpsavefiledir, exonoutfiledir, cnvoutfiledir, mchr) {
     exon1CNV = length(exon1info) > 0
     exon2CNV = length(exon2info) > 0
@@ -77,7 +77,16 @@ pennCNVinput = function(chrid, mpos, exon1info, exon2info, celfiledir,
     write.table(pfb, file = xname1, row.names = FALSE, sep = "\t", quote = FALSE)
 }
 
-CNVinput = function(nm, ns, geno, mm, ms, ss, nsize, ngeno, iig) {
+# calculates LRR and BAF values for a single SNP position
+# PARAMETERS:
+#   intensityConts:
+#       per-sample intensity contrasts (A allele vs B allele)
+#   intensityAvgs:
+#       per-sample intensity averages (A averaged with B)
+#   geno:
+#       per-sample genotypes
+calcLRRAndBAF <- function(intensityConts, intensityAvgs, geno, mm, ms, ss, nsize, ngeno, iig)
+{
     BAF = lrr = rep(0, nsize)
     if (ngeno == 3) {
         c1 = sqrt(ss[[1]][1, 1])
@@ -86,115 +95,115 @@ CNVinput = function(nm, ns, geno, mm, ms, ss, nsize, ngeno, iig) {
         s1 = sqrt(ss[[1]][2, 2])
         s2 = sqrt(ss[[2]][2, 2])
         s3 = sqrt(ss[[3]][2, 2])
-        tmp = nm >= mm[1]
+        tmp = intensityConts >= mm[1]
         if (any(tmp)) {
             BAF[tmp] = 0
-            lrr[tmp] = log2(ns[tmp]/ns[1])
+            lrr[tmp] = log2(intensityAvgs[tmp]/intensityAvgs[1])
         }
-        tmp = nm < mm[1] & nm > mm[2]
+        tmp = intensityConts < mm[1] & intensityConts > mm[2]
         if (any(tmp)) {
-            k1 = (mm[1] - nm[tmp])/c1
-            k2 = (nm[tmp] - mm[2])/c2
+            k1 = (mm[1] - intensityConts[tmp])/c1
+            k2 = (intensityConts[tmp] - mm[2])/c2
             BAF[tmp] = 0.5 * k1/(k1 + k2)
-            lrr[tmp] = log2(ns[tmp]/((k2 * ns[1] + k1 * ns[2])/(k1 + k2)))
+            lrr[tmp] = log2(intensityAvgs[tmp]/((k2 * intensityAvgs[1] + k1 * intensityAvgs[2])/(k1 + k2)))
         }
-        tmp = nm <= mm[2] & nm > mm[3]
+        tmp = intensityConts <= mm[2] & intensityConts > mm[3]
         if (any(tmp)) {
-            k1 = (mm[2] - nm[tmp])/c2
-            k2 = (nm[tmp] - mm[3])/c3
+            k1 = (mm[2] - intensityConts[tmp])/c2
+            k2 = (intensityConts[tmp] - mm[3])/c3
             BAF[tmp] = 0.5 + 0.5 * k1/(k1 + k2)
-            lrr[tmp] = log2(ns[tmp]/((k2 * ns[2] + k1 * ns[3])/(k1 + k2)))
+            lrr[tmp] = log2(intensityAvgs[tmp]/((k2 * intensityAvgs[2] + k1 * intensityAvgs[3])/(k1 + k2)))
         }
-        tmp = nm <= mm[3]
+        tmp = intensityConts <= mm[3]
         if (any(tmp)) {
             BAF[tmp] = 1
-            lrr[tmp] = log2(ns[tmp]/ns[3])
+            lrr[tmp] = log2(intensityAvgs[tmp]/intensityAvgs[3])
         }
     }
-    if (ngeno == 2) {
+    else if (ngeno == 2) {
         id = sum(iig)
         if (id == 4) {
             c1 = sqrt(ss[[1]][1, 1])
             c3 = sqrt(ss[[3]][1, 1])
             s1 = sqrt(ss[[1]][2, 2])
             s3 = sqrt(ss[[3]][2, 2])
-            tmp = nm >= mm[1]
+            tmp = intensityConts >= mm[1]
             if (any(tmp)) {
                 BAF[tmp] = 0
-                lrr[tmp] = log2(ns[tmp]/ns[1])
+                lrr[tmp] = log2(intensityAvgs[tmp]/intensityAvgs[1])
             }
-            tmp = nm < mm[1] & nm > mm[3]
+            tmp = intensityConts < mm[1] & intensityConts > mm[3]
             if (any(tmp)) {
-                k1 = (mm[1] - nm[tmp])/c1
-                k3 = (nm[tmp] - mm[3])/c3
+                k1 = (mm[1] - intensityConts[tmp])/c1
+                k3 = (intensityConts[tmp] - mm[3])/c3
                 BAF[tmp] = k1/(k1 + k3)
-                lrr[tmp] = log2(ns[tmp]/((k3 * ns[1] + k1 * ns[3])/(k1 + k3)))
+                lrr[tmp] = log2(intensityAvgs[tmp]/((k3 * intensityAvgs[1] + k1 * intensityAvgs[3])/(k1 + k3)))
             }
-            tmp = nm <= mm[3]
+            tmp = intensityConts <= mm[3]
             if (any(tmp)) {
                 BAF[tmp] = 1
-                lrr[tmp] = log2(ns[tmp]/ns[3])
+                lrr[tmp] = log2(intensityAvgs[tmp]/intensityAvgs[3])
             }
         }
-        if (id == 5) {
+        else if (id == 5) {
             c2 = sqrt(ss[[2]][1, 1])
             c3 = sqrt(ss[[3]][1, 1])
             s2 = sqrt(ss[[2]][2, 2])
             s3 = sqrt(ss[[3]][2, 2])
-            tmp = nm >= mm[2]
+            tmp = intensityConts >= mm[2]
             if (any(tmp)) {
                 BAF[tmp] = 0.5
-                lrr[tmp] = log2(ns[tmp]/ns[2])
+                lrr[tmp] = log2(intensityAvgs[tmp]/intensityAvgs[2])
             }
-            tmp = nm < mm[2] & nm > mm[3]
+            tmp = intensityConts < mm[2] & intensityConts > mm[3]
             if (any(tmp)) {
-                k2 = (mm[2] - nm[tmp])/c2
-                k3 = (nm[tmp] - mm[3])/c3
+                k2 = (mm[2] - intensityConts[tmp])/c2
+                k3 = (intensityConts[tmp] - mm[3])/c3
                 BAF[tmp] = 0.5 + 0.5 * k2/(k2 + k3)
-                lrr[tmp] = log2(ns[tmp]/((k3 * ns[2] + k2 * ns[3])/(k2 + k3)))
+                lrr[tmp] = log2(intensityAvgs[tmp]/((k3 * intensityAvgs[2] + k2 * intensityAvgs[3])/(k2 + k3)))
             }
-            tmp = nm <= mm[3]
+            tmp = intensityConts <= mm[3]
             if (any(tmp)) {
                 BAF[tmp] = 1
-                lrr[tmp] = log2(ns[tmp]/ns[3])
+                lrr[tmp] = log2(intensityAvgs[tmp]/intensityAvgs[3])
             }
         }
-        if (id == 3) {
+        else if (id == 3) {
             c1 = sqrt(ss[[1]][1, 1])
             c2 = sqrt(ss[[2]][1, 1])
             s1 = sqrt(ss[[1]][2, 2])
             s2 = sqrt(ss[[2]][2, 2])
-            tmp = nm >= mm[1]
+            tmp = intensityConts >= mm[1]
             if (any(tmp)) {
                 BAF[tmp] = 0
-                lrr[tmp] = log2(ns[tmp]/ns[1])
+                lrr[tmp] = log2(intensityAvgs[tmp]/intensityAvgs[1])
             }
-            tmp = nm < mm[1] & nm > mm[2]
+            tmp = intensityConts < mm[1] & intensityConts > mm[2]
             if (any(tmp)) {
-                k1 = (mm[1] - nm[tmp])/c1
-                k2 = (nm[tmp] - mm[2])/c2
+                k1 = (mm[1] - intensityConts[tmp])/c1
+                k2 = (intensityConts[tmp] - mm[2])/c2
                 BAF[tmp] = 0.5 * k1/(k1 + k2)
-                lrr[tmp] = log2(ns[tmp]/((k1 * ns[2] + k2 * ns[1])/(k1 + k2)))
+                lrr[tmp] = log2(intensityAvgs[tmp]/((k1 * intensityAvgs[2] + k2 * intensityAvgs[1])/(k1 + k2)))
             }
-            tmp = nm <= mm[2]
+            tmp = intensityConts <= mm[2]
             if (any(tmp)) {
                 BAF[tmp] = 0.5
-                lrr[tmp] = log2(ns[tmp]/ns[2])
+                lrr[tmp] = log2(intensityAvgs[tmp]/intensityAvgs[2])
             }
         }
     }
-    if (ngeno == 1) {
+    else if (ngeno == 1) {
         if (iig == 1) {
             BAF = rep(0, nsize)
-            lrr = log2(ns/ns[1])
+            lrr = log2(intensityAvgs/intensityAvgs[1])
         }
-        if (iig == 2) {
+        else if (iig == 2) {
             BAF = rep(0.5, nsize)
-            lrr = log2(ns/ns[2])
+            lrr = log2(intensityAvgs/intensityAvgs[2])
         }
-        if (iig == 3) {
+        else if (iig == 3) {
             BAF = rep(1, nsize)
-            lrr = log2(ns/ns[3])
+            lrr = log2(intensityAvgs/intensityAvgs[3])
         }
     }
     list(BAF = BAF, lrr = lrr)

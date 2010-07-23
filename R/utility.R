@@ -59,6 +59,8 @@ densityplot = function(filenames, allid, ABid, type = c("Average", "MatchedSet")
 
 createAppendResultsToCSVFunction <- function(fileName)
 {
+    # if the file already exists we should delete it (without this we would end
+    # up appending to the exising file which we don't want)
     unlink(fileName)
     
     function(snpProbesetInfoChunk, genotypingResultsChunk)
