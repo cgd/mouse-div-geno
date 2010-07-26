@@ -83,66 +83,83 @@ pennCNVinput <- function(chrid, mpos, exon1info, exon2info, celfiledir,
 #       per-sample intensity contrasts (A allele vs B allele)
 #   intensityAvgs:
 #       per-sample intensity averages (A averaged with B)
-#   geno:
+#   genos:
 #       per-sample genotypes
-calcLRRAndBAF <- function(intensityConts, intensityAvgs, geno, mm, ms, ss, nsize, ngeno, iig)
+# RETURNS:
+#   A data.frame object with BAF adn LRR components.
+#   The row count of this dataframe will equal length(genos)
+calcLRRAndBAF <- function(intensityConts, intensityAvgs, genos, mm, ms, ss)
 {
-    BAF = lrr = rep(0, nsize)
-    if (ngeno == 3) {
+    sampleCount <- length(genos)
+    uniqueGenos <- sort(unique(genos))
+    uniqueGenoCount <- length(uniqueGenos)
+    BAF <- rep(0, sampleCount)
+    LRR <- rep(0, sampleCount)
+    
+    medianContPerGeno <- rep(0, 3)
+    ms <- rep(0, 3)
+    for(genoCode in uniqueGenos)
+    {
+        genoIndices <- which(genos == genoCode)
+        medianContPerGeno[genoCode] <- median(intensityConts[genoIndices])
+        ms[genoCode] <- median(intensityAvgs[genoIndices])
+    }
+    
+    if (uniqueGenoCount == 3) {
         c1 = sqrt(ss[[1]][1, 1])
         c2 = sqrt(ss[[2]][1, 1])
         c3 = sqrt(ss[[3]][1, 1])
         s1 = sqrt(ss[[1]][2, 2])
         s2 = sqrt(ss[[2]][2, 2])
         s3 = sqrt(ss[[3]][2, 2])
-        tmp = intensityConts >= mm[1]
+        tmp = intensityConts >= medianContPerGeno[1]
         if (any(tmp)) {
             BAF[tmp] = 0
-            lrr[tmp] = log2(intensityAvgs[tmp]/intensityAvgs[1])
+            LRR[tmp] = log2(intensityAvgs[tmp]/intensityAvgs[1])
         }
-        tmp = intensityConts < mm[1] & intensityConts > mm[2]
+        tmp = intensityConts < medianContPerGeno[1] & intensityConts > medianContPerGeno[2]
         if (any(tmp)) {
-            k1 = (mm[1] - intensityConts[tmp])/c1
-            k2 = (intensityConts[tmp] - mm[2])/c2
+            k1 = (medianContPerGeno[1] - intensityConts[tmp])/c1
+            k2 = (intensityConts[tmp] - medianContPerGeno[2])/c2
             BAF[tmp] = 0.5 * k1/(k1 + k2)
-            lrr[tmp] = log2(intensityAvgs[tmp]/((k2 * intensityAvgs[1] + k1 * intensityAvgs[2])/(k1 + k2)))
+            LRR[tmp] = log2(intensityAvgs[tmp]/((k2 * intensityAvgs[1] + k1 * intensityAvgs[2])/(k1 + k2)))
         }
-        tmp = intensityConts <= mm[2] & intensityConts > mm[3]
+        tmp = intensityConts <= medianContPerGeno[2] & intensityConts > medianContPerGeno[3]
         if (any(tmp)) {
-            k1 = (mm[2] - intensityConts[tmp])/c2
-            k2 = (intensityConts[tmp] - mm[3])/c3
+            k1 = (medianContPerGeno[2] - intensityConts[tmp])/c2
+            k2 = (intensityConts[tmp] - medianContPerGeno[3])/c3
             BAF[tmp] = 0.5 + 0.5 * k1/(k1 + k2)
-            lrr[tmp] = log2(intensityAvgs[tmp]/((k2 * intensityAvgs[2] + k1 * intensityAvgs[3])/(k1 + k2)))
+            LRR[tmp] = log2(intensityAvgs[tmp]/((k2 * intensityAvgs[2] + k1 * intensityAvgs[3])/(k1 + k2)))
         }
-        tmp = intensityConts <= mm[3]
+        tmp = intensityConts <= medianContPerGeno[3]
         if (any(tmp)) {
             BAF[tmp] = 1
-            lrr[tmp] = log2(intensityAvgs[tmp]/intensityAvgs[3])
+            LRR[tmp] = log2(intensityAvgs[tmp]/intensityAvgs[3])
         }
     }
-    else if (ngeno == 2) {
-        id = sum(iig)
+    else if (uniqueGenoCount == 2) {
+        id = sum(uniqueGenos)
         if (id == 4) {
             c1 = sqrt(ss[[1]][1, 1])
             c3 = sqrt(ss[[3]][1, 1])
             s1 = sqrt(ss[[1]][2, 2])
             s3 = sqrt(ss[[3]][2, 2])
-            tmp = intensityConts >= mm[1]
+            tmp = intensityConts >= medianContPerGeno[1]
             if (any(tmp)) {
                 BAF[tmp] = 0
-                lrr[tmp] = log2(intensityAvgs[tmp]/intensityAvgs[1])
+                LRR[tmp] = log2(intensityAvgs[tmp]/intensityAvgs[1])
             }
-            tmp = intensityConts < mm[1] & intensityConts > mm[3]
+            tmp = intensityConts < medianContPerGeno[1] & intensityConts > medianContPerGeno[3]
             if (any(tmp)) {
-                k1 = (mm[1] - intensityConts[tmp])/c1
-                k3 = (intensityConts[tmp] - mm[3])/c3
+                k1 = (medianContPerGeno[1] - intensityConts[tmp])/c1
+                k3 = (intensityConts[tmp] - medianContPerGeno[3])/c3
                 BAF[tmp] = k1/(k1 + k3)
-                lrr[tmp] = log2(intensityAvgs[tmp]/((k3 * intensityAvgs[1] + k1 * intensityAvgs[3])/(k1 + k3)))
+                LRR[tmp] = log2(intensityAvgs[tmp]/((k3 * intensityAvgs[1] + k1 * intensityAvgs[3])/(k1 + k3)))
             }
-            tmp = intensityConts <= mm[3]
+            tmp = intensityConts <= medianContPerGeno[3]
             if (any(tmp)) {
                 BAF[tmp] = 1
-                lrr[tmp] = log2(intensityAvgs[tmp]/intensityAvgs[3])
+                LRR[tmp] = log2(intensityAvgs[tmp]/intensityAvgs[3])
             }
         }
         else if (id == 5) {
@@ -150,22 +167,22 @@ calcLRRAndBAF <- function(intensityConts, intensityAvgs, geno, mm, ms, ss, nsize
             c3 = sqrt(ss[[3]][1, 1])
             s2 = sqrt(ss[[2]][2, 2])
             s3 = sqrt(ss[[3]][2, 2])
-            tmp = intensityConts >= mm[2]
+            tmp = intensityConts >= medianContPerGeno[2]
             if (any(tmp)) {
                 BAF[tmp] = 0.5
-                lrr[tmp] = log2(intensityAvgs[tmp]/intensityAvgs[2])
+                LRR[tmp] = log2(intensityAvgs[tmp]/intensityAvgs[2])
             }
-            tmp = intensityConts < mm[2] & intensityConts > mm[3]
+            tmp = intensityConts < medianContPerGeno[2] & intensityConts > medianContPerGeno[3]
             if (any(tmp)) {
-                k2 = (mm[2] - intensityConts[tmp])/c2
-                k3 = (intensityConts[tmp] - mm[3])/c3
+                k2 = (medianContPerGeno[2] - intensityConts[tmp])/c2
+                k3 = (intensityConts[tmp] - medianContPerGeno[3])/c3
                 BAF[tmp] = 0.5 + 0.5 * k2/(k2 + k3)
-                lrr[tmp] = log2(intensityAvgs[tmp]/((k3 * intensityAvgs[2] + k2 * intensityAvgs[3])/(k2 + k3)))
+                LRR[tmp] = log2(intensityAvgs[tmp]/((k3 * intensityAvgs[2] + k2 * intensityAvgs[3])/(k2 + k3)))
             }
-            tmp = intensityConts <= mm[3]
+            tmp = intensityConts <= medianContPerGeno[3]
             if (any(tmp)) {
                 BAF[tmp] = 1
-                lrr[tmp] = log2(intensityAvgs[tmp]/intensityAvgs[3])
+                LRR[tmp] = log2(intensityAvgs[tmp]/intensityAvgs[3])
             }
         }
         else if (id == 3) {
@@ -173,40 +190,41 @@ calcLRRAndBAF <- function(intensityConts, intensityAvgs, geno, mm, ms, ss, nsize
             c2 = sqrt(ss[[2]][1, 1])
             s1 = sqrt(ss[[1]][2, 2])
             s2 = sqrt(ss[[2]][2, 2])
-            tmp = intensityConts >= mm[1]
+            tmp = intensityConts >= medianContPerGeno[1]
             if (any(tmp)) {
                 BAF[tmp] = 0
-                lrr[tmp] = log2(intensityAvgs[tmp]/intensityAvgs[1])
+                LRR[tmp] = log2(intensityAvgs[tmp]/intensityAvgs[1])
             }
-            tmp = intensityConts < mm[1] & intensityConts > mm[2]
+            tmp = intensityConts < medianContPerGeno[1] & intensityConts > medianContPerGeno[2]
             if (any(tmp)) {
-                k1 = (mm[1] - intensityConts[tmp])/c1
-                k2 = (intensityConts[tmp] - mm[2])/c2
+                k1 = (medianContPerGeno[1] - intensityConts[tmp])/c1
+                k2 = (intensityConts[tmp] - medianContPerGeno[2])/c2
                 BAF[tmp] = 0.5 * k1/(k1 + k2)
-                lrr[tmp] = log2(intensityAvgs[tmp]/((k1 * intensityAvgs[2] + k2 * intensityAvgs[1])/(k1 + k2)))
+                LRR[tmp] = log2(intensityAvgs[tmp]/((k1 * intensityAvgs[2] + k2 * intensityAvgs[1])/(k1 + k2)))
             }
-            tmp = intensityConts <= mm[2]
+            tmp = intensityConts <= medianContPerGeno[2]
             if (any(tmp)) {
                 BAF[tmp] = 0.5
-                lrr[tmp] = log2(intensityAvgs[tmp]/intensityAvgs[2])
+                LRR[tmp] = log2(intensityAvgs[tmp]/intensityAvgs[2])
             }
         }
     }
-    else if (ngeno == 1) {
-        if (iig == 1) {
-            BAF = rep(0, nsize)
-            lrr = log2(intensityAvgs/intensityAvgs[1])
+    else if (uniqueGenoCount == 1) {
+        if (uniqueGenos == 1) {
+            BAF = rep(0, sampleCount)
+            LRR = log2(intensityAvgs/intensityAvgs[1])
         }
-        else if (iig == 2) {
-            BAF = rep(0.5, nsize)
-            lrr = log2(intensityAvgs/intensityAvgs[2])
+        else if (uniqueGenos == 2) {
+            BAF = rep(0.5, sampleCount)
+            LRR = log2(intensityAvgs/intensityAvgs[2])
         }
-        else if (iig == 3) {
-            BAF = rep(1, nsize)
-            lrr = log2(intensityAvgs/intensityAvgs[3])
+        else if (uniqueGenos == 3) {
+            BAF = rep(1, sampleCount)
+            LRR = log2(intensityAvgs/intensityAvgs[3])
         }
     }
-    list(BAF = BAF, lrr = lrr)
+    
+    data.frame(BAF = BAF, LRR = LRR)
 }
 
 igp = function(celfiledir, outfiledir, outfilename, id, chrid, mpos, ename, 
