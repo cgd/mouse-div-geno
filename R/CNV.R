@@ -88,7 +88,7 @@ pennCNVinput <- function(chrid, mpos, exon1info, exon2info, celfiledir,
 # RETURNS:
 #   A data.frame object with BAF adn LRR components.
 #   The row count of this dataframe will equal length(genos)
-calcLRRAndBAF <- function(intensityConts, intensityAvgs, genos, mm, ms, ss)
+calcLRRAndBAF <- function(intensityConts, intensityAvgs, genos, mm, ss)
 {
     sampleCount <- length(genos)
     uniqueGenos <- sort(unique(genos))
@@ -97,7 +97,6 @@ calcLRRAndBAF <- function(intensityConts, intensityAvgs, genos, mm, ms, ss)
     LRR <- rep(0, sampleCount)
     
     medianContPerGeno <- rep(0, 3)
-    ms <- rep(0, 3)
     for(genoCode in uniqueGenos)
     {
         genoIndices <- which(genos == genoCode)
