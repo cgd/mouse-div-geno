@@ -191,7 +191,7 @@ calcLRRAndBAF <- function(intensityConts, intensityAvgs, genos)
     else if (uniqueGenoCount == 2) {
         id <- sum(uniqueGenos)
         
-        # the genotypes are AA and BB
+        # the genotypes are AA and BB: c(1, 3)
         if (id == 4) {
             aaIndex <- 1
             bbIndex <- 2
@@ -223,7 +223,7 @@ calcLRRAndBAF <- function(intensityConts, intensityAvgs, genos)
             }
         }
         
-        # the genotypes are AB and BB
+        # the genotypes are AB and BB: c(2, 3)
         else if (id == 5) {
             abIndex <- 1
             bbIndex <- 2
@@ -255,7 +255,7 @@ calcLRRAndBAF <- function(intensityConts, intensityAvgs, genos)
             }
         }
         
-        # the genotypes are AA and AB
+        # the genotypes are AA and AB: c(1, 2)
         else if (id == 3) {
             aaIndex <- 1
             abIndex <- 2
