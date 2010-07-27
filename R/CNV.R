@@ -84,11 +84,11 @@ pennCNVinput <- function(chrid, mpos, exon1info, exon2info, celfiledir,
 #   intensityAvgs:
 #       per-sample intensity averages (A averaged with B)
 #   genos:
-#       per-sample genotypes
+#       per-sample genotypes 1 = AA, 2 = AB, 3 = BB
 # RETURNS:
-#   A data.frame object with BAF adn LRR components.
-#   The row count of this dataframe will equal length(genos)
-calcLRRAndBAF <- function(intensityConts, intensityAvgs, genos, mm, ss)
+#   A data.frame object with B-Allele Frequency (BAF) and Log R Ratio (LRR)
+#   components. The row count of this dataframe will equal length(genos)
+calcLRRAndBAF <- function(intensityConts, intensityAvgs, genos)
 {
     sampleCount <- length(genos)
     uniqueGenos <- sort(unique(genos))
@@ -96,130 +96,213 @@ calcLRRAndBAF <- function(intensityConts, intensityAvgs, genos, mm, ss)
     BAF <- rep(0, sampleCount)
     LRR <- rep(0, sampleCount)
     
-    medianContPerGeno <- rep(0, 3)
-    for(genoCode in uniqueGenos)
+    medianContPerGeno <- numeric(uniqueGenoCount)
+    medianAvgsPerGeno <- numeric(uniqueGenoCount)
+    contVariancePerGeno <- numeric(uniqueGenoCount)
+    for(genoIndex in 1 : uniqueGenoCount)
     {
-        genoIndices <- which(genos == genoCode)
-        medianContPerGeno[genoCode] <- median(intensityConts[genoIndices])
-        ms[genoCode] <- median(intensityAvgs[genoIndices])
+        genoCode <- uniqueGenos[genoIndex]
+        currIndices <- which(genos == genoCode)
+        
+        currIntensityConts <- intensityConts[currIndices]
+        currIntensityAvgs <- intensityAvgs[currIndices]
+        
+        if(length(currIndices) == 1)
+        {
+            medianContPerGeno[genoIndex] <- currIntensityConts
+            medianAvgsPerGeno[genoIndex] <- currIntensityAvgs
+            
+            # there's no valid variance for the single-genotype case. So,
+            # we'll set it to NA for now and fix it later.
+            contVariancePerGeno[genoIndex] <- NA
+        }
+        else
+        {
+            medianContPerGeno[genoIndex] <- median(currIntensityConts)
+            medianAvgsPerGeno[genoIndex] <- median(currIntensityAvgs)
+            contVariancePerGeno[genoIndex] <- bivar(currIntensityConts)
+        }
     }
     
+    naVars <- is.na(contVariancePerGeno)
+    naVarIndices <- which(naVars)
+    validVarIndices <- which(!naVars)
+    
+    # the genotypes with only a single sample will be given the average
+    # variance of the other genotypes
+    averagedVariances <- sum(contVariancePerGeno[validVarIndices]) / length(validVarIndices)
+    contVariancePerGeno[naVarIndices] <- averagedVariances
+    
+    # shrink the variances toward the averaged variances
+    for(genoIndex in validVarIndices)
+    {
+        contVariancePerGeno[genoIndex] <-
+            0.5 * (averagedVariances + contVariancePerGeno[genoIndex])
+    }
+    contStdDevs <- sqrt(contVariancePerGeno)
+    
+    # all three genotypes should be represented
     if (uniqueGenoCount == 3) {
-        c1 = sqrt(ss[[1]][1, 1])
-        c2 = sqrt(ss[[2]][1, 1])
-        c3 = sqrt(ss[[3]][1, 1])
-        s1 = sqrt(ss[[1]][2, 2])
-        s2 = sqrt(ss[[2]][2, 2])
-        s3 = sqrt(ss[[3]][2, 2])
-        tmp = intensityConts >= medianContPerGeno[1]
+        aaIndex <- 1
+        abIndex <- 2
+        bbIndex <- 3
+        
+        # for the contrasts that are >= the AA median
+        # ----BB----AB----AAxxxx
+        tmp = intensityConts >= medianContPerGeno[aaIndex]
         if (any(tmp)) {
             BAF[tmp] = 0
-            LRR[tmp] = log2(intensityAvgs[tmp]/intensityAvgs[1])
+            LRR[tmp] = log2(intensityAvgs[tmp]/medianAvgsPerGeno[aaIndex])
         }
-        tmp = intensityConts < medianContPerGeno[1] & intensityConts > medianContPerGeno[2]
+        
+        # < AA median and > AB meadian:
+        # ----BB----AB-xx-AA----
+        tmp = intensityConts < medianContPerGeno[aaIndex] & intensityConts > medianContPerGeno[abIndex]
         if (any(tmp)) {
-            k1 = (medianContPerGeno[1] - intensityConts[tmp])/c1
-            k2 = (intensityConts[tmp] - medianContPerGeno[2])/c2
+            k1 = (medianContPerGeno[aaIndex] - intensityConts[tmp])/contStdDevs[aaIndex]
+            k2 = (intensityConts[tmp] - medianContPerGeno[abIndex])/contStdDevs[abIndex]
             BAF[tmp] = 0.5 * k1/(k1 + k2)
-            LRR[tmp] = log2(intensityAvgs[tmp]/((k2 * intensityAvgs[1] + k1 * intensityAvgs[2])/(k1 + k2)))
+            LRR[tmp] = log2(intensityAvgs[tmp]/((k2 * medianAvgsPerGeno[aaIndex] + k1 * medianAvgsPerGeno[abIndex])/(k1 + k2)))
         }
-        tmp = intensityConts <= medianContPerGeno[2] & intensityConts > medianContPerGeno[3]
+        
+        # <= the AB median and > BB median
+        # ----BB-xxxAB----AA----
+        tmp = intensityConts <= medianContPerGeno[abIndex] & intensityConts > medianContPerGeno[bbIndex]
         if (any(tmp)) {
-            k1 = (medianContPerGeno[2] - intensityConts[tmp])/c2
-            k2 = (intensityConts[tmp] - medianContPerGeno[3])/c3
+            k1 = (medianContPerGeno[abIndex] - intensityConts[tmp])/contStdDevs[abIndex]
+            k2 = (intensityConts[tmp] - medianContPerGeno[bbIndex])/contStdDevs[bbIndex]
             BAF[tmp] = 0.5 + 0.5 * k1/(k1 + k2)
-            LRR[tmp] = log2(intensityAvgs[tmp]/((k2 * intensityAvgs[2] + k1 * intensityAvgs[3])/(k1 + k2)))
+            LRR[tmp] = log2(intensityAvgs[tmp]/((k2 * medianAvgsPerGeno[abIndex] + k1 * medianAvgsPerGeno[bbIndex])/(k1 + k2)))
         }
-        tmp = intensityConts <= medianContPerGeno[3]
+        
+        # <= BB median
+        # xxxxBB----AB----AA----
+        tmp = intensityConts <= medianContPerGeno[bbIndex]
         if (any(tmp)) {
             BAF[tmp] = 1
-            LRR[tmp] = log2(intensityAvgs[tmp]/intensityAvgs[3])
+            LRR[tmp] = log2(intensityAvgs[tmp]/medianAvgsPerGeno[bbIndex])
         }
     }
+    
+    # there are only two genotypes represented in the samples for this SNP
     else if (uniqueGenoCount == 2) {
         id = sum(uniqueGenos)
+        
+        # the genotypes are AA and BB
         if (id == 4) {
-            c1 = sqrt(ss[[1]][1, 1])
-            c3 = sqrt(ss[[3]][1, 1])
-            s1 = sqrt(ss[[1]][2, 2])
-            s3 = sqrt(ss[[3]][2, 2])
-            tmp = intensityConts >= medianContPerGeno[1]
+            aaIndex <- 1
+            bbIndex <- 2
+            
+            # >= AA median
+            # ----BB----AB----AAxxxx
+            tmp = intensityConts >= medianContPerGeno[aaIndex]
             if (any(tmp)) {
                 BAF[tmp] = 0
-                LRR[tmp] = log2(intensityAvgs[tmp]/intensityAvgs[1])
+                LRR[tmp] = log2(intensityAvgs[tmp]/medianAvgsPerGeno[aaIndex])
             }
-            tmp = intensityConts < medianContPerGeno[1] & intensityConts > medianContPerGeno[3]
+            
+            # < AA median and > BB median
+            # ----BB-xxxABxxx-AA----
+            tmp = intensityConts < medianContPerGeno[aaIndex] & intensityConts > medianContPerGeno[bbIndex]
             if (any(tmp)) {
-                k1 = (medianContPerGeno[1] - intensityConts[tmp])/c1
-                k3 = (intensityConts[tmp] - medianContPerGeno[3])/c3
+                k1 = (medianContPerGeno[aaIndex] - intensityConts[tmp])/contStdDevs[aaIndex]
+                k3 = (intensityConts[tmp] - medianContPerGeno[bbIndex])/contStdDevs[bbIndex]
                 BAF[tmp] = k1/(k1 + k3)
-                LRR[tmp] = log2(intensityAvgs[tmp]/((k3 * intensityAvgs[1] + k1 * intensityAvgs[3])/(k1 + k3)))
+                LRR[tmp] = log2(intensityAvgs[tmp]/((k3 * medianAvgsPerGeno[aaIndex] + k1 * medianAvgsPerGeno[bbIndex])/(k1 + k3)))
             }
-            tmp = intensityConts <= medianContPerGeno[3]
+            
+            # <= BB median
+            # xxxxBB----AB----AA----
+            tmp = intensityConts <= medianContPerGeno[bbIndex]
             if (any(tmp)) {
                 BAF[tmp] = 1
-                LRR[tmp] = log2(intensityAvgs[tmp]/intensityAvgs[3])
+                LRR[tmp] = log2(intensityAvgs[tmp]/medianAvgsPerGeno[bbIndex])
             }
         }
+        
+        # the genotypes are AB and BB
         else if (id == 5) {
-            c2 = sqrt(ss[[2]][1, 1])
-            c3 = sqrt(ss[[3]][1, 1])
-            s2 = sqrt(ss[[2]][2, 2])
-            s3 = sqrt(ss[[3]][2, 2])
-            tmp = intensityConts >= medianContPerGeno[2]
+            abIndex <- 1
+            bbIndex <- 2
+            
+            # >= AB median
+            # ----BB----ABxxxxAAxxxx
+            tmp = intensityConts >= medianContPerGeno[abIndex]
             if (any(tmp)) {
                 BAF[tmp] = 0.5
-                LRR[tmp] = log2(intensityAvgs[tmp]/intensityAvgs[2])
+                LRR[tmp] = log2(intensityAvgs[tmp]/medianAvgsPerGeno[abIndex])
             }
-            tmp = intensityConts < medianContPerGeno[2] & intensityConts > medianContPerGeno[3]
+            
+            # < AB median and > BB median
+            # ----BB-xx-AB----AA----
+            tmp = intensityConts < medianContPerGeno[abIndex] & intensityConts > medianContPerGeno[bbIndex]
             if (any(tmp)) {
-                k2 = (medianContPerGeno[2] - intensityConts[tmp])/c2
-                k3 = (intensityConts[tmp] - medianContPerGeno[3])/c3
+                k2 = (medianContPerGeno[abIndex] - intensityConts[tmp])/contStdDevs[abIndex]
+                k3 = (intensityConts[tmp] - medianContPerGeno[bbIndex])/contStdDevs[bbIndex]
                 BAF[tmp] = 0.5 + 0.5 * k2/(k2 + k3)
-                LRR[tmp] = log2(intensityAvgs[tmp]/((k3 * intensityAvgs[2] + k2 * intensityAvgs[3])/(k2 + k3)))
+                LRR[tmp] = log2(intensityAvgs[tmp]/((k3 * medianAvgsPerGeno[abIndex] + k2 * medianAvgsPerGeno[bbIndex])/(k2 + k3)))
             }
-            tmp = intensityConts <= medianContPerGeno[3]
+            
+            # <= BB median
+            # xxxxBB----AB----AA----
+            tmp = intensityConts <= medianContPerGeno[bbIndex]
             if (any(tmp)) {
                 BAF[tmp] = 1
-                LRR[tmp] = log2(intensityAvgs[tmp]/intensityAvgs[3])
+                LRR[tmp] = log2(intensityAvgs[tmp]/medianAvgsPerGeno[bbIndex])
             }
         }
+        
+        # the genotypes are AA and AB
         else if (id == 3) {
-            c1 = sqrt(ss[[1]][1, 1])
-            c2 = sqrt(ss[[2]][1, 1])
-            s1 = sqrt(ss[[1]][2, 2])
-            s2 = sqrt(ss[[2]][2, 2])
-            tmp = intensityConts >= medianContPerGeno[1]
+            aaIndex <- 1
+            abIndex <- 2
+            
+            # >= AA median
+            # ----BB----AB----AAxxxx
+            tmp = intensityConts >= medianContPerGeno[aaIndex]
             if (any(tmp)) {
                 BAF[tmp] = 0
-                LRR[tmp] = log2(intensityAvgs[tmp]/intensityAvgs[1])
+                LRR[tmp] = log2(intensityAvgs[tmp]/medianAvgsPerGeno[aaIndex])
             }
-            tmp = intensityConts < medianContPerGeno[1] & intensityConts > medianContPerGeno[2]
+            
+            # < AA median and > AB median
+            # ----BB----AB-xx-AA----
+            tmp = intensityConts < medianContPerGeno[aaIndex] & intensityConts > medianContPerGeno[abIndex]
             if (any(tmp)) {
-                k1 = (medianContPerGeno[1] - intensityConts[tmp])/c1
-                k2 = (intensityConts[tmp] - medianContPerGeno[2])/c2
+                k1 = (medianContPerGeno[aaIndex] - intensityConts[tmp])/contStdDevs[aaIndex]
+                k2 = (intensityConts[tmp] - medianContPerGeno[abIndex])/contStdDevs[abIndex]
                 BAF[tmp] = 0.5 * k1/(k1 + k2)
-                LRR[tmp] = log2(intensityAvgs[tmp]/((k1 * intensityAvgs[2] + k2 * intensityAvgs[1])/(k1 + k2)))
+                LRR[tmp] = log2(intensityAvgs[tmp]/((k1 * medianAvgsPerGeno[abIndex] + k2 * medianAvgsPerGeno[aaIndex])/(k1 + k2)))
             }
-            tmp = intensityConts <= medianContPerGeno[2]
+            
+            # <= AB median
+            # xxxxBBxxxxAB----AA----
+            tmp = intensityConts <= medianContPerGeno[abIndex]
             if (any(tmp)) {
                 BAF[tmp] = 0.5
-                LRR[tmp] = log2(intensityAvgs[tmp]/intensityAvgs[2])
+                LRR[tmp] = log2(intensityAvgs[tmp]/medianAvgsPerGeno[abIndex])
             }
         }
     }
+    
+    # if there is only a single genotype at this SNP for all samples
     else if (uniqueGenoCount == 1) {
+        # the genotype for all samples is AA
         if (uniqueGenos == 1) {
             BAF = rep(0, sampleCount)
-            LRR = log2(intensityAvgs/intensityAvgs[1])
+            LRR = log2(intensityAvgs/medianAvgsPerGeno[1])
         }
+        
+        # the genotype for all samples is AB
         else if (uniqueGenos == 2) {
             BAF = rep(0.5, sampleCount)
-            LRR = log2(intensityAvgs/intensityAvgs[2])
+            LRR = log2(intensityAvgs/medianAvgsPerGeno[2])
         }
+        
+        # the genotype for all samples is BB
         else if (uniqueGenos == 3) {
             BAF = rep(1, sampleCount)
-            LRR = log2(intensityAvgs/intensityAvgs[3])
+            LRR = log2(intensityAvgs/medianAvgsPerGeno[3])
         }
     }
     
