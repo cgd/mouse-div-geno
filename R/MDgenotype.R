@@ -8,7 +8,7 @@
 #
 #########################################################################
 
-MouseDivGenotype = function(
+MouseDivGenotype <- function(
     snpProbeInfo, snpInfo, referenceDistribution = NULL,
     transformMethod = c("CCStrans", "MAtrans"), celFiles = getwd(),
     chromosomes = c(1:19, "X", "Y", "M"), cacheDir = tempdir(),
@@ -16,12 +16,12 @@ MouseDivGenotype = function(
     processResultsFunction = NULL) {
     #library("time")
     
-    transformMethod = match.arg(transformMethod)
+    transformMethod <- match.arg(transformMethod)
     if(!inherits(snpProbeInfo, "data.frame") ||
        !all(c("probeIndex", "isAAllele", "snpId") %in% names(snpProbeInfo)))
     {
         stop("You must supply a \"snpProbeInfo\" data frame parameter which has ",
-             "at a minimum the \"probeIndex\", \"isAAllele\" and \"snpId\"",
+             "at a minimum the \"probeIndex\", \"isAAllele\" and \"snpId\" ",
              "components. Please see the help documentation for more details.")
     }
     

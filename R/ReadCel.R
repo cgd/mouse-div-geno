@@ -43,9 +43,9 @@ inferGender <- function(
     isMale
 }
 
-ccstrans = function(a, b, k = 4) {
-    x = asinh(k * (a - b)/(a + b))/asinh(k)
-    y = (log2(a) + log2(b))/2
+ccstrans <- function(a, b, k = 4) {
+    x <- asinh(k * (a - b)/(a + b))/asinh(k)
+    y <- (log2(a) + log2(b))/2
     list(x = x, y = y)
 }
 
@@ -293,8 +293,8 @@ normalizeCelFileByChr <- function(
         y <- normalize.quantiles.use.target(y, target = referenceDistribution)
     
     # separate A alleles from B alleles and summarize to the probeset level
-    allAint = y[snpProbeInfo$isAAllele, 1, drop = FALSE]
-    allBint = y[!snpProbeInfo$isAAllele, 1, drop = FALSE]
+    allAint <- y[snpProbeInfo$isAAllele, 1, drop = FALSE]
+    allBint <- y[!snpProbeInfo$isAAllele, 1, drop = FALSE]
     allAint <- subColSummarizeMedian(
         matrix(allAint, ncol = 1),
         snpProbeInfo$snpId[snpProbeInfo$isAAllele])
@@ -312,14 +312,14 @@ normalizeCelFileByChr <- function(
     
     if (trans == "CCStrans") {
         # fixed K??
-        res = ccstrans(2^allAint, 2^allBint)
-        M = res$x
-        S = res$y
+        res <- ccstrans(2^allAint, 2^allBint)
+        M <- res$x
+        S <- res$y
     }
     else if (trans == "MAtrans") {
         # then prior??
-        M = allAint - allBint
-        S = (allAint + allBint)/2
+        M <- allAint - allBint
+        S <- (allAint + allBint)/2
     }
     else {
         stop(paste("bad transformation argument:", trans))

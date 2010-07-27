@@ -16,58 +16,59 @@
 # nm = MM[1,]; ns = SS[1,]
 # geno = genotype(nm, ns, hint = NULL)
 #======================================================================
-genotype = function(nm, ns, hint1, trans) {
-    hint = rep(0, 3)
-    hint[1] = max(nm)
-    hint[3] = min(nm)
+genotype <- function(nm, ns, hint1, trans) {
+    hint <- rep(0, 3)
+    hint[1] <- max(nm)
+    hint[3] <- min(nm)
     if (length(hint1) != 0) 
-        hint[2] = hint1
+        hint[2] <- hint1
     
-    nsize = length(nm)
+    nsize <- length(nm)
     
     # thres is for CCStrans. The thresholds are used to determine how many and
     # what kind of genotypes we should consider for our tests.
     # (Eg: if all smaller than .3 BB or H so 2 only)
     #         <--B          H-----H         A-->
-    thres = c(-0.4, -0.3, -0.15, 0.15, 0.3, 0.4)
-    MAtransthres = c(-0.8, -0.6, -0.3, 0.3, 0.6, 0.8)
+    thres <- c(-0.4, -0.3, -0.15, 0.15, 0.3, 0.4)
+    MAtransthres <- c(-0.8, -0.6, -0.3, 0.3, 0.6, 0.8)
     if (is.element(trans, "MAtrans")) 
-        thres = MAtransthres
+        thres <- MAtransthres
     
     # rmid is used to remove the values that fall outside of our chosen
     # threshold. Calculated because vinos tend to be low intensity (if you only
     # use contrast dimension you get a bad clustering) note that 1st part is for
     # testing "in H range" and quantile part is testing for low intensity
-    rmid = nm >= thres[2] & nm <= thres[5] & ns < quantile(ns, 0.2)
-    lnrmid = sum(!rmid)
-    istwo = isone = FALSE
-    iig = NULL
+    rmid <- nm >= thres[2] & nm <= thres[5] & ns < quantile(ns, 0.2)
+    lnrmid <- sum(!rmid)
+    istwo <- FALSE
+    isone <- FALSE
+    iig <- NULL
     #================================================ obvious one group SNPs
     if (all(nm[!rmid] < thres[1])) {
-        geno = rep(3, nsize)
-        v1 = vinotype(nm, ns, geno)
-        vino = v1$vino
-        conf = v1$conf
+        geno <- rep(3, nsize)
+        v1 <- vinotype(nm, ns, geno)
+        vino <- v1$vino
+        conf <- v1$conf
     }
     else if (all(nm[!rmid] > thres[6])) {
-        geno = rep(1, nsize)
-        v1 = vinotype(nm, ns, geno)
-        vino = v1$vino
-        conf = v1$conf
+        geno <- rep(1, nsize)
+        v1 <- vinotype(nm, ns, geno)
+        vino <- v1$vino
+        conf <- v1$conf
     }
     else if (all(nm[!rmid] >= thres[3] & nm[!rmid] <= thres[4])) {
-        geno = rep(2, nsize)
-        v1 = vinotype(nm, ns, geno)
-        vino = v1$vino
-        conf = v1$conf
+        geno <- rep(2, nsize)
+        v1 <- vinotype(nm, ns, geno)
+        vino <- v1$vino
+        conf <- v1$conf
     }
     else if (all(nm[!rmid] <= thres[2] | nm[!rmid] >= thres[5])) {
         # 1,3
-        geno = rep(1, nsize)
-        geno[nm < 0] = 3
-        v1 = vinotype(nm, ns, geno)
-        vino = v1$vino
-        conf = v1$conf
+        geno <- rep(1, nsize)
+        geno[nm < 0] <- 3
+        v1 <- vinotype(nm, ns, geno)
+        vino <- v1$vino
+        conf <- v1$conf
     }
     else {
         #cat("timing section 1\n")
@@ -76,13 +77,13 @@ genotype = function(nm, ns, hint1, trans) {
         ##============================================ obvious two groups SNPs
         if (all(nm <= thres[5])) {
             # 2,3
-            istwo = TRUE
-            iig = c(2, 3)
+            istwo <- TRUE
+            iig <- c(2, 3)
         }
         if (all(nm >= thres[2])) {
             # 1,2
-            istwo = TRUE
-            iig = c(1, 2)
+            istwo <- TRUE
+            iig <- c(1, 2)
         }
         
         # Some background:
@@ -90,70 +91,70 @@ genotype = function(nm, ns, hint1, trans) {
         # x axis is 1 to -1 but y (intensity) is typically around 8 to 11.
         # horizontal is much bigger than vertical
         # ns / (max(ns) - min(ns)) is used for scaling to adjust for this
-        adata = cbind(nm, ns/(max(ns) - min(ns)))
-        nsize = length(nm)
+        adata <- cbind(nm, ns/(max(ns) - min(ns)))
+        nsize <- length(nm)
         #======== test 2 ====== based on one dimension at this time rather than two
         #startTime <- proc.time()[3]
         
         emResult <- em2Genos(c(hint[1], hint[3]), nm[!rmid])
-        T = round(emResult$T, 4)
-        tgeno2 = rep(-1, nsize)
-        geno2 = rep(-1, lnrmid)
+        T <- round(emResult$T, 4)
+        tgeno2 <- rep(-1, nsize)
+        geno2 <- rep(-1, lnrmid)
         
         # ig => based on T give group membership by comparing two probabilities
         #       (bigger number gets group)
         #       also make sure that T is big enough (don't just pick the biggest)
         #       value is 1,2 or 2,1
-        ig = order(emResult$tau, decreasing = TRUE)
+        ig <- order(emResult$tau, decreasing = TRUE)
         
         # if 2nd grp is bigger ii is 2, otherwise 1
-        ii = ig[1]
+        ii <- ig[1]
         
         # assign membership if group has a bigger probability
         # T => sum of grp 1 + grp 2 is  1 which allows us to use 0.5 as a basis
         # for finding the most probable group 
-        geno2[T[, ii] >= median(T[T[, ig[2]] < 0.5, ii])] = ii
-        ii = ig[2]
+        geno2[T[, ii] >= median(T[T[, ig[2]] < 0.5, ii])] <- ii
+        ii <- ig[2]
         
         # geno2 == -1 indicates that geno still has no group membership
-        tt = table(T[geno2 == -1, ii])
+        tt <- table(T[geno2 == -1, ii])
         
         # Sort from highest to lowest probability
-        stt = sort(tt, decreasing = TRUE)[1]
-        th = sort(as.numeric(names(tt[tt == stt])), decreasing = TRUE)[1]
+        stt <- sort(tt, decreasing = TRUE)[1]
+        th <- sort(as.numeric(names(tt[tt == stt])), decreasing = TRUE)[1]
         
         # give membership to the second group if the probability is high enough
-        geno2[geno2 == -1 & T[, ii] >= min(max(T[, ii]), max(median(T[T[, ig[1]] < 0.5, ii]), th))] = ii
-        tgeno2[!rmid] = geno2
+        geno2[geno2 == -1 & T[, ii] >= min(max(T[, ii]), max(median(T[T[, ig[1]] < 0.5, ii]), th))] <- ii
+        tgeno2[!rmid] <- geno2
         if (length(unique(tgeno2[tgeno2 != -1])) == 1) {
             # test for 3 group case
-            isone = TRUE
-            mm = median(nm)
+            isone <- TRUE
+            mm <- median(nm)
             if (mm > thres[5]) 
-                geno = rep(1, nsize)
+                geno <- rep(1, nsize)
             else if (mm < thres[2]) 
-                geno = rep(3, nsize)
-            else geno = rep(2, nsize)
+                geno <- rep(3, nsize)
+            else geno <- rep(2, nsize)
             if (istwo) {
-                v1 = vinotype(nm, ns, geno)
-                vino = v1$vino
-                conf = v1$conf
+                v1 <- vinotype(nm, ns, geno)
+                vino <- v1$vino
+                conf <- v1$conf
             }
         }
         else {
             if (any(tgeno2 == -1))
                 # use vdist to give membership (TODO why divided by 5)
-                tgeno2 = vdist(adata[, 1], adata[, 2]/5, tgeno2)
+                tgeno2 <- vdist(adata[, 1], adata[, 2]/5, tgeno2)
             
-            tscore2 = silhouette(match(tgeno2[!rmid], unique(tgeno2[!rmid])), dist(nm[!rmid]))
+            tscore2 <- silhouette(match(tgeno2[!rmid], unique(tgeno2[!rmid])), dist(nm[!rmid]))
             if(any(is.na(tscore2))) stop("Internal Error: silhouette score is NA")
             
             if (istwo) {
                 # test if it's one group or two group
-                geno = test12(tscore2, nm, tgeno2, rmid, thres, iig, nsize)
-                v1 = vinotype(nm, ns, geno)
-                vino = v1$vino
-                conf = v1$conf
+                geno <- test12(tscore2, nm, tgeno2, rmid, thres, iig, nsize)
+                v1 <- vinotype(nm, ns, geno)
+                vino <- v1$vino
+                conf <- v1$conf
             }
         }
         #cat(proc.time()[3] - startTime, "\n")
@@ -164,69 +165,69 @@ genotype = function(nm, ns, hint1, trans) {
         if (!istwo) {
             #======== test 3
             emResult <- em3Genos(hint, nm[!rmid])
-            T = round(emResult$T, 4)
-            tgeno3 = rep(-1, nsize)
-            geno3 = rep(-1, lnrmid)
+            T <- round(emResult$T, 4)
+            tgeno3 <- rep(-1, nsize)
+            geno3 <- rep(-1, lnrmid)
             
             # create the 3x3 mm matrix and sort by decreasing tau
-            ig = order(emResult$tau, decreasing = TRUE)
-            mm = matrix(c(3, 2, 1, 1, 3, 2, 1, 2, 3), nrow = 3, byrow = TRUE)
-            mm = mm[ig, ]
+            ig <- order(emResult$tau, decreasing = TRUE)
+            mm <- matrix(c(3, 2, 1, 1, 3, 2, 1, 2, 3), nrow = 3, byrow = TRUE)
+            mm <- mm[ig, ]
             
-            out1 = apply(T, 2, max)
-            out = rep(1, 3)
-            out[mm[1, 3]] = median(T[T[, mm[1, 1]] < 0.5 & T[, mm[1, 2]] < 0.5, mm[1, 3]])
-            tt = table(T[geno3 == -1, mm[2, 3]])
-            stt = sort(tt, decreasing = TRUE)[1]
-            th = sort(as.numeric(names(tt[tt == stt])), decreasing = TRUE)[1]
-            out[mm[2, 3]] = max(median(T[T[, mm[2, 1]] <= min(out[mm[2, 1]], 0.5) & T[, mm[2, 2]] <= min(out[mm[2, 2]], 0.5), mm[2, 3]]), th)
-            tt = table(T[geno3 == -1, mm[3, 3]])
-            stt = sort(tt, decreasing = TRUE)[1]
-            th = sort(as.numeric(names(tt[tt == stt])), decreasing = TRUE)[1]
+            out1 <- apply(T, 2, max)
+            out <- rep(1, 3)
+            out[mm[1, 3]] <- median(T[T[, mm[1, 1]] < 0.5 & T[, mm[1, 2]] < 0.5, mm[1, 3]])
+            tt <- table(T[geno3 == -1, mm[2, 3]])
+            stt <- sort(tt, decreasing = TRUE)[1]
+            th <- sort(as.numeric(names(tt[tt == stt])), decreasing = TRUE)[1]
+            out[mm[2, 3]] <- max(median(T[T[, mm[2, 1]] <= min(out[mm[2, 1]], 0.5) & T[, mm[2, 2]] <= min(out[mm[2, 2]], 0.5), mm[2, 3]]), th)
+            tt <- table(T[geno3 == -1, mm[3, 3]])
+            stt <- sort(tt, decreasing = TRUE)[1]
+            th <- sort(as.numeric(names(tt[tt == stt])), decreasing = TRUE)[1]
             
             # out contains the threshold in this section which is used later
-            out[mm[3, 3]] = max(median(T[T[, mm[3, 1]] <= min(out[mm[3, 1]], 0.5) & T[, mm[3, 2]] <= min(out[mm[3, 2]], 0.5), mm[3, 3]]), th)
+            out[mm[3, 3]] <- max(median(T[T[, mm[3, 1]] <= min(out[mm[3, 1]], 0.5) & T[, mm[3, 2]] <= min(out[mm[3, 2]], 0.5), mm[3, 3]]), th)
             if (any(is.na(out))) {
                 # we need to fall back on the 2 vs 1 group test
                 if (!isone) 
-                  geno = test12(tscore2, nm, tgeno2, rmid, thres, iig, nsize)
-                v1 = vinotype(nm, ns, geno)
-                vino = v1$vino
-                conf = v1$conf
+                  geno <- test12(tscore2, nm, tgeno2, rmid, thres, iig, nsize)
+                v1 <- vinotype(nm, ns, geno)
+                vino <- v1$vino
+                conf <- v1$conf
             }
             else {
-                out[out1 < out] = out1[out1 < out]
-                geno3[T[, mm[1, 3]] >= out[mm[1, 3]]] = mm[1, 3]
-                geno3[T[, mm[2, 3]] >= out[mm[2, 3]]] = mm[2, 3]
-                geno3[T[, mm[3, 3]] >= out[mm[3, 3]]] = mm[3, 3]
-                tgeno3[!rmid] = geno3
+                out[out1 < out] <- out1[out1 < out]
+                geno3[T[, mm[1, 3]] >= out[mm[1, 3]]] <- mm[1, 3]
+                geno3[T[, mm[2, 3]] >= out[mm[2, 3]]] <- mm[2, 3]
+                geno3[T[, mm[3, 3]] >= out[mm[3, 3]]] <- mm[3, 3]
+                tgeno3[!rmid] <- geno3
                 if (length(unique(tgeno3[tgeno3 != -1])) < 3) {
                     # we need to fall back on the 2 vs 1 group test
                   if (!isone) 
-                    geno = test12(tscore2, nm, tgeno2, rmid, thres, iig, nsize)
-                  v1 = vinotype(nm, ns, geno)
-                  vino = v1$vino
-                  conf = v1$conf
+                    geno <- test12(tscore2, nm, tgeno2, rmid, thres, iig, nsize)
+                  v1 <- vinotype(nm, ns, geno)
+                  vino <- v1$vino
+                  conf <- v1$conf
                 }
                 else {
                   # at this point the 3 group scenario is still possible
                   if (any(tgeno3 == -1)) {
                     # use vdist to assign membership where prev geno test did
                     # not succeed
-                    tgeno3 = vdist(adata[, 1], adata[, 2]/5, tgeno3)
+                    tgeno3 <- vdist(adata[, 1], adata[, 2]/5, tgeno3)
                   }
-                  tscore3 = silhouette(match(tgeno3[!rmid], unique(tgeno3[!rmid])), dist(nm[!rmid]))
+                  tscore3 <- silhouette(match(tgeno3[!rmid], unique(tgeno3[!rmid])), dist(nm[!rmid]))
                   if (isone) {
-                    geno = test13(tscore3, nm, tgeno3, rmid, geno)
-                    v1 = vinotype(nm, ns, geno)
-                    vino = v1$vino
-                    conf = v1$conf
+                    geno <- test13(tscore3, nm, tgeno3, rmid, geno)
+                    v1 <- vinotype(nm, ns, geno)
+                    vino <- v1$vino
+                    conf <- v1$conf
                   }
                   else {
-                    geno = test123(tscore2, tscore3, nm, tgeno2, tgeno3, rmid, thres, iig, nsize)
-                    v1 = vinotype(nm, ns, geno)
-                    vino = v1$vino
-                    conf = v1$conf
+                    geno <- test123(tscore2, tscore3, nm, tgeno2, tgeno3, rmid, thres, iig, nsize)
+                    v1 <- vinotype(nm, ns, geno)
+                    vino <- v1$vino
+                    conf <- v1$conf
                   }
                 }
             }
@@ -251,18 +252,18 @@ em3Genos.using_r <- function(hint, nmSubset)
         sigma3 = 0.1)
     theta1 <- otheta1
     
-    ok = TRUE
-    delta = 0.001
-    imax = 50
-    iter = 0
+    ok <- TRUE
+    delta <- 0.001
+    imax <- 50
+    iter <- 0
     while (ok & iter <= imax) {
-        iter = iter + 1
+        iter <- iter + 1
         
         # T is a matrix of # samples x 3 groups
         T <- E.step3(theta1, nmSubset)
-        T[is.na(T)] = 1/3
+        T[is.na(T)] <- 1/3
         theta1 <- M.step3(T, nmSubset)
-        ok1 = TRUE
+        ok1 <- TRUE
         
         # determines the stopping condition of EM algo (analogous to
         # the two group version)
@@ -274,12 +275,12 @@ em3Genos.using_r <- function(hint, nmSubset)
              !is.na(theta1$sigma3) && !is.infinite(theta1$sigma1) &&
              !is.infinite(theta1$sigma2) && !is.infinite(theta1$sigma3))
         if (ok) {
-            m = (theta1$sigma1 + theta1$sigma2 + theta1$sigma3)/3
-            theta1$sigma1 = 0.5 * theta1$sigma1 + 0.5 * m
-            theta1$sigma2 = 0.5 * theta1$sigma2 + 0.5 * m
-            theta1$sigma3 = 0.5 * theta1$sigma3 + 0.5 * m
+            m <- (theta1$sigma1 + theta1$sigma2 + theta1$sigma3)/3
+            theta1$sigma1 <- 0.5 * theta1$sigma1 + 0.5 * m
+            theta1$sigma2 <- 0.5 * theta1$sigma2 + 0.5 * m
+            theta1$sigma3 <- 0.5 * theta1$sigma3 + 0.5 * m
         }
-        otheta1 = theta1
+        otheta1 <- theta1
     }
     
     # TODO rename T so it doesn't overlap with the TRUE constant
@@ -309,30 +310,31 @@ em3Genos <- em3Genos.using_c
 em2Genos.using_r <- function(hint, nmSubset)
 {
     # Start with priors
-    otheta1 = theta1 = list(
+    theta1 <- list(
         tau = c(0.5, 0.5),
         mu1 = hint[1],
         mu2 = hint[2],
         sigma1 = 0.01,
         sigma2 = 0.01)
-    ok = TRUE
-    delta = 0.001
-    imax = 50
-    iter = 0
+    otheta1 <- theta1
+    ok <- TRUE
+    delta <- 0.001
+    imax <- 50
+    iter <- 0
     
     #cat(proc.time()[3] - startTime, "\n")
     #cat("iterating\n")
     #startTime <- proc.time()[3]
     
     while (ok & iter <= imax) {
-        iter = iter + 1
+        iter <- iter + 1
         
         # probability that belongs to group 1 vs prob group 2
         # T matrix is # samples x 2 groups
         T <- E.step2(theta1, nmSubset)
-        T[is.na(T)] = 0.5
+        T[is.na(T)] <- 0.5
         theta1 <- M.step2(T, nmSubset)
-        ok1 = TRUE
+        ok1 <- TRUE
         
         # Determines the stopping condition of EM algo.
         # There are two groups so if 1st group mean is stable but the 2nd is
@@ -346,11 +348,11 @@ em2Genos.using_r <- function(hint, nmSubset)
             (!is.na(theta1$sigma1) && !is.na(theta1$sigma2) &&
              !is.infinite(theta1$sigma1) && !is.infinite(theta1$sigma2))
         if (ok) {
-            m = (theta1$sigma1 + theta1$sigma2)/2
-            theta1$sigma1 = 0.5 * theta1$sigma1 + 0.5 * m
-            theta1$sigma2 = 0.5 * theta1$sigma2 + 0.5 * m
+            m <- (theta1$sigma1 + theta1$sigma2)/2
+            theta1$sigma1 <- 0.5 * theta1$sigma1 + 0.5 * m
+            theta1$sigma2 <- 0.5 * theta1$sigma2 + 0.5 * m
         }
-        otheta1 = theta1
+        otheta1 <- theta1
     }
     
     list(T = T, tau = theta1$tau)
@@ -378,148 +380,148 @@ em2Genos <- em2Genos.using_c
 
 # genotyping for probesets that we know are homozygous a priori
 genotypeHomozygous <- function(nm, ns, trans) {
-    nsize = length(nm)
-    hint = c(max(nm), min(nm))
+    nsize <- length(nm)
+    hint <- c(max(nm), min(nm))
     
     # thres is for CCStrans 
-    thres = c(-0.4, -0.3, -0.15, 0.15, 0.3, 0.4)
-    MAtransthres = c(-0.8, -0.6, -0.3, 0.3, 0.6, 0.8)
+    thres <- c(-0.4, -0.3, -0.15, 0.15, 0.3, 0.4)
+    MAtransthres <- c(-0.8, -0.6, -0.3, 0.3, 0.6, 0.8)
     if (is.element(trans, "MAtrans")) 
-        thres = MAtransthres
-    rmid = nm >= thres[2] & nm <= thres[5] & ns < quantile(ns, 0.2)
-    lnrmid = sum(!rmid)
+        thres <- MAtransthres
+    rmid <- nm >= thres[2] & nm <= thres[5] & ns < quantile(ns, 0.2)
+    lnrmid <- sum(!rmid)
     
     if (all(nm[!rmid] < thres[3])) {
-        geno = rep(3, nsize)
-        v1 = vinotype(nm, ns, geno)
-        vino = v1$vino
-        conf = v1$conf
+        geno <- rep(3, nsize)
+        v1 <- vinotype(nm, ns, geno)
+        vino <- v1$vino
+        conf <- v1$conf
     }
     else if (all(nm[!rmid] > thres[4])) {
-        geno = rep(1, nsize)
-        v1 = vinotype(nm, ns, geno)
-        vino = v1$vino
-        conf = v1$conf
+        geno <- rep(1, nsize)
+        v1 <- vinotype(nm, ns, geno)
+        vino <- v1$vino
+        conf <- v1$conf
     }
     else if (all(nm[!rmid] <= thres[3] | nm[!rmid] >= thres[4])) {
         # 1,3
-        geno = rep(1, nsize)
-        geno[nm < 0] = 3
-        v1 = vinotype(nm, ns, geno)
-        vino = v1$vino
-        conf = v1$conf
+        geno <- rep(1, nsize)
+        geno[nm < 0] <- 3
+        v1 <- vinotype(nm, ns, geno)
+        vino <- v1$vino
+        conf <- v1$conf
     }
     else {
-        adata = cbind(nm, ns/(max(ns) - min(ns)))
+        adata <- cbind(nm, ns/(max(ns) - min(ns)))
         #======== test 2
         emResult <- em2Genos(hint, nm[!rmid])
-        T = round(emResult$T, 4)
-        geno = rep(-1, nsize)
-        geno2 = rep(-1, lnrmid)
-        ig = order(emResult$tau, decreasing = TRUE)
-        ii = ig[1]
-        geno2[T[, ii] >= median(T[T[, ig[2]] < 0.5, ii])] = ii
-        ii = ig[2]
-        tt = table(T[geno2 == -1, ii])
-        stt = sort(tt, decreasing = TRUE)[1]
-        th = sort(as.numeric(names(tt[tt == stt])), decreasing = TRUE)[1]
-        geno2[geno2 == -1 & T[, ii] >= min(max(T[, ii]), max(median(T[T[, ig[1]] < 0.5, ii]), th))] = ii
-        geno[!rmid] = geno2
+        T <- round(emResult$T, 4)
+        geno <- rep(-1, nsize)
+        geno2 <- rep(-1, lnrmid)
+        ig <- order(emResult$tau, decreasing = TRUE)
+        ii <- ig[1]
+        geno2[T[, ii] >= median(T[T[, ig[2]] < 0.5, ii])] <- ii
+        ii <- ig[2]
+        tt <- table(T[geno2 == -1, ii])
+        stt <- sort(tt, decreasing = TRUE)[1]
+        th <- sort(as.numeric(names(tt[tt == stt])), decreasing = TRUE)[1]
+        geno2[geno2 == -1 & T[, ii] >= min(max(T[, ii]), max(median(T[T[, ig[1]] < 0.5, ii]), th))] <- ii
+        geno[!rmid] <- geno2
         if (length(unique(geno[geno != -1])) == 1) {
-            mm = median(nm)
-            geno = rep(1, nsize)
+            mm <- median(nm)
+            geno <- rep(1, nsize)
             if (mm < 0) 
-                geno = rep(3, nsize)
-            v1 = vinotype(nm, ns, geno)
-            vino = v1$vino
-            conf = v1$conf
+                geno <- rep(3, nsize)
+            v1 <- vinotype(nm, ns, geno)
+            vino <- v1$vino
+            conf <- v1$conf
         }
         else {
             if (any(geno == -1))
                 # TODO why divided by 2?
-                geno = vdist(adata[, 1], adata[, 2]/2, geno)
-            keepthis = tapply(nm, geno, mean)
+                geno <- vdist(adata[, 1], adata[, 2]/2, geno)
+            keepthis <- tapply(nm, geno, mean)
             if (keepthis[1] > keepthis[2]) 
-                geno[geno == 2] = 3
+                geno[geno == 2] <- 3
             else {
-                geno[geno == 1] = 3
-                geno[geno == 2] = 1
+                geno[geno == 1] <- 3
+                geno[geno == 2] <- 1
             }
-            v1 = vinotype(nm, ns, geno)
-            vino = v1$vino
-            conf = v1$conf
+            v1 <- vinotype(nm, ns, geno)
+            vino <- v1$vino
+            conf <- v1$conf
         }
     }
     list(geno = geno, vino = vino, conf = conf)
 }
 
 # test three groups (the tscore parameters are silhoutte scores)
-test123 = function(tscore2, tscore3, nm, tgeno2, tgeno3, rmid, thres, iig, nsize) {
+test123 <- function(tscore2, tscore3, nm, tgeno2, tgeno3, rmid, thres, iig, nsize) {
     if (length(tscore3) < 3) {
         # the score is not available
-        mscore3 = 0
+        mscore3 <- 0
     }
     else {
         # use the mean of the 3rd column which stores avg scores
-        mscore3 = mean(tscore3[, 3])
+        mscore3 <- mean(tscore3[, 3])
     }
     
     if (length(tscore2) < 3) {
         # the score is not available
-        mscore2 = 0
+        mscore2 <- 0
     }
     else {
         # use the mean of the 3rd column which stores avg scores
-        mscore2 = mean(tscore2[, 3])
+        mscore2 <- mean(tscore2[, 3])
     }
     
     # calculates the difference between the 0.1 and 0.9 quantiles
-    d1 = quantile(nm[tgeno3 == 1 & !rmid], 0.1) - quantile(nm[tgeno3 == 2 & !rmid], 0.9)
-    d2 = quantile(nm[tgeno3 == 2 & !rmid], 0.1) - quantile(nm[tgeno3 == 3 & !rmid], 0.9)
+    d1 <- quantile(nm[tgeno3 == 1 & !rmid], 0.1) - quantile(nm[tgeno3 == 2 & !rmid], 0.9)
+    d2 <- quantile(nm[tgeno3 == 2 & !rmid], 0.1) - quantile(nm[tgeno3 == 3 & !rmid], 0.9)
     if (((mscore2 - mscore3 <= 0.15) | mscore3 > 0.8) & (d1 > 0.1 & d2 > 0.1)) {
         # three groups
-        geno = tgeno3
+        geno <- tgeno3
     }
     else {
-        geno = test12(tscore2, nm, tgeno2, rmid, thres, iig, nsize)
+        geno <- test12(tscore2, nm, tgeno2, rmid, thres, iig, nsize)
     }
     
     geno
 }
 
-test13 = function(tscore3, nm, tgeno3, rmid, geno) {
+test13 <- function(tscore3, nm, tgeno3, rmid, geno) {
     if (length(tscore3) < 3) {
         # the score is not available
-        mscore3 = 0
+        mscore3 <- 0
     }
     else {
         # use the mean of the 3rd column which stores avg scores
-        mscore3 = mean(tscore3[, 3])
+        mscore3 <- mean(tscore3[, 3])
     }
     
     # calculates the difference between the 0.1 and 0.9 quantiles
-    d1 = quantile(nm[tgeno3 == 1 & !rmid], 0.1) - quantile(nm[tgeno3 == 2 & !rmid], 0.9)
-    d2 = quantile(nm[tgeno3 == 2 & !rmid], 0.1) - quantile(nm[tgeno3 == 3 & !rmid], 0.9)
+    d1 <- quantile(nm[tgeno3 == 1 & !rmid], 0.1) - quantile(nm[tgeno3 == 2 & !rmid], 0.9)
+    d2 <- quantile(nm[tgeno3 == 2 & !rmid], 0.1) - quantile(nm[tgeno3 == 3 & !rmid], 0.9)
     if (mscore3 > 0.65 & (d1 > 0.1 & d2 > 0.1)) {
-        geno = tgeno3
+        geno <- tgeno3
     }
     
     geno
 }
 
 # test two groups
-test12 = function(tscore2, nm, tgeno, rmid, thres, iig, nsize) {
+test12 <- function(tscore2, nm, tgeno, rmid, thres, iig, nsize) {
     if (length(tscore2) < 3) {
         # the score is not available
-        mscore = 0
+        mscore <- 0
     }
     else {
         # use the mean of the 3rd column which stores avg scores
-        mscore = mean(tscore2[, 3])
+        mscore <- mean(tscore2[, 3])
     }
     
     # calculates the difference between the 0.1 and 0.9 quantiles
-    d = quantile(nm[tgeno == 1 & !rmid], 0.1) - quantile(nm[tgeno == 2 & !rmid], 0.9)
+    d <- quantile(nm[tgeno == 1 & !rmid], 0.1) - quantile(nm[tgeno == 2 & !rmid], 0.9)
     
     # two group
     if (mscore > 0.6 & d > 0.1) {
@@ -527,30 +529,30 @@ test12 = function(tscore2, nm, tgeno, rmid, thres, iig, nsize) {
             # length(iig) == 0 indicates that we went with one of the obvious
             # cases in the genotype function so now we need to figure out based
             # on threshold
-            tmp = c(median(nm[tgeno == 1]), median(nm[tgeno == 2]))
+            tmp <- c(median(nm[tgeno == 1]), median(nm[tgeno == 2]))
             if (tmp[1] > thres[5] & tmp[2] < thres[2]) {
-                iig = c(1, 3)
+                iig <- c(1, 3)
             }
             else if (tmp[1] < thres[5]) { 
-                iig = c(2, 3)
+                iig <- c(2, 3)
             }
             else {
-                iig = c(1, 2)
+                iig <- c(1, 2)
             }
         }
         
-        tgeno = iig[match(tgeno, sort(unique(tgeno)))]
+        tgeno <- iig[match(tgeno, sort(unique(tgeno)))]
     }
     else {
-        mm = median(nm)
+        mm <- median(nm)
         if (mm > thres[5]) {
-            tgeno = rep(1, nsize)
+            tgeno <- rep(1, nsize)
         }
         else if (mm < thres[2]) {
-            tgeno = rep(3, nsize)
+            tgeno <- rep(3, nsize)
         }
         else {
-            tgeno = rep(2, nsize)
+            tgeno <- rep(2, nsize)
         }
     }
     
@@ -559,50 +561,50 @@ test12 = function(tscore2, nm, tgeno, rmid, thres, iig, nsize) {
 
 # vdist performs hierarchical clustering (our fallback function when we are
 # left with unassigned genotypes)
-vdist.using_r = function(ta, tb, t2) {
+vdist.using_r <- function(ta, tb, t2) {
     # the list of unassigned geno indices
-    la = which(t2 == -1)
+    la <- which(t2 == -1)
     
     # the number of unassigned genos
-    l = length(la)
+    l <- length(la)
     
     # dta is a symetrix matrix where each cell measures the euclidian distance
     # two rows in the matrix. For example,
     # sqrt((ta[1] - ta[3]) ^ 2 + (tb[1] - tb[3]) ^ 2) == dta[1, 3] == dta[3, 1]
-    dta = as.matrix(dist(cbind(ta, tb)))
-    diag(dta) = 1000
+    dta <- as.matrix(dist(cbind(ta, tb)))
+    diag(dta) <- 1000
     while (l > 0) {
         # t3 contains all valid genotypes
-        t3 = t2[t2 != -1]
+        t3 <- t2[t2 != -1]
         
         # tmp is the distance matrix where the rows are from unassigned genos
         # and the the cols are from assigned genos
-        tmp = dta[la, t2 != -1]
+        tmp <- dta[la, t2 != -1]
         if (l == 1) {
             # if there is only 1 unassigned genotype assign it to the
             # nearest valid genotype
-            t2[la] = t3[which(min(tmp) == tmp)[1]]
+            t2[la] <- t3[which(min(tmp) == tmp)[1]]
         }
         else {
             # id is the index from tmp with the smallest distance
-            id = which(tmp == min(tmp))[1]
+            id <- which(tmp == min(tmp))[1]
             
             # iid is the tmp row of the unassigned geno with the smallest distance
-            iid = id%%l
-            iid[iid == 0] = l
+            iid <- id%%l
+            iid[iid == 0] <- l
             
             # la[iid] recovers the index of the nearest unassigned geno which
             # we then assign it to the nearest genotype
-            t2[la[iid]] = t3[which(tmp[iid, ] == min(tmp[iid, ]))[1]]
+            t2[la[iid]] <- t3[which(tmp[iid, ] == min(tmp[iid, ]))[1]]
         }
         
-        la = which(t2 == -1)
-        l = length(la)
+        la <- which(t2 == -1)
+        l <- length(la)
     }
     t2
 }
 
-vdist.using_c = function(ta, tb, t2) {
+vdist.using_c <- function(ta, tb, t2) {
     c_call <- .C(
         name = vdist_from_r,
         vectors_length = as.integer(length(t2)),
@@ -615,13 +617,15 @@ vdist.using_c = function(ta, tb, t2) {
 vdist <- vdist.using_c
 
 E.step3.using_r <- function(theta, data) {
-    i1 = i2 = i3 = rep(0, length(data))
+    i1 <- rep(0, length(data))
+    i2 <- i1
+    i3 <- i1
     if (theta$tau[1] > 0) 
-        i1 = theta$tau[1] * dnorm(data, mean = theta$mu1, sd = sqrt(theta$sigma1))
+        i1 <- theta$tau[1] * dnorm(data, mean = theta$mu1, sd = sqrt(theta$sigma1))
     if (theta$tau[2] > 0) 
-        i2 = theta$tau[2] * dnorm(data, mean = theta$mu2, sd = sqrt(theta$sigma2))
+        i2 <- theta$tau[2] * dnorm(data, mean = theta$mu2, sd = sqrt(theta$sigma2))
     if (theta$tau[3] > 0) 
-        i3 = theta$tau[3] * dnorm(data, mean = theta$mu3, sd = sqrt(theta$sigma3))
+        i3 <- theta$tau[3] * dnorm(data, mean = theta$mu3, sd = sqrt(theta$sigma3))
     t(apply(cbind(i1, i2, i3), 1, function(x) x/sum(x)))
 }
 
@@ -646,19 +650,24 @@ E.step3.using_c <- function(theta, data) {
 E.step3 <- E.step3.using_c
 
 M.step3.using_r <- function(T, data) {
-    mu1 = mu2 = mu3 = sigma1 = sigma2 = sigma3 = NA
-    tau = apply(T, 2, mean)
+    mu1 <- NA
+    mu2 <- NA
+    mu3 <- NA
+    sigma1 <- NA
+    sigma2 <- NA
+    sigma3 <- NA
+    tau <- apply(T, 2, mean)
     if (tau[1] > 0) {
-        mu1 = weighted.mean(data, T[, 1])
-        sigma1 = cov.wt(matrix(data, ncol = 1), T[, 1])$cov
+        mu1 <- weighted.mean(data, T[, 1])
+        sigma1 <- cov.wt(matrix(data, ncol = 1), T[, 1])$cov
     }
     if (tau[2] > 0) {
-        mu2 = weighted.mean(data, T[, 2])
-        sigma2 = cov.wt(matrix(data, ncol = 1), T[, 2])$cov
+        mu2 <- weighted.mean(data, T[, 2])
+        sigma2 <- cov.wt(matrix(data, ncol = 1), T[, 2])$cov
     }
     if (tau[3] > 0) {
-        mu3 = weighted.mean(data, T[, 3])
-        sigma3 = cov.wt(matrix(data, ncol = 1), T[, 3])$cov
+        mu3 <- weighted.mean(data, T[, 3])
+        sigma3 <- cov.wt(matrix(data, ncol = 1), T[, 3])$cov
     }
     list(tau = tau, mu1 = mu1, mu2 = mu2, mu3 = mu3, sigma1 = sigma1, sigma2 = sigma2, sigma3 = sigma3)
 }
@@ -687,11 +696,12 @@ M.step3.using_c <- function(T, data)
 M.step3 <- M.step3.using_c
 
 E.step2.using_r <- function(theta, data) {
-    i1 = i2 = rep(0, length(data))
+    i1 <- rep(0, length(data))
+    i2 <- i1
     if (theta$tau[1] > 0) 
-        i1 = theta$tau[1] * dnorm(data, mean = theta$mu1, sd = sqrt(theta$sigma1))
+        i1 <- theta$tau[1] * dnorm(data, mean = theta$mu1, sd = sqrt(theta$sigma1))
     if (theta$tau[2] > 0) 
-        i2 = theta$tau[2] * dnorm(data, mean = theta$mu2, sd = sqrt(theta$sigma2))
+        i2 <- theta$tau[2] * dnorm(data, mean = theta$mu2, sd = sqrt(theta$sigma2))
     t(apply(cbind(i1, i2), 1, function(x) x/sum(x)))
 }
 
@@ -733,15 +743,18 @@ M.step2.using_c <- function(T, data)
 }
 
 M.step2.using_r <- function(T, data) {
-    mu1 = mu2 = sigma1 = sigma2 = NA
-    tau = apply(T, 2, mean)
+    mu1 <- NA
+    mu2 <- NA
+    sigma1 <- NA
+    sigma2 <- NA
+    tau <- apply(T, 2, mean)
     if (tau[1] > 0) {
-        mu1 = weighted.mean(data, T[, 1])
-        sigma1 = cov.wt(matrix(data, ncol = 1), T[, 1])$cov
+        mu1 <- weighted.mean(data, T[, 1])
+        sigma1 <- cov.wt(matrix(data, ncol = 1), T[, 1])$cov
     }
     if (tau[2] > 0) {
-        mu2 = weighted.mean(data, T[, 2])
-        sigma2 = cov.wt(matrix(data, ncol = 1), T[, 2])$cov
+        mu2 <- weighted.mean(data, T[, 2])
+        sigma2 <- cov.wt(matrix(data, ncol = 1), T[, 2])$cov
     }
     list(tau = tau, mu1 = mu1, mu2 = mu2, sigma1 = sigma1, sigma2 = sigma2)
 }
