@@ -2,6 +2,8 @@ pennCNVinput <- function(chrid, mpos, exon1info, exon2info, celfiledir,
     filenames, snpsavefiledir, exonoutfiledir, cnvoutfiledir, mchr) {
     exon1CNV <- length(exon1info) > 0
     exon2CNV <- length(exon2info) > 0
+    
+    # normalize and save all of the exon probeset intensity info
     if (exon1CNV) 
         e1 <- igp(celfiledir, exonoutfiledir, outfilename = "exon1", exon1info$exon1id, 
             exon1info$chrid, exon1info$mpos, exon1info$exon1, exon1info$CGFLcorrection, 
@@ -10,34 +12,50 @@ pennCNVinput <- function(chrid, mpos, exon1info, exon2info, celfiledir,
         e2 <- igp(celfiledir, exonoutfiledir, outfilename = "exon2", exon2info$exon2id, 
             exon2info$chrid, exon2info$mpos, exon2info$exon2, exon2info$CGFLcorrection, 
             exon2info$reference, filenames, mchr)
+    
     allbaf <- NULL
     alllrr <- NULL
     allpos <- NULL
     chrid <- NULL
+    
     for (chri in mchr) {
+        # load baf
         xname <- paste(snpsavefiledir, "/baf", chri, sep = "", collapse = "")
         load(xname)
         file.remove(xname)
+        
+        # load lrr
         xname <- paste(snpsavefiledir, "/lrr", chri, sep = "", collapse = "")
         load(xname)
         file.remove(xname)
+        
+        # accumulate allpos allbaf alllrr and chrid for the current chromosome
         pos <- mpos[match(rownames(lrr), names(mpos))]
         allpos <- c(allpos, pos)
         allbaf <- rbind(allbaf, baf)
         alllrr <- rbind(alllrr, lrr)
         chrid <- c(chrid, rep(chri, nrow(baf)))
     }
-    nn <- rownames(allbaf)
-    exonsize <- 0
     
+    # initialize nn to all SNP IDs
+    nn <- rownames(allbaf)
+    
+    exonsize <- 0
     for (sampleid in 1:ncol(baf)) {
         alrr <- alllrr[, sampleid]
+        
+        # All exons are given BAF of 2 and LRR of
+        # log2(normalized-intensity-per-probeset / avg-probe-intensity-per-probeset) 
         if (exon1CNV) {
-            xname2 <- paste(exonoutfiledir, "/", gsub(".CEL", "exon1", filenames[sampleid]), 
-                sep = "", collapse = "")
+            # brings y (normalized exon intensity) into scope
+            xname2 <- paste(exonoutfiledir, "/", gsub(".CEL", "exon1", filenames[sampleid]), sep = "", collapse = "")
             load(xname2)
             file.remove(xname2)
+            
             alrr <- c(alrr, log2(y/e1))
+            
+            # we only need to accumulate probset annotation for the 1st sample.
+            # This includes nn (exon IDs), allpos, chrid
             if (sampleid == 1) {
                 ny <- names(y)
                 nn <- c(nn, ny)
@@ -48,11 +66,15 @@ pennCNVinput <- function(chrid, mpos, exon1info, exon2info, celfiledir,
             }
         }
         if (exon2CNV) {
-            xname2 <- paste(exonoutfiledir, "/", gsub(".CEL", "exon2", filenames[sampleid]), 
-                sep = "", collapse = "")
+            # brings y (normalized exon intensity) into scope
+            xname2 <- paste(exonoutfiledir, "/", gsub(".CEL", "exon2", filenames[sampleid]), sep = "", collapse = "")
             load(xname2)
             file.remove(xname2)
+            
             alrr <- c(alrr, log2(y/e2))
+            
+            # we only need to accumulate probset annotation for the 1st sample.
+            # This includes nn (exon IDs), allpos, chrid
             if (sampleid == 1) {
                 ny <- names(y)
                 nn <- c(nn, ny)
@@ -63,6 +85,7 @@ pennCNVinput <- function(chrid, mpos, exon1info, exon2info, celfiledir,
             }
         }
         
+        # save LRR and BAF for this sample (includes all SNPs and exons)
         tmp <- c(allbaf[, sampleid], rep(2, exonsize))
         s <- cbind(nn, alrr, tmp)
         colnames(s) <- c("Name", paste(gsub("CEL", "Log R Ratio", filenames[sampleid]), 
@@ -312,10 +335,19 @@ calcLRRAndBAF <- function(intensityConts, intensityAvgs, genos)
     data.frame(BAF = BAF, LRR = LRR)
 }
 
-igp <- function(celfiledir, outfiledir, outfilename, id, chrid, mpos, ename, 
-    CGFLcorrection, reference, filenames, mchr) {
-    library("affyio")
-    library("preprocessCore")
+igp <- function(
+    celfiledir,
+    outfiledir,
+    outfilename,
+    id,
+    chrid,
+    mpos,
+    ename,
+    CGFLcorrection,
+    reference,
+    filenames,
+    mchr)
+{
     setwd(celfiledir)
     if (missing(id)) 
         stop("No CDF file information")
@@ -340,14 +372,14 @@ igp <- function(celfiledir, outfiledir, outfilename, id, chrid, mpos, ename,
             ty <- ty + y
         }
     }
+    
+    # returns the average intensity per-exon
     ty <- ty/nfile
     ty
 }
 
 simpleigp <- function(celfiledir, id, chrid, mpos, ename, CGFLcorrection, 
     reference, filenames, mchr) {
-    library("affyio")
-    library("preprocessCore")
     setwd(celfiledir)
     
     y <- as.matrix(read.celfile(as.character(filenames), intensity.means.only = TRUE)[["INTENSITY"]][["MEAN"]][id])
@@ -381,8 +413,6 @@ simpleCNV <- function(allid, ABid, chrid, CGFLcorrection, reference, exon1info,
 
 simpleCNVdata <- function(allid, ABid, chrid, CGFLcorrection, reference, 
     exon1info, exon2info, celfiledir, filenames, cnvoutfiledir, mchr) {
-    library("affyio")
-    library("preprocessCore")
     setwd(celfiledir)
     SNPname <- ABid$SNPname
     Aid <- ABid$allAid
@@ -436,6 +466,7 @@ simpleCNVdata <- function(allid, ABid, chrid, CGFLcorrection, reference,
 }
 
 simpleCNVsummary <- function(cnvoutfiledir, filenames, refid, mchr, stname) {
+    # TODO add HiddenMarkov as a suggested library to NAMESPACE
     library(HiddenMarkov)
     k <- 0.9999
     pi <- matrix(c(k, (1 - k)/2, (1 - k)/2, (1 - k)/2, k, (1 - k)/2, (1 - k)/2, (1 - 
