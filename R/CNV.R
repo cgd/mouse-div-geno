@@ -141,6 +141,135 @@ pennCNVinput <- function(
     write.table(pfb, file = xname1, row.names = FALSE, sep = "\t", quote = FALSE)
 }
 
+# append PennCNV data for the given LRR/BAF files and the PFB file using
+# invariants (thes files should already have a header in place since this
+# function will not create one)
+# PARAMETERS:
+#   snpIds:
+#       a data frame with a row per SNP. this parameter should have the
+#       following components: snpId, chrId, positionsBp
+#   probesetIntensities:
+#       the summerized intensities per-probeset
+#   lrrAndBafConnection:
+#       vector of connections to append to for LRR and BAF data (one connection
+#       per sample)
+#   pfbConnection:
+#       the connection to use for the PBF file.
+appendToPennCNVForInvariants <- function(
+    snpInfo,
+    probesetIntensities,
+    lrrAndBafConnections,
+    pfbConnection)
+{
+    snpCount <- nrow(snpInfo)
+    sampleCount <- length(lrrAndBafConnections)
+    
+    if(!inherits(lrrAndBafConnections, "connection") || !inherits(pfbConnection, "connection"))
+    {
+        stop("both lrrAndBafConnections and pfbConnection should inherit from ",
+             "the \"connection\" class")
+    }
+    
+    # set all BAFs to 2 indicating that it's not a polymorphic probeset
+    bafs <- rep(2, snpCount)
+    lrrs <- log2(probesetIntensities / apply(mean, 1, probesetIntensities))
+    for(sampleIndex in 1 : sampleCount)
+    {
+        write.table(
+            data.frame(snpInfo$snpId, lrrs[, sampleIndex], bafs),
+            file = lrrAndBafConnections[sampleIndex],
+            sep = "\t",
+            row.names = FALSE,
+            col.names = FALSE,
+            qmethod = "double")
+    }
+    
+    # write the PFB (Population frequency of B allele) file using mean BAF in
+    # the PBF column
+    write.table(
+        data.frame(snpInfo$snpId, snpInfo$chrId, snpInfo$positionsBp, bafs),
+        file = pfbConnection,
+        sep = "\t",
+        row.names = FALSE,
+        col.names = FALSE,
+        qmethod = "double")
+}
+
+# append PennCNV data for the given LRR/BAF files and the PFB file using SNP
+# data (thes files should already have a header in place since this function
+# will not create one)
+# PARAMETERS:
+#   snpInfo:
+#       a data frame with a row per SNP. this parameter should have the
+#       following components: snpId, chrId, positionsBp
+#   intensityConts:
+#       a matrix of intensity contrasts which has a column per sample and a row
+#       per SNP
+#   intensityAvgs:
+#       a matrix of intensity averages which has a column per sample and a row
+#       per SNP
+#   genotypes:
+#       a matrix of genotype codes which has a column per sample and a row
+#       per SNP
+#   lrrAndBafConnection:
+#       vector of connections to append to for LRR and BAF data (one connection
+#       per sample)
+#   pfbConnection:
+#       the connection to use for the PBF file.
+appendToPennCNVForSNPs <- function(
+    snpInfo,
+    intensityConts,
+    intensityAvgs,
+    genotypes,
+    lrrAndBafConnections,
+    pfbConnection)
+{
+    if(!inherits(lrrAndBafConnections, "connection") || !inherits(pfbConnection, "connection"))
+    {
+        stop("both lrrAndBafConnections and pfbConnection should inherit from ",
+            "the \"connection\" class")
+    }
+    
+    snpCount <- nrow(snpInfo)
+    sampleCount <- length(lrrAndBafConnections)
+    
+    # preallocate BAF and LRR matrices for speed then calculate BAF and LRR for
+    # each SNP
+    bafs <- matrix(0.0, nrow = snpCount, ncol = sampleCount)
+    lrrs <- matrix(0.0, nrow = snpCount, ncol = sampleCount)
+    for(snpIndex in 1 : snpCount)
+    {
+        bafAndLrr <- calcLRRAndBAF(
+            intensityConts[snpIndex, ],
+            intensityAvgs[snpIndex, ],
+            genotypes[snpIndex, ])
+        bafs[snpIndex, ] <- bafAndLrr$BAF
+        lrrs[snpIndex, ] <- bafAndLrr$LRR
+    }
+    
+    # write the LRR/BAF files per-sample
+    for(sampleIndex in 1 : sampleCount)
+    {
+        write.table(
+            data.frame(snpInfo$snpId, lrrs[, sampleIndex], bafs[, sampleIndex]),
+            file = lrrAndBafConnections[sampleIndex],
+            sep = "\t",
+            row.names = FALSE,
+            col.names = FALSE,
+            qmethod = "double")
+    }
+    
+    # write the PFB (Population frequency of B allele) file using mean BAF in
+    # the PBF column
+    write.table(
+        data.frame(snpInfo$snpId, snpInfo$chrId, snpInfo$positionsBp, apply(bafs, 1, mean)),
+        file = pfbConnection,
+        sep = "\t",
+        row.names = FALSE,
+        col.names = FALSE,
+        qmethod = "double")
+}
+
 # calculates LRR and BAF values for a single SNP position
 # PARAMETERS:
 #   intensityConts:
@@ -371,6 +500,28 @@ calcLRRAndBAF <- function(intensityConts, intensityAvgs, genos)
     }
     
     data.frame(BAF = BAF, LRR = LRR)
+}
+
+normalizeCelFileForInvariants <- function(
+    celFileName,
+    probesetChunkSize,
+    verbose,
+    invariantProbeInfo,
+    allChr,
+    referenceDistribution)
+{
+    if(verbose) cat("Reading and normalizing CEL file: ", celFileName, "\n", sep="")
+    
+    celData <- read.celfile(celFileName, intensity.means.only = TRUE)
+    y <- log2(as.matrix(celData[["INTENSITY"]][["MEAN"]][invariantProbeInfo$probeIndex]))
+    if (length(invariantProbeInfo$correction) > 0)
+        # C+G and fragment length correction y
+        y <- y + invariantProbeInfo$correction
+    if (length(referenceDistribution) > 0)
+        y <- normalize.quantiles.use.target(y, target = referenceDistribution)
+    
+    y <- subColSummarizeMedian(matrix(y, ncol = 1), invariantProbeInfo$probesetId)
+    y
 }
 
 igp <- function(
