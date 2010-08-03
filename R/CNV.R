@@ -127,6 +127,13 @@ pennCNVinput <- function(
         write.table(s, file = xname1, row.names = FALSE, sep = "\t", quote = FALSE)
     }
     
+    # write the PFB file 
+    # (see http://www.openbioinformatics.org/penncnv/penncnv_input.html#_Toc214852012)
+    # which contains one row per probeset and the following columns:
+    #   Name:       the probeset name
+    #   Chr:        the chromosome
+    #   Position:   the genomic position in base pairs
+    #   PFB:        the mean BAF across samples (2 indicates no polymorphism)
     PFB <- c(apply(allbaf, 1, mean), rep(2, exonsize))
     pfb <- cbind(nn, chrid, allpos, PFB)
     colnames(pfb) <- c("Name", "Chr", "Position", "PFB")
@@ -389,10 +396,16 @@ igp <- function(
         y <- y + CGFLcorrection
         y <- normalize.quantiles.use.target(y, target = reference)
         y <- subColSummarizeMedian(matrix(y, ncol = 1), ename)
+        
+        # removes any probesets from y if they belong to chromosomes that are
+        # not found in mchr
         g <- match(chrid, mchr)
         y <- y[match(names(chrid[!is.na(g)]), rownames(y)), ]
+        
+        # save the IGP's median intensities to file
         xname2 <- paste(outfiledir, "/", gsub(".CEL", outfilename, filenames[i]), sep = "", collapse = "")
         save(y, file = xname2)
+        
         if(i == 1) 
         {
             ty <- y
@@ -403,7 +416,7 @@ igp <- function(
         }
     }
     
-    # returns the average intensity per-exon
+    # return the average intensity per-exon
     ty <- ty/nfile
     ty
 }
