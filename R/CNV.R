@@ -141,6 +141,287 @@ pennCNVinput <- function(
     write.table(pfb, file = xname1, row.names = FALSE, sep = "\t", quote = FALSE)
 }
 
+# TODO make sure it's well documented that the SNPs in "genotypes must match the
+#      order of the SNPs in snpProbeInfo (otherwise we should do something
+#      allowing for SNP IDs to be used... actually this is what we should do)
+buildPennCNVInputFiles <- function(
+    outdir = getwd(), allowOverwrite = FALSE,
+    genotypes, snpProbeInfo, snpInfo, snpReferenceDistribution = NULL,
+    invariantProbeInfo, invariantProbesetInfo, invariantReferenceDistribution = NULL,
+    transformMethod = c("CCStrans", "MAtrans"), celFiles = getwd(),
+    chromosomes = c(1:19, "X", "Y", "M"), cacheDir = tempdir(),
+    retainCache = FALSE, verbose = FALSE,
+    probesetChunkSize = 1000)
+{
+    snpCount <- nrow(snpInfo)
+    sampleCount <- ncol(genotypes)
+    
+    transformMethod <- match.arg(transformMethod)
+    if(!inherits(snpProbeInfo, "data.frame") ||
+        !all(c("probeIndex", "isAAllele", "snpId") %in% names(snpProbeInfo)))
+    {
+        stop("You must supply a \"snpProbeInfo\" data frame parameter which has ",
+            "at a minimum the \"probeIndex\", \"isAAllele\" and \"snpId\" ",
+            "components. Please see the help documentation for more details.")
+    }
+    
+    if(!inherits(snpInfo, "data.frame") ||
+        !all(c("snpId", "chrId", "positionBp") %in% names(snpInfo)))
+    {
+        stop("You must supply a \"snpInfo\" data frame parameter which has ",
+            "at a minimum the \"snpId\" and \"chrId\" ",
+            "components. Please see the help documentation for more details.")
+    }
+    
+    # it is an error if isInPAR is set to TRUE in a non-X chromosome
+    if(!is.null(snpInfo$isInPAR))
+    {
+        parChrs <- unique(snpInfo$chrId[snpInfo$isInPar])
+        if(!all(parChrs == "X"))
+        {
+            stop("snpInfo$isInPar should only ever be TRUE on the \"X\" ",
+                "chromosome, but TRUE isInPar values were found on chromosomes: ",
+                paste(parChrs, collapse=", "))
+        }
+    }
+    
+    # if the user passes us a list (or data frame) rather than a vector of file
+    # names we should attempt to pull out a fileName component
+    if(is.list(celFiles))
+    {
+        if(!("fileName" %in% names(celFiles)))
+        {
+            stop("failed to find \"fileName\" component in the \"celFiles\" list")
+        }
+        
+        celFiles <- celFiles$fileName
+    }
+    
+    if(length(celFiles) != sampleCount)
+    {
+        stop("the number of CEL files doesn't match the number of columns in ",
+            "\"genotypes\" (", sampleCount, "). The expanded CEL files are: ",
+            paste(celFiles, sep = ", "))
+    }
+    
+    if(nrow(genotypes) != snpCount)
+    {
+        stop("the number of rows in the \"genotypes\" parameter must match ",
+             "the number of rows in the \"snpInfo\" parameter")
+    }
+    
+    # make sure that the chromosome vector is not numeric
+    # TODO is toupper the right thing to do here? (I do it in MDgenotype.R too)
+    chromosomes <- toupper(as.character(chromosomes))
+    
+    # figure out how many chunks there will be per chromosome
+    chrChunks <- list()
+    for(currChr in chromosomes)
+    {
+        chrProbesetCount <- sum(snpInfo$chrId == currChr)
+        chrChunks[[currChr]] <- chunkIndices(chrProbesetCount, probesetChunkSize)
+    }
+    
+    for(celfile in celFiles)
+    {
+        # wrapping this up as a local function def allows us to avoid doing the
+        # normalization work unless it's necessary
+        makeMsList <- function()
+        {
+            normalizeCelFileByChr(
+                celfile,
+                probesetChunkSize,
+                verbose,
+                snpProbeInfo,
+                snpInfo,
+                chromosomes,
+                snpReferenceDistribution,
+                transformMethod)
+        }
+        msList <- NULL
+        
+        for(currChr in chromosomes)
+        {
+            for(chunkIndex in 1 : length(chrChunks[[currChr]]))
+            {
+                chunkFile <- chunkFileName(cacheDir, "snp", celfile, currChr, probesetChunkSize, chunkIndex)
+                chunkFileAlreadyExists <- file.exists(chunkFile)
+                
+                if(!chunkFileAlreadyExists)
+                {
+                    # if we haven't yet normalized the CEL file we'll have to
+                    # do that now
+                    if(is.null(msList))
+                    {
+                        msList <- makeMsList()
+                    }
+                    
+                    chunk <- chrChunks[[currChr]][[chunkIndex]]
+                    probesetIndices <- chunk$start : chunk$end
+                    mChunk <- msList[[currChr]]$M[probesetIndices]
+                    sChunk <- msList[[currChr]]$S[probesetIndices]
+                    
+                    save(mChunk, sChunk, file = chunkFile)
+                }
+            }
+        }
+        
+        rm(msList)
+    }
+    
+    lrrAndBafBaseNames <- paste(fileBaseWithoutExtension(celFiles), ".txt", sep = "")
+    lrrAndBafOutputFiles <- file.path(outdir, lrrAndBafBaseNames)
+    if(!allowOverwrite && any(file.exists(lrrAndBafOutputFiles)))
+    {
+        stop("refusing to overwrite the following files: ",
+             paste(lrrAndBafOutputFiles[file.exists(lrrAndBafOutputFiles)], collapse = ", "),
+             ". In order to procede you can either set allowOverwrite to TRUE or ",
+             "you can manually delete the files.")
+    }
+    
+    pfbOutputFile <- file.path(outdir, "pfbdata.txt")
+    if(!allowOverwrite && file.exists(pfbOutputFile))
+    {
+        stop("refusing to overwrite : ", pfbOutputFile,
+            ". In order to procede you can either set allowOverwrite to TRUE or ",
+            "you can manually delete the files.")
+    }
+    
+    lrrAndBafConnections <- sapply(lrrAndBafOutputFiles, file, "wt")
+    pfbConnection <- file(pfbOutputFile, "wt")
+    
+    # TODO write the headers!!!!!!!!!!!!!!!!!!!!!!!
+    
+    # append the SNP-based LRR/BAF values
+    for(currChr in chromosomes)
+    {
+        chrIndices <- which(snpInfo$chrId == currChr)
+        chrGenos <- genotypes[chrIndices, ]
+        chrSnpInfo <- snpInfo[chrIndices, ]
+        for(chunkIndex in 1 : length(chrChunks[[currChr]]))
+        {
+            chunk <- chrChunks[[currChr]][[chunkIndex]]
+            chunkIndices <- chunk$start : chunk$end
+            chunkSize <- 1 + chunk$end - chunk$start
+            
+            # pre-allocate M and S matrices
+            mMatrix <- matrix(0, nrow = chunkSize, ncol = length(celFiles))
+            sMatrix <- matrix(0, nrow = chunkSize, ncol = length(celFiles))
+            
+            # stitch together the M and S chunks
+            for(fileIndex in 1 : length(celFiles))
+            {
+                celfile <- celFiles[fileIndex]
+                
+                # loads mChunk and sChunk into scope
+                chunkFile <- chunkFileName(cacheDir, "snp", celfile, currChr, probesetChunkSize, chunkIndex)
+                load(chunkFile)
+                
+                mMatrix[, fileIndex] <- mChunk
+                sMatrix[, fileIndex] <- sChunk
+            }
+            
+            appendToPennCNVForSNPs(
+                snpInfo = chrSnpInfo[chunkIndices, ],
+                intensityConts = mMatrix,
+                intensityAvgs = sMatrix,
+                genotypes = chrGenos[chunkIndices, ],
+                lrrAndBafConnections = lrrAndBafConnections,
+                pfbConnection = pfbConnection)
+        }
+    }
+    
+    invariantChrChunks <- list()
+    for(currChr in chromosomes)
+    {
+        chrProbesetCount <- sum(invariantProbesetInfo$chrId == currChr)
+        chrChunks[[currChr]] <- chunkIndices(chrProbesetCount, probesetChunkSize)
+    }
+
+    # append the invariant LRR/BAF values
+    for(celfile in celFiles)
+    {
+        makeNormInvariantList <- function()
+        {
+            #TODO remember to add invariantProbesetInfo !!!!!!!!!!!!!!!!!!!!!!!!!!!
+            normalizeCelFileForInvariants(
+                celfile,
+                verbose,
+                invariantProbeInfo,
+                invariantProbesetInfo,
+                chromosomes,
+                invariantReferenceDistribution)
+        }
+        normInvariantList <- NULL
+        
+        for(currChr in chromosomes)
+        {
+            for(chunkIndex in 1 : length(invariantChrChunks[[currChr]]))
+            {
+                chunkFile <- chunkFileName(cacheDir, "invariant", celfile, currChr, probesetChunkSize, chunkIndex)
+                chunkFileAlreadyExists <- file.exists(chunkFile)
+                
+                if(!chunkFileAlreadyExists)
+                {
+                    # if we haven't yet normalized the CEL file we'll have to
+                    # do that now
+                    if(is.null(normInvariantList))
+                    {
+                        normInvariantList <- makeNormInvariantList()
+                    }
+                    
+                    chunk <- invariantChrChunks[[currChr]][[chunkIndex]]
+                    probesetIndices <- chunk$start : chunk$end
+                    intensityChunk <- normInvariantList[[currChr]][probesetIndices]
+                    
+                    save(intensityChunk = intensityChunk)
+                }
+            }
+        }
+        
+        rm(normInvariantList)
+    }
+    
+    for(currChr in chromosomes)
+    {
+        chrInvariantProbeInfo <- invariantProbeInfo[invariantProbeInfo$chrId == currChr, ]
+        for(chunkIndex in 1 : length(invariantChrChunks[[currChr]]))
+        {
+            chunk <- invariantChrChunks[[currChr]][[chunkIndex]]
+            chunkIndices <- chunk$start : chunk$end
+            chunkSize <- 1 + chunk$end + chunk$start
+            
+            # pre-allocate intensity matrix
+            intensityMatrix <- matrix(0, nrow = chunkSize, ncol = length(celFiles))
+            
+            # stitch together the intensity chunks
+            for(fileIndex in 1 : length(celFiles))
+            {
+                celfile <- celFiles[fileIndex]
+                
+                # loads intensityChunk into scope
+                chunkFile <- chunkFileName(cacheDir, "invariant", celfile, currChr, probesetChunkSize, chunkIndex)
+                load(chunkFile)
+                
+                intensityMatrix[, fileIndex] <- intensityChunk
+            }
+            
+            appendToPennCNVForInvariants(
+                probesetInfo = chrInvariantProbeInfo,
+                probesetIntensities = intensityMatrix,
+                lrrAndBafConnections = lrrAndBafConnections,
+                pfbConnection = pfbConnection)
+        }
+    }
+    
+    # close all of the open connections
+    for(con in lrrAndBafConnections)
+    {
+        close(con)
+    }
+    close(pfbConnection)
+}
+
 # append PennCNV data for the given LRR/BAF files and the PFB file using
 # invariants (thes files should already have a header in place since this
 # function will not create one)
@@ -510,9 +791,9 @@ calcLRRAndBAF <- function(intensityConts, intensityAvgs, genos)
 
 normalizeCelFileForInvariants <- function(
     celFileName,
-    probesetChunkSize,
     verbose,
     invariantProbeInfo,
+    invariantProbesetInfo,
     allChr,
     referenceDistribution)
 {
@@ -527,7 +808,16 @@ normalizeCelFileForInvariants <- function(
         y <- normalize.quantiles.use.target(y, target = referenceDistribution)
     
     y <- subColSummarizeMedian(matrix(y, ncol = 1), invariantProbeInfo$probesetId)
-    y
+    
+    # now that the data is normalized by probeset,
+    # organize the data into chromosome groups
+    chrIntensityList <- list()
+    for(chr in allChr)
+    {
+        chrIntensityList[chr] <- y[invariantProbesetInfo$chrId == chr]
+    }
+    
+    chrIntensityList
 }
 
 igp <- function(
