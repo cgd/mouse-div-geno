@@ -274,7 +274,6 @@ genotypeYChromosomeChunk <- function(ms, ss, hint, trans, isMale)
 # groups should be factors where
 normalizeCelFileByChr <- function(
     celFileName,
-    probesetChunkSize,
     verbose,
     snpProbeInfo,
     snpProbesetInfo,
@@ -365,10 +364,10 @@ chunkIndices <- function(to, by) {
 }
 
 # TODO we need more parameters to make sure this is really meaningfully unique
-chunkFileName <- function(baseDir, celFileName, chrName, chunkSize, chunkIndex)
+chunkFileName <- function(baseDir, kind, celFileName, chrName, chunkSize, chunkIndex)
 {
     fileBase <- fileBaseWithoutExtension(celFileName)
-    chunkFile <- paste(fileBase, "-", chrName, "-", chunkSize, "-", chunkIndex, ".RData", sep="")
+    chunkFile <- paste(fileBase, "-", kind, "-", chrName, "-", chunkSize, "-", chunkIndex, ".RData", sep="")
     
     file.path(baseDir, chunkFile)
 }

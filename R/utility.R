@@ -125,3 +125,27 @@ bivar <- function(x) {
     bi <- top/botx
     bi
 }
+
+# a simple function that will return all CEL file in a dir if given a
+# dir argument, or a single CEL file if that is what it's given. If the given
+# file is not null and does not end in ".CEL" then NULL is returned
+expandCelFiles <- function(filename)
+{
+    retVal <- NULL
+    if(!file.exists(filename))
+    {
+        stop("failed to find file named \"", filename, "\"")
+    }
+    else if(file.info(filename)$isdir)
+    {
+        # if it's a dir expand it to all CEL file contents
+        fileListing <- dir(filename, full.names = TRUE)
+        retVal <- fileListing[grep("*.CEL$", toupper(fileListing))]
+    }
+    else if(grep("*.CEL$", toupper(filename)))
+    {
+        retVal <- filename
+    }
+    
+    retVal
+}

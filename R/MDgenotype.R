@@ -10,10 +10,12 @@
 
 MouseDivGenotype <- function(
     snpProbeInfo, snpInfo, referenceDistribution = NULL,
-    transformMethod = c("CCStrans", "MAtrans"), celFiles = getwd(),
+    transformMethod = c("CCStrans", "MAtrans"),
+    celFiles = expandCelFiles(getwd()),
     chromosomes = c(1:19, "X", "Y", "M"), cacheDir = tempdir(),
-    verbose = FALSE, cluster = NULL, probesetChunkSize=1000,
-    processResultsFunction = NULL) {
+    retainCache = FALSE, verbose = FALSE, cluster = NULL,
+    probesetChunkSize = 1000, processResultsFunction = NULL)
+{
     #library("time")
     
     transformMethod <- match.arg(transformMethod)
@@ -51,63 +53,24 @@ MouseDivGenotype <- function(
         stop("failed to load the snow library")
     }
     
+    # if we have a list (or data frame) pull out the file names and gender info
+    # if it's in there
     isMale <- NULL
-    filenames <- NULL
-    if(is.data.frame(celFiles) || is.matrix(celFiles))
+    if(is.list(celFiles))
     {
-        if(ncol(celFiles) >= 2)
+        if(!("fileName" %in% names(celFiles)))
         {
-            gender <- toupper(celFiles[, 2])
-            isMale <- gender == "MALE" | gender == "M"
-            isFemale <- gender == "FEMALE" | gender == "F"
-
-            # TODO in old code there was fallback to using vdist for gender
-            #      inference. Ask Hyuna about the vdist fallback
-            if(sum(isMale) + sum(isFemale) != nrow(filenames))
-            {
-                isMale <- NULL
-                isFemale <- NULL
-            }
-        }
-        filenames <- celFiles[1, ]
-    }
-    else if(is.character(celFiles))
-    {
-        # a simple function that will return all CEL file in a dir if given a
-        # dir argument, or a single CEL file if that is what it's given
-        celExpander <- function(name)
-        {
-            retVal <- c()
-            if(!file.exists(name))
-            {
-                stop("failed to find file named \"", name, "\"")
-            }
-            else if(file.info(name)$isdir)
-            {
-                # if it's a dir expand it to all CEL file contents
-                fileListing <- dir(name, full.names = TRUE)
-                retVal <- fileListing[grep("*.CEL$", toupper(fileListing))]
-            }
-            else if(grep("*.CEL$", toupper(name)))
-            {
-                retVal <- name
-            }
-            
-            retVal
+            stop("failed to find \"fileName\" component in the \"celFiles\" list")
         }
         
-        filenames <- unlist(lapply(celFiles, celExpander))
-    }
-    else
-    {
-        stop("expected celFiles to be one of the following: ",
-             "a matrix/data frame where the ",
-             "first column contains CEL file names and the second column ",
-             "contains CEL file gender (\"male\" or \"female\"), the name of ",
-             "a directory containing CEL files, or a vector of CEL file names");
+        if("isMale" %in% names(celFiles))
+        {
+            isMale <- celFiles$isMale
+        }
+        celFiles <- celFiles$fileName
     }
     
-    nfile <- length(filenames)
+    nfile <- length(celFiles)
     if(nfile <= 1)
     {
         stop("Cannot successfully genotype with less than two CEL files")
@@ -117,7 +80,7 @@ MouseDivGenotype <- function(
     # TODO is toupper the right thing to do here?
     chromosomes <- toupper(as.character(chromosomes))
     
-    allChr <- unique(snpInfo$chrId)
+    allChr <- as.character(unique(snpInfo$chrId))
     allAutosomes <- setdiff(allChr, c("X", "Y", "M"))
     
     # we must infer gender if we don't yet have it and we need to
@@ -129,8 +92,8 @@ MouseDivGenotype <- function(
         # mean intensity values for the X and Y chromosomes. We'll initialize
         # them as all 0's
         anyToZero <- function(...) { 0.0 }
-        meanIntensityXPerArray <- sapply(filenames, anyToZero)
-        meanIntensityYPerArray <- sapply(filenames, anyToZero)
+        meanIntensityXPerArray <- sapply(celFiles, anyToZero)
+        meanIntensityYPerArray <- sapply(celFiles, anyToZero)
         meanIntensityPerAutosome <- sapply(allAutosomes, anyToZero)
     }
     
@@ -146,7 +109,7 @@ MouseDivGenotype <- function(
     
     # loop through all the CELL files. We need to read and normalize the CEL
     # file data and save it to file in chunks no bigger than probesetChunkSize
-    for(celfile in filenames)
+    for(celfile in celFiles)
     {
         # wrapping this up as a local function def allows us to avoid doing the
         # normalization work unless it's necessary
@@ -154,7 +117,6 @@ MouseDivGenotype <- function(
         {
             normalizeCelFileByChr(
                 celfile,
-                probesetChunkSize,
                 verbose,
                 snpProbeInfo,
                 snpInfo,
@@ -168,7 +130,7 @@ MouseDivGenotype <- function(
         {
             for(chunkIndex in 1 : length(chrChunks[[currChr]]))
             {
-                chunkFile <- chunkFileName(cacheDir, celfile, currChr, probesetChunkSize, chunkIndex)
+                chunkFile <- chunkFileName(cacheDir, "snp", celfile, currChr, probesetChunkSize, chunkIndex)
                 chunkFileAlreadyExists <- file.exists(chunkFile)
                 if(!chunkFileAlreadyExists)
                 {
@@ -245,7 +207,8 @@ MouseDivGenotype <- function(
     #      we optionally include a function argument that allows the user to
     #      write the results to file
     chrResults <- list()
-    for (chri in chromosomes) {
+    for (chri in chromosomes)
+    {
         chrIndices <- which(snpInfo$chrId == chri)
         argLists <- list()
         chrResults[[chri]] <- list()
@@ -266,7 +229,8 @@ MouseDivGenotype <- function(
         for(chunkIndex in 1 : length(chrChunks[[chri]]))
         {
             chunk <- chrChunks[[chri]][[chunkIndex]]
-            if(verbose) {
+            if(verbose)
+            {
                 cat("geno/vinotyping chromosome ", chri,
                     " from probeset #", chunk$start,
                     " to probeset #", chunk$end, "\n", sep="")
@@ -277,16 +241,17 @@ MouseDivGenotype <- function(
             # paste the chromosomes together for genotyping
             MM <- NULL
             SS <- NULL
-            for (i in 1:nfile) {
-                chunkFile <- chunkFileName(cacheDir, filenames[i], chri, probesetChunkSize, chunkIndex)
+            for (i in 1:nfile)
+            {
+                chunkFile <- chunkFileName(cacheDir, "snp", celFiles[i], chri, probesetChunkSize, chunkIndex)
                 load(chunkFile)
                 MM <- cbind(MM, mChunk)
                 SS <- cbind(SS, sChunk)
                 rm(mChunk, sChunk)
             }
             
-            colnames(MM) <- filenames
-            colnames(SS) <- filenames
+            colnames(MM) <- celFiles
+            colnames(SS) <- celFiles
             
             #cat("time it took us to get to genotypethis\n")
             #timeReport(startTime)
@@ -335,7 +300,7 @@ MouseDivGenotype <- function(
                             
                             for(k in 1 : length(chunkResult))
                             {
-                                colnames(chunkResult[[k]]) <- fileBaseWithoutExtension(filenames)
+                                colnames(chunkResult[[k]]) <- fileBaseWithoutExtension(celFiles)
                             }
                             processResultsFunction(chunkProbesetInfo, chunkResult)
                         }
@@ -374,7 +339,7 @@ MouseDivGenotype <- function(
                     
                     for(k in 1 : length(chunkResult))
                     {
-                        colnames(chunkResult[[k]]) <- fileBaseWithoutExtension(filenames)
+                        colnames(chunkResult[[k]]) <- fileBaseWithoutExtension(celFiles)
                     }
                     processResultsFunction(chunkProbesetInfo, chunkResult)
                 }
@@ -392,6 +357,32 @@ MouseDivGenotype <- function(
     if(!is.null(processResultsFunction))
     {
         chrResults <- NULL
+    }
+    
+    # clean-up unless we were asked to retain the cache
+    if(!retainCache)
+    {
+        if(verbose)
+        {
+            cat("cleaning up cache files before returning geno/vinotype results")
+        }
+        
+        for(celfile in celFiles)
+        {
+            for(currChr in allChr)
+            {
+                for(chunkIndex in 1 : length(chrChunks[[currChr]]))
+                {
+                    chunkFile <- chunkFileName(cacheDir, "snp", celfile, currChr, probesetChunkSize, chunkIndex)
+                    if(file.exists(chunkFile))
+                    {
+                        file.delete(chunkFile)
+                    }
+                }
+            }
+            
+            rm(msList)
+        }
     }
     
     chrResults
