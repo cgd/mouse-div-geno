@@ -145,9 +145,9 @@ pennCNVinput <- function(
 # invariants (thes files should already have a header in place since this
 # function will not create one)
 # PARAMETERS:
-#   snpIds:
-#       a data frame with a row per SNP. this parameter should have the
-#       following components: snpId, chrId, positionsBp
+#   probesetInfo:
+#       a data frame with a row per probeset. this parameter should have the
+#       following components: probesetId, chrId, positionBp
 #   probesetIntensities:
 #       the summerized intensities per-probeset
 #   lrrAndBafConnection:
@@ -156,13 +156,19 @@ pennCNVinput <- function(
 #   pfbConnection:
 #       the connection to use for the PBF file.
 appendToPennCNVForInvariants <- function(
-    snpInfo,
+    probesetInfo,
     probesetIntensities,
     lrrAndBafConnections,
     pfbConnection)
 {
-    snpCount <- nrow(snpInfo)
+    probesetCount <- nrow(probesetInfo)
     sampleCount <- length(lrrAndBafConnections)
+    
+    if(!all(c("probesetId", "chrId", "positionBp") %in% names(probesetInfo)))
+    {
+        stop("the \"probesetInfo\" parameter must contain the following components: ",
+             "probesetId, chrId, positionBp")
+    }
     
     if(!inherits(lrrAndBafConnections, "connection") || !inherits(pfbConnection, "connection"))
     {
@@ -171,12 +177,12 @@ appendToPennCNVForInvariants <- function(
     }
     
     # set all BAFs to 2 indicating that it's not a polymorphic probeset
-    bafs <- rep(2, snpCount)
+    bafs <- rep(2, probesetCount)
     lrrs <- log2(probesetIntensities / apply(mean, 1, probesetIntensities))
     for(sampleIndex in 1 : sampleCount)
     {
         write.table(
-            data.frame(snpInfo$snpId, lrrs[, sampleIndex], bafs),
+            data.frame(probesetInfo$probesetId, lrrs[, sampleIndex], bafs),
             file = lrrAndBafConnections[sampleIndex],
             sep = "\t",
             row.names = FALSE,
@@ -187,7 +193,7 @@ appendToPennCNVForInvariants <- function(
     # write the PFB (Population frequency of B allele) file using mean BAF in
     # the PBF column
     write.table(
-        data.frame(snpInfo$snpId, snpInfo$chrId, snpInfo$positionsBp, bafs),
+        data.frame(probesetInfo$probesetId, probesetInfo$chrId, probesetInfo$positionBp, bafs),
         file = pfbConnection,
         sep = "\t",
         row.names = FALSE,
@@ -201,7 +207,7 @@ appendToPennCNVForInvariants <- function(
 # PARAMETERS:
 #   snpInfo:
 #       a data frame with a row per SNP. this parameter should have the
-#       following components: snpId, chrId, positionsBp
+#       following components: snpId, chrId, positionBp
 #   intensityConts:
 #       a matrix of intensity contrasts which has a column per sample and a row
 #       per SNP
@@ -262,7 +268,7 @@ appendToPennCNVForSNPs <- function(
     # write the PFB (Population frequency of B allele) file using mean BAF in
     # the PBF column
     write.table(
-        data.frame(snpInfo$snpId, snpInfo$chrId, snpInfo$positionsBp, apply(bafs, 1, mean)),
+        data.frame(snpInfo$snpId, snpInfo$chrId, snpInfo$positionBp, apply(bafs, 1, mean)),
         file = pfbConnection,
         sep = "\t",
         row.names = FALSE,
