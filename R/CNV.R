@@ -178,7 +178,7 @@ appendToPennCNVForInvariants <- function(
     
     # set all BAFs to 2 indicating that it's not a polymorphic probeset
     bafs <- rep(2, probesetCount)
-    lrrs <- log2(probesetIntensities / apply(mean, 1, probesetIntensities))
+    lrrs <- log2(probesetIntensities / apply(probesetIntensities, 1, mean))
     for(sampleIndex in 1 : sampleCount)
     {
         write.table(
