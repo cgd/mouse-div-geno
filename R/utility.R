@@ -61,7 +61,7 @@ createAppendResultsToCSVFunction <- function(fileName)
 {
     # if the file already exists we should delete it (without this we would end
     # up appending to the exising file which we don't want)
-    unlink(fileName)
+    file.remove(fileName)
     
     function(snpProbesetInfoChunk, genotypingResultsChunk)
     {
