@@ -91,10 +91,9 @@ MouseDivGenotype <- function(
         # in order to be able to infer gender we'll need per-array
         # mean intensity values for the X and Y chromosomes. We'll initialize
         # them as all 0's
-        anyToZero <- function(...) { 0.0 }
-        meanIntensityXPerArray <- sapply(celFiles, anyToZero)
-        meanIntensityYPerArray <- sapply(celFiles, anyToZero)
-        meanIntensityPerAutosome <- sapply(allAutosomes, anyToZero)
+        meanIntensityXPerArray <- rep(0, length(celFiles))
+        meanIntensityYPerArray <- rep(0, length(celFiles))
+        meanIntensityPerAutosome <- rep(0, length(allAutosomes))
     }
     
     # figure out how many chunks there will be per chromosome. The reason we
@@ -203,15 +202,11 @@ MouseDivGenotype <- function(
             meanIntensityPerAutosome)
     }
     
-    # TODO storing in a chrResults list may be bad for mem requirements. should
-    #      we optionally include a function argument that allows the user to
-    #      write the results to file
-    chrResults <- list()
+    results <- list()
     for (chri in chromosomes)
     {
         chrIndices <- which(snpInfo$chrId == chri)
         argLists <- list()
-        chrResults[[chri]] <- list()
         
         # pull out the hints for this chromosome (if they exist)
         chrHint <- NULL
@@ -280,13 +275,13 @@ MouseDivGenotype <- function(
                         if(is.null(processResultsFunction))
                         {
                             # we only accumulate results if there is no function
-                            if(length(chrResults[[chri]]) == 0)
+                            if(length(results) == 0)
                             {
-                                chrResults[[chri]] <- chunkResult
+                                results <- chunkResult
                             }
                             else
                             {
-                                chrResults[[chri]] <- mapply(rbind, chrResults[[chri]], chunkResult, SIMPLIFY = FALSE)
+                                results <- mapply(rbind, results, chunkResult, SIMPLIFY = FALSE)
                             }
                         }
                         else
@@ -324,13 +319,13 @@ MouseDivGenotype <- function(
                 if(is.null(processResultsFunction))
                 {
                     # we only accumulate results if there is no function
-                    if(length(chrResults[[chri]]) == 0)
+                    if(length(results) == 0)
                     {
-                        chrResults[[chri]] <- chunkResult
+                        results <- chunkResult
                     }
                     else
                     {
-                        chrResults[[chri]] <- mapply(rbind, chrResults[[chri]], chunkResult, SIMPLIFY = FALSE)
+                        results <- mapply(rbind, results, chunkResult, SIMPLIFY = FALSE)
                     }
                 }
                 else
@@ -353,10 +348,38 @@ MouseDivGenotype <- function(
     }
     
     # if the user asked us to use a function to process the results that means
-    # we have not accumulated any results to return
+    # we have not accumulated any results to return, otherwise we have a bit
+    # of post-processing to do to make sure that the matrices that we return
+    # to the user match up nicely with what they passed in
     if(!is.null(processResultsFunction))
     {
-        chrResults <- NULL
+        results <- NULL
+    }
+    else
+    {
+        # using list/unlist because c() will coerce factors into an integer
+        snpIdsByChr <- list()
+        for(chri in chromosomes)
+        {
+            snpIdsByChr[[chri]] <- snpInfo$snpId[snpInfo$chrId == chri]
+        }
+        snpIdsByChr <- unlist(snpIdsByChr, use.names = FALSE)
+        
+        snpIdsInOrder <- snpInfo$snpId[snpInfo$chrId %in% chromosomes]
+        snpOrdering <- match(snpIdsInOrder, snpIdsByChr)
+        if(any(is.na(snpOrdering)))
+        {
+            stop("internal error: failed to match up SNP IDs in results")
+        }
+        
+        # reorder the SNPs so that they match up with the snpInfo frame that
+        # was passed in
+        for(i in 1 : length(results))
+        {
+            results[[i]] <- results[[i]][snpOrdering, ]
+            rownames(results[[i]]) <- snpIdsInOrder
+            colnames(results[[i]]) <- fileBaseWithoutExtension(celFiles)
+        }
     }
     
     # clean-up unless we were asked to retain the cache
@@ -376,16 +399,14 @@ MouseDivGenotype <- function(
                     chunkFile <- chunkFileName(cacheDir, "snp", celfile, currChr, probesetChunkSize, chunkIndex)
                     if(file.exists(chunkFile))
                     {
-                        file.delete(chunkFile)
+                        file.remove(chunkFile)
                     }
                 }
             }
-            
-            rm(msList)
         }
     }
     
-    chrResults
+    results
 }
 
 # this apply function is defined to take a list in order to allow us to take
