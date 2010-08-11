@@ -158,7 +158,7 @@ buildPennCNVInputFiles <- function(
     
     transformMethod <- match.arg(transformMethod)
     if(!inherits(snpProbeInfo, "data.frame") ||
-        !all(c("probeIndex", "isAAllele", "snpId") %in% names(snpProbeInfo)))
+       !all(c("probeIndex", "isAAllele", "snpId") %in% names(snpProbeInfo)))
     {
         stop("You must supply a \"snpProbeInfo\" data frame parameter which has ",
             "at a minimum the \"probeIndex\", \"isAAllele\" and \"snpId\" ",
@@ -166,10 +166,10 @@ buildPennCNVInputFiles <- function(
     }
     
     if(!inherits(snpInfo, "data.frame") ||
-        !all(c("snpId", "chrId", "positionBp") %in% names(snpInfo)))
+       !all(c("snpId", "chrId", "positionBp") %in% names(snpInfo)))
     {
         stop("You must supply a \"snpInfo\" data frame parameter which has ",
-            "at a minimum the \"snpId\" and \"chrId\" ",
+            "at a minimum the \"snpId\", \"chrId\" and \"positionBp\"",
             "components. Please see the help documentation for more details.")
     }
     
@@ -204,11 +204,45 @@ buildPennCNVInputFiles <- function(
             paste(celFiles, sep = ", "))
     }
     
-    if(nrow(genotypes) != snpCount)
+    genoRownames <- rownames(genotypes)
+    if(is.null(genoRownames))
     {
-        stop("the number of rows in the \"genotypes\" parameter must match ",
-             "the number of rows in the \"snpInfo\" parameter")
+        if(nrow(genotypes) != snpCount)
+        {
+            stop("the number of rows in the \"genotypes\" parameter must match ",
+                 "the number of rows in the \"snpInfo\" parameter. Alternatively ",
+                 "you can set \"rownames(genotypes)\" to match up with the ",
+                 "corresponding \"snpInfo$snpId\" values")
+        }
     }
+    else
+    {
+        # make sure that the genotype rows all match up OK
+        genoIndexMapping <- match(genoRownames, snpInfo$snpId)
+        if(any(is.na(genoIndexMapping)))
+        {
+            stop("all of the \"rownames(genotypes)\" values must match up with ",
+                 "a SNP ID in \"snpInfo$snpId\". Alternatively you can set ",
+                 "\"rownames(genotypes)\" to NULL which implies that genotypes ",
+                 "will be matched to snpInfo rows on index alone")
+        }
+        
+        # subset the SNP info to just those SNPs that we have genotypes for
+        snpInfo <- snpInfo[genoIndexMapping, ]
+        rm(genoIndexMapping)
+    }
+    rm(genoRownames)
+    
+    uniqueChrs <- unique(snpInfo$chrId)
+    if(!all(chromosomes %in% uniqueChrs))
+    {
+        warning(
+            "Data for the following requested chromosomes are not available: ",
+            paste(setdiff(chromosomes, uniqueChrs), collapse = ", "),
+            ". These chromosomes will be skipped.")
+        chromosomes <- intersect(chromosomes, uniqueChrs)
+    }
+    rm(uniqueChrs)
     
     # make sure that the chromosome vector is not numeric
     # TODO is toupper the right thing to do here? (I do it in MDgenotype.R too)
@@ -287,7 +321,7 @@ buildPennCNVInputFiles <- function(
             "you can manually delete the files.")
     }
     
-    lrrAndBafConnections <- sapply(lrrAndBafOutputFiles, file, "wt")
+    lrrAndBafConnections <- lapply(as.list(lrrAndBafOutputFiles), file, "wt")
     pfbConnection <- file(pfbOutputFile, "wt")
     
     # TODO write the headers!!!!!!!!!!!!!!!!!!!!!!!
@@ -384,7 +418,7 @@ buildPennCNVInputFiles <- function(
     
     for(currChr in chromosomes)
     {
-        chrInvariantProbeInfo <- invariantProbeInfo[invariantProbeInfo$chrId == currChr, ]
+        chrInvariantProbesetInfo <- invariantProbesetInfo[invariantProbesetInfo$chrId == currChr, ]
         for(chunkIndex in 1 : length(invariantChrChunks[[currChr]]))
         {
             chunk <- invariantChrChunks[[currChr]][[chunkIndex]]
@@ -407,7 +441,7 @@ buildPennCNVInputFiles <- function(
             }
             
             appendToPennCNVForInvariants(
-                probesetInfo = chrInvariantProbeInfo,
+                probesetInfo = chrInvariantProbesetInfo,
                 probesetIntensities = intensityMatrix,
                 lrrAndBafConnections = lrrAndBafConnections,
                 pfbConnection = pfbConnection)
@@ -451,7 +485,8 @@ appendToPennCNVForInvariants <- function(
              "probesetId, chrId, positionBp")
     }
     
-    if(!inherits(lrrAndBafConnections, "connection") || !inherits(pfbConnection, "connection"))
+    if(!all(sapply(lrrAndBafConnections, inherits, "connection")) ||
+       !inherits(pfbConnection, "connection"))
     {
         stop("both lrrAndBafConnections and pfbConnection should inherit from ",
              "the \"connection\" class")
@@ -464,7 +499,7 @@ appendToPennCNVForInvariants <- function(
     {
         write.table(
             data.frame(probesetInfo$probesetId, lrrs[, sampleIndex], bafs),
-            file = lrrAndBafConnections[sampleIndex],
+            file = lrrAndBafConnections[[sampleIndex]],
             sep = "\t",
             row.names = FALSE,
             col.names = FALSE,
@@ -511,7 +546,8 @@ appendToPennCNVForSNPs <- function(
     lrrAndBafConnections,
     pfbConnection)
 {
-    if(!inherits(lrrAndBafConnections, "connection") || !inherits(pfbConnection, "connection"))
+    if(!all(sapply(lrrAndBafConnections, inherits, "connection")) ||
+       !inherits(pfbConnection, "connection"))
     {
         stop("both lrrAndBafConnections and pfbConnection should inherit from ",
             "the \"connection\" class")
@@ -539,7 +575,7 @@ appendToPennCNVForSNPs <- function(
     {
         write.table(
             data.frame(snpInfo$snpId, lrrs[, sampleIndex], bafs[, sampleIndex]),
-            file = lrrAndBafConnections[sampleIndex],
+            file = lrrAndBafConnections[[sampleIndex]],
             sep = "\t",
             row.names = FALSE,
             col.names = FALSE,
