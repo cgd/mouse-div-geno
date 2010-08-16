@@ -233,24 +233,39 @@ buildPennCNVInputFiles <- function(
     }
     rm(genoRownames)
     
-    uniqueChrs <- unique(snpInfo$chrId)
-    if(!all(chromosomes %in% uniqueChrs))
-    {
-        warning(
-            "Data for the following requested chromosomes are not available: ",
-            paste(setdiff(chromosomes, uniqueChrs), collapse = ", "),
-            ". These chromosomes will be skipped.")
-        chromosomes <- intersect(chromosomes, uniqueChrs)
-    }
-    rm(uniqueChrs)
-    
     # make sure that the chromosome vector is not numeric
     # TODO is toupper the right thing to do here? (I do it in MDgenotype.R too)
     chromosomes <- toupper(as.character(chromosomes))
     
+    snpChromosomes <- unique(snpInfo$chrId)
+    if(!all(chromosomes %in% snpChromosomes))
+    {
+        warning(
+            "SNP data for the following requested chromosomes are not available: ",
+            paste(setdiff(chromosomes, snpChromosomes), collapse = ", "),
+            ". These chromosomes will be skipped.")
+    }
+    snpChromosomes <- intersect(chromosomes, snpChromosomes)
+    
+    invariantChromosomes <- unique(invariantProbesetInfo$chrId)
+    if(!all(chromosomes %in% invariantChromosomes))
+    {
+        warning(
+            "Invariant data for the following requested chromosomes are not available: ",
+            paste(setdiff(chromosomes, invariantChromosomes), collapse = ", "),
+            ". These chromosomes will be skipped.")
+    }
+    invariantChromosomes <- unique(chromosomes, invariantChromosomes)
+    rm(chromosomes)
+    
+    if(verbose)
+    {
+        cat("processing CEL files for SNP probes\n")
+    }
+    
     # figure out how many chunks there will be per chromosome
     chrChunks <- list()
-    for(currChr in chromosomes)
+    for(currChr in snpChromosomes)
     {
         chrProbesetCount <- sum(snpInfo$chrId == currChr)
         chrChunks[[currChr]] <- chunkIndices(chrProbesetCount, probesetChunkSize)
@@ -264,17 +279,16 @@ buildPennCNVInputFiles <- function(
         {
             normalizeCelFileByChr(
                 celfile,
-                probesetChunkSize,
                 verbose,
                 snpProbeInfo,
                 snpInfo,
-                chromosomes,
+                snpChromosomes,
                 snpReferenceDistribution,
                 transformMethod)
         }
         msList <- NULL
         
-        for(currChr in chromosomes)
+        for(currChr in snpChromosomes)
         {
             for(chunkIndex in 1 : length(chrChunks[[currChr]]))
             {
@@ -326,8 +340,13 @@ buildPennCNVInputFiles <- function(
     
     # TODO write the headers!!!!!!!!!!!!!!!!!!!!!!!
     
+    if(verbose)
+    {
+        cat("generating PennCNV input for SNP probes\n")
+    }
+    
     # append the SNP-based LRR/BAF values
-    for(currChr in chromosomes)
+    for(currChr in snpChromosomes)
     {
         chrIndices <- which(snpInfo$chrId == currChr)
         chrGenos <- genotypes[chrIndices, ]
@@ -365,11 +384,16 @@ buildPennCNVInputFiles <- function(
         }
     }
     
+    if(verbose)
+    {
+        cat("processing CEL files for invariant probes\n")
+    }
+    
     invariantChrChunks <- list()
-    for(currChr in chromosomes)
+    for(currChr in invariantChromosomes)
     {
         chrProbesetCount <- sum(invariantProbesetInfo$chrId == currChr)
-        chrChunks[[currChr]] <- chunkIndices(chrProbesetCount, probesetChunkSize)
+        invariantChrChunks[[currChr]] <- chunkIndices(chrProbesetCount, probesetChunkSize)
     }
 
     # append the invariant LRR/BAF values
@@ -383,12 +407,12 @@ buildPennCNVInputFiles <- function(
                 verbose,
                 invariantProbeInfo,
                 invariantProbesetInfo,
-                chromosomes,
+                invariantChromosomes,
                 invariantReferenceDistribution)
         }
         normInvariantList <- NULL
         
-        for(currChr in chromosomes)
+        for(currChr in invariantChromosomes)
         {
             for(chunkIndex in 1 : length(invariantChrChunks[[currChr]]))
             {
@@ -408,7 +432,7 @@ buildPennCNVInputFiles <- function(
                     probesetIndices <- chunk$start : chunk$end
                     intensityChunk <- normInvariantList[[currChr]][probesetIndices]
                     
-                    save(intensityChunk = intensityChunk)
+                    save(intensityChunk = intensityChunk, file = chunkFile)
                 }
             }
         }
@@ -416,14 +440,19 @@ buildPennCNVInputFiles <- function(
         rm(normInvariantList)
     }
     
-    for(currChr in chromosomes)
+    if(verbose)
+    {
+        cat("generating PennCNV input for invariant probes\n")
+    }
+    
+    for(currChr in invariantChromosomes)
     {
         chrInvariantProbesetInfo <- invariantProbesetInfo[invariantProbesetInfo$chrId == currChr, ]
         for(chunkIndex in 1 : length(invariantChrChunks[[currChr]]))
         {
             chunk <- invariantChrChunks[[currChr]][[chunkIndex]]
             chunkIndices <- chunk$start : chunk$end
-            chunkSize <- 1 + chunk$end + chunk$start
+            chunkSize <- 1 + chunk$end - chunk$start
             
             # pre-allocate intensity matrix
             intensityMatrix <- matrix(0, nrow = chunkSize, ncol = length(celFiles))
@@ -441,7 +470,7 @@ buildPennCNVInputFiles <- function(
             }
             
             appendToPennCNVForInvariants(
-                probesetInfo = chrInvariantProbesetInfo,
+                probesetInfo = chrInvariantProbesetInfo[chunkIndices, ],
                 probesetIntensities = intensityMatrix,
                 lrrAndBafConnections = lrrAndBafConnections,
                 pfbConnection = pfbConnection)
@@ -850,7 +879,7 @@ normalizeCelFileForInvariants <- function(
     chrIntensityList <- list()
     for(chr in allChr)
     {
-        chrIntensityList[chr] <- y[invariantProbesetInfo$chrId == chr]
+        chrIntensityList[[chr]] <- y[invariantProbesetInfo$chrId == chr]
     }
     
     chrIntensityList
