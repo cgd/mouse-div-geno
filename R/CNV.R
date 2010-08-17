@@ -820,6 +820,7 @@ simpleCNVdata <- function(
     cnvoutfiledir,
     mchr)
 {
+    # some simple variable initialization
     setwd(celfiledir)
     SNPname <- ABid$SNPname
     Aid <- ABid$allAid
@@ -828,7 +829,10 @@ simpleCNVdata <- function(
     mpos <- chrid$mpos
     chrid <- chrid$chrid
     nfile <- length(filenames)
+    
     for (i in 1:nfile) {
+        
+        # normalize the SNP probesets
         y <- as.matrix(read.celfile(as.character(filenames[i]), intensity.means.only = TRUE)[["INTENSITY"]][["MEAN"]][allid])
         y <- log2(y)
         if (length(CGFLcorrection) > 0) 
@@ -846,6 +850,8 @@ simpleCNVdata <- function(
         B <- normalize.quantiles.use.target(B, target = exon1info$reference)
         B <- subColSummarizeMedian(matrix(B, ncol = 1), SNPname)
         
+        # normalize the exon probesets and return the data as per-chromosome
+        # lists (each chromosome list item has a pos component and an ey component)
         exon1 <- simpleigp(
             celfiledir,
             exon1info$exon1id,
