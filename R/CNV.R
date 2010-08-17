@@ -893,21 +893,22 @@ simpleCNVdata <- function(
     }
 }
 
-simpleCNVsummary <- function(cnvoutfiledir, filenames, refid, mchr, stname) {
+simpleCNVsummary <- function(cnvoutfiledir, filenames, refid, mchr, stname, th = 0.1, trans = 0.9999) {
     # TODO add HiddenMarkov as a suggested library to NAMESPACE
     library(HiddenMarkov)
-    k <- 0.9999
     pi <- matrix(
         c(
-            k,
-            (1 - k)/2,
-            (1 - k)/2,
-            (1 - k)/2,
-            k,
-            (1 - k)/2,
-            (1 - k)/2,
-            (1 - k)/2,
-            k),
+            trans,
+            (1 - trans)/2,
+            (1 - trans)/2,
+            
+            (1 - trans)/2,
+            trans,
+            (1 - trans)/2,
+            
+            (1 - trans)/2,
+            (1 - trans)/2,
+            trans),
         3,
         3)
     delta <- c(0, 1, 0)
@@ -937,7 +938,7 @@ simpleCNVsummary <- function(cnvoutfiledir, filenames, refid, mchr, stname) {
             load(xname2)
             a <- inte/ref
             m <- mean(a)
-            b <- dthmm(a, pi, delta, "norm", list(mean = c(m - 0.1, m, m + 0.1), sd = c(0.05, 0.05, 0.05)))
+            b <- dthmm(a, pi, delta, "norm", list(mean = c(m - th, m, m + th), sd = c(0.05, 0.05, 0.05)))
             states <- Viterbi(b)
             cnv <- cbind(cnv, states)
             
@@ -1041,20 +1042,28 @@ simpleCNVsummary <- function(cnvoutfiledir, filenames, refid, mchr, stname) {
                 }
             }
         }
-        colnames(cnvtable) <- c(
-            "Name",
-            "Status",
-            "StartPosition",
-            "EndPosition",
-            "Number of Probe sets",
-            "Size",
-            "Number of SNP probe sets",
-            "Number of exon1 sets",
-            "Number of exon2 sets",
-            "Mean intensity of reference sample",
-            "Mean intensity of sample")
-        colnames(cnv) <- stname
-        xname <- paste("~/cnvChr", chri, sep = "", collapse = "")
-        save(cnv, cnvtable, file = xname)
+        
+        if(length(cnvtable) > 0)
+        {
+            colnames(cnvtable) <- c(
+                "Name",
+                "Status",
+                "StartPosition",
+                "EndPosition",
+                "Number of Probe sets",
+                "Size",
+                "Number of SNP probe sets",
+                "Number of exon1 sets",
+                "Number of exon2 sets",
+                "Mean intensity of reference sample",
+                "Mean intensity of sample")
+            colnames(cnv) <- stname
+            rownames(cnvtable) <- NULL
+            rownames(cnv) <- NULL
+            xname <- paste(cnvoutfiledir, "/cnvChr", chri, sep = "", collapse = "")
+            save(cnv, cnvtable, file = xname)
+            xname <- paste(cnvoutfiledir, "/cnvChr", chri, ".txt", sep = "", collapse = "")
+            write.table(cnvtable, file = xname, quote = FALSE, row.names = FALSE, sep = "\t")
+        }
     }
 } 
