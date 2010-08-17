@@ -742,6 +742,8 @@ normalizeCelFileForInvariants <- function(
     chrIntensityList
 }
 
+# this is essentially using the same normalization as normalizeCelFileForInvariants
+# except that it keeps track of corresponding "pos" also
 simpleigp <- function(
     celfiledir,
     id,
@@ -769,6 +771,7 @@ simpleigp <- function(
     out
 }
 
+# top-level function for running the simple CNV analysis
 simpleCNV <- function(
     allid,
     ABid,
@@ -807,6 +810,8 @@ simpleCNV <- function(
     simpleCNVsummary(cnvoutfiledir, filenames, refid, mchr, stname)
 }
 
+# this function processes the SNP and exon intensity data and then saves the
+# results to file
 simpleCNVdata <- function(
     allid,
     ABid,
@@ -872,19 +877,27 @@ simpleCNVdata <- function(
             exon2info$reference,
             filenames[i],
             mchr)
+        
         for (chri in mchr) {
+            # for pos, id and inte append snp vals, exon1 vals and exon2 vals
             pos <- c(mpos[chrid == chri], exon1[[chri]]$pos, exon2[[chri]]$pos)
             id <- c(
                 rep(1, sum(chrid == chri)),
                 rep(2, length(exon1[[chri]]$pos)),
                 rep(3, length(exon2[[chri]]$pos)))
             inte <- c(B[chrid == chri], exon1[[chri]]$ey, exon2[[chri]]$ey)
+            
+            # reorder the values according to thier posisions
             o <- order(pos)
             pos <- pos[o]
             id <- id[o]
             inte <- inte[o]
+            
+            # save intensities per CEL file, per chromosome
             xname2 <- paste(cnvoutfiledir, "/", gsub(".CEL", "Chr", filenames[i]), chri, sep = "", collapse = "")
             save(inte, file = xname2)
+            
+            # for the 1st CEL file only, save the position and ID data
             if (i == 1) {
                 xname2 <- paste(cnvoutfiledir, "/pos", chri, sep = "", collapse = "")
                 save(pos, id, file = xname2)
@@ -893,9 +906,16 @@ simpleCNVdata <- function(
     }
 }
 
+# this function calculates the maximum likelihood CNV states using an HMM,
+# then saves those states along with other statistics to file
 simpleCNVsummary <- function(cnvoutfiledir, filenames, refid, mchr, stname, th = 0.1, trans = 0.9999) {
     # TODO add HiddenMarkov as a suggested library to NAMESPACE
     library(HiddenMarkov)
+    
+    # the transition matrix (pi) and initial state probabilities (delta)
+    #   State 1: indicates a copy loss w.r.t. reference
+    #   State 2: indicates copy count matches reference
+    #   State 3: indicates a copy gain w.r.t. reference
     pi <- matrix(
         c(
             trans,
@@ -914,8 +934,12 @@ simpleCNVsummary <- function(cnvoutfiledir, filenames, refid, mchr, stname, th =
     delta <- c(0, 1, 0)
     nfile <- length(filenames)
     for (chri in mchr) {
+        
+        # this load brings pos and id (from simpleCNVdata) into scope
         xname2 <- paste(cnvoutfiledir, "/pos", chri, sep = "", collapse = "")
         load(xname2)
+        
+        # this load brings inte (from simpleCNVdata) for the reference into scope
         xname2 <- paste(
             cnvoutfiledir,
             "/",
@@ -924,10 +948,19 @@ simpleCNVsummary <- function(cnvoutfiledir, filenames, refid, mchr, stname, th =
             sep = "",
             collapse = "")
         load(xname2)
+        
+        # rename inte so it doesn't conflict with subsequent loads
         ref <- inte
+        
+        # cnv stores maximum likelihood CNV states (1=loss, 2=no change, 3=gain)
+        # per-sample, per-probeset (probesets are rows and samples are columns)
         cnv <- NULL
+        
+        # cnvtable is used to hold more detailed info about the gain and loss
+        # intervals
         cnvtable <- NULL
         for (i in 1:nfile) {
+            # this load brings inte (from simpleCNVdata) for the current CEL file into scope
             xname2 <- paste(
                 cnvoutfiledir,
                 "/",
@@ -936,6 +969,9 @@ simpleCNVsummary <- function(cnvoutfiledir, filenames, refid, mchr, stname, th =
                 sep = "",
                 collapse = "")
             load(xname2)
+            
+            # find the maximum likelihood states using viterbi for the current CEL file
+            # and append column to the cnv matrix
             a <- inte/ref
             m <- mean(a)
             b <- dthmm(a, pi, delta, "norm", list(mean = c(m - th, m, m + th), sd = c(0.05, 0.05, 0.05)))
@@ -947,42 +983,45 @@ simpleCNVsummary <- function(cnvoutfiledir, filenames, refid, mchr, stname, th =
             ll <- length(l)
             lg <- length(g)
             if (lg > 2) {
+                
+                # calculate start and end position of gains
                 k <- diff(g[, 1])
                 ep <- which(k > 1)
                 sp <- c(1, ep + 1)
                 ep <- c(ep, lg/2)
                 s <- length(sp)
+                
                 if (s == 1) 
                   cnvtable <- rbind(
                       cnvtable,
                       c(
-                          stname[i],
-                          "gain",
-                          g[sp, 2],
-                          g[ep, 2],
-                          g[ep, ] - g[sp, ] + 1,
-                          sum(id[g[sp, 1]:g[ep, 1]] == 1),
-                          sum(id[g[sp, 1]:g[ep, 1]] == 2),
-                          sum(id[g[sp, 1]:g[ep, 1]] == 3),
-                          round(mean(ref[g[sp, 1]:g[ep, 1]]), 3),
-                          round(mean(inte[g[sp, 1]:g[ep, 1]]), 3)))
+                          stname[i],             # name
+                          "gain",                # status
+                          g[sp, 2],              # start pos
+                          g[ep, 2],              # end pos
+                          g[ep, ] - g[sp, ] + 1, # num probesets, size
+                          sum(id[g[sp, 1]:g[ep, 1]] == 1),  # num SNPs
+                          sum(id[g[sp, 1]:g[ep, 1]] == 2),  # num exon1
+                          sum(id[g[sp, 1]:g[ep, 1]] == 3),  # num exon2
+                          round(mean(ref[g[sp, 1]:g[ep, 1]]), 3),   # mean ref intensity
+                          round(mean(inte[g[sp, 1]:g[ep, 1]]), 3))) # mean sample intensity loss
                 if (s > 1) {
                   k <- cbind(
-                      g[sp, 2],
-                      g[ep, 2],
-                      g[ep, ] - g[sp, ] + 1,
-                      g[sp, 1],
-                      g[ep, 1])
+                      g[sp, 2],                # col1: start position
+                      g[ep, 2],                # col2: end position
+                      g[ep, ] - g[sp, ] + 1,   # col3,4: end index - start index + 1, end pos - start pos + 1
+                      g[sp, 1],                # col5: start index
+                      g[ep, 1])                # col6: end index
                   k1 <- apply(
                       k,
                       1,
                       function(x, ref, id, inte) {
                           c(
-                              sum(id[x[6]:x[5]] == 1),
-                              sum(id[x[6]:x[5]] == 2),
-                              sum(id[x[6]:x[5]] == 3),
-                              mean(ref[x[6]:x[5]]),
-                              mean(inte[x[6]:x[5]]))
+                              sum(id[x[6]:x[5]] == 1), # how many in gain are SNPs
+                              sum(id[x[6]:x[5]] == 2), # how many in gain are exon1
+                              sum(id[x[6]:x[5]] == 3), # how many in gain are exon2
+                              mean(ref[x[6]:x[5]]),    # mean reference intensity of gain
+                              mean(inte[x[6]:x[5]]))   # mean sample intensity of gain
                       },
                       ref,
                       id,
@@ -990,44 +1029,52 @@ simpleCNVsummary <- function(cnvoutfiledir, filenames, refid, mchr, stname, th =
                   cnvtable <- rbind(
                       cnvtable,
                       cbind(
-                          rep(stname[i], s),
-                          rep("gain", s),
-                          k[, 1:4],
-                          t(round(k1, 3))))
+                          rep(stname[i], s), # Name
+                          rep("gain", s),    # Status
+                          k[, 1:4],          # StartPosition, EndPosition, Num Probe sets, Size
+                          t(round(k1, 3))))  # #SNPs, #exon1, #exon2, mean ref inten, mean sample inten
                 }
             }
             if (ll > 2) {
+                
+                # calculate the start and end position of losses
                 k <- diff(l[, 1])
                 ep <- which(k > 1)
                 sp <- c(1, ep + 1)
                 ep <- c(ep, ll/2)
                 s <- length(sp)
+                
                 if (s == 1) 
                   cnvtable <- rbind(
                       cnvtable,
                       c(
-                          stname[i],
-                          "loss",
-                          l[sp, 2],
-                          l[ep, 2],
-                          l[ep, ] - l[sp, ] + 1,
-                          sum(id[l[sp, 1]:l[ep, 1]] == 1),
-                          sum(id[l[sp, 1]:l[ep, 1]] == 2),
-                          sum(id[l[sp, 1]:l[ep, 1]] == 3),
-                          round(mean(ref[l[sp, 1]:l[ep, 1]]), 3),
-                          round(mean(inte[l[sp, 1]:l[ep, 1]]), 3)))
+                          stname[i],             # name
+                          "loss",                # status
+                          l[sp, 2],              # start pos
+                          l[ep, 2],              # end pos
+                          l[ep, ] - l[sp, ] + 1, # num probesets, size
+                          sum(id[l[sp, 1]:l[ep, 1]] == 1),  # num SNPs
+                          sum(id[l[sp, 1]:l[ep, 1]] == 2),  # num exon1
+                          sum(id[l[sp, 1]:l[ep, 1]] == 3),  # num exon2
+                          round(mean(ref[l[sp, 1]:l[ep, 1]]), 3),   # mean ref intensity
+                          round(mean(inte[l[sp, 1]:l[ep, 1]]), 3))) # mean sample intensity
                 if (s > 1) {
-                  k <- cbind(l[sp, 2], l[ep, 2], l[ep, ] - l[sp, ] + 1, l[sp, 1], l[ep, 1])
+                  k <- cbind(
+                      l[sp, 2],                # col1: start position
+                      l[ep, 2],                # col2: end position
+                      l[ep, ] - l[sp, ] + 1,   # col3,4: end index - start index + 1, end pos - start pos + 1
+                      l[sp, 1],                # col5: start index
+                      l[ep, 1])                # col6: end index
                   k1 <- apply(
                       k,
                       1,
                       function(x, ref, id, inte) {
                           c(
-                              sum(id[x[6]:x[5]] == 1),
-                              sum(id[x[6]:x[5]] == 2),
-                              sum(id[x[6]:x[5]] == 3),
-                              mean(ref[x[6]:x[5]]),
-                              mean(inte[x[6]:x[5]]))
+                              sum(id[x[6]:x[5]] == 1), # how many in loss are SNPs
+                              sum(id[x[6]:x[5]] == 2), # how many in loss are exon1
+                              sum(id[x[6]:x[5]] == 3), # how many in loss are exon2
+                              mean(ref[x[6]:x[5]]),    # mean reference intensity of loss
+                              mean(inte[x[6]:x[5]]))   # mean sample intensity of loss
                       },
                       ref,
                       id,
@@ -1035,14 +1082,15 @@ simpleCNVsummary <- function(cnvoutfiledir, filenames, refid, mchr, stname, th =
                   cnvtable <- rbind(
                       cnvtable,
                       cbind(
-                          rep(stname[i], s),
-                          rep("loss", s),
-                          k[, 1:4],
-                          t(round(k1, 3))))
+                          rep(stname[i], s), # Name
+                          rep("loss", s),    # Status
+                          k[, 1:4],          # StartPosition, EndPosition, Num Probe sets, Size
+                          t(round(k1, 3))))  # #SNPs, #exon1, #exon2, mean ref inten, mean sample inten
                 }
             }
         }
         
+        # nothing to do here if we haven't observed any CNVs
         if(length(cnvtable) > 0)
         {
             colnames(cnvtable) <- c(
