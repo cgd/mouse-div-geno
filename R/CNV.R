@@ -1093,9 +1093,19 @@ simpleCNVsummary <- function(cnvoutfiledir, filenames, refid, mchr, stname, th =
         # nothing to do here if we haven't observed any CNVs
         if(length(cnvtable) > 0)
         {
+            if(length(cnvtable) == 11)
+            {
+                cnvtable <- matrix(c(cnvtable[1:2], chri, cnvtable[3:11]), nrow = 1)
+            }
+            else
+            {
+                cnvtable <- cbind(cnvtable[, 1:2], rep(chri, nrow(cnvtable)), cnvtable[, 3:11])
+            }
+            
             colnames(cnvtable) <- c(
                 "Name",
                 "Status",
+                "Chr",
                 "StartPosition",
                 "EndPosition",
                 "Number of Probe sets",
