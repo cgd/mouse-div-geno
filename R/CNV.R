@@ -848,6 +848,8 @@ simpleCNVdata <- function(
         oBint <- y[Bid, 1, drop = FALSE]
         allAint <- subColSummarizeMedian(matrix(oAint, ncol = 1), SNPname)
         allBint <- subColSummarizeMedian(matrix(oBint, ncol = 1), SNPname)
+        
+        # B will be the higher of the A or B allele (the allele that we think is "on")
         tmp <- names(allAint[allAint > allBint, ])
         g <- match(SNPname, tmp)
         B <- oAint
