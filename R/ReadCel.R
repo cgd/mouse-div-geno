@@ -301,6 +301,7 @@ normalizeCelFileByChr <- function(
         matrix(allBint, ncol = 1),
         snpProbeInfo$snpId[!snpProbeInfo$isAAllele])
     
+    # TODO we could do something here which is more robust
     aSnpIds <- rownames(allAint)
     bSnpIds <- rownames(allBint)
     if(!all(aSnpIds == bSnpIds))
