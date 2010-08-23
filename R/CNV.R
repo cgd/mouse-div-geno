@@ -14,6 +14,8 @@ buildPennCNVInputFiles <- function(
     sampleCount <- ncol(genotypes)
     
     transformMethod <- match.arg(transformMethod)
+    
+    # validate snp info parameters
     if(!inherits(snpProbeInfo, "data.frame") ||
        !all(c("probeIndex", "isAAllele", "snpId") %in% names(snpProbeInfo)))
     {
@@ -30,7 +32,6 @@ buildPennCNVInputFiles <- function(
             "components. Please see the help documentation for more details.")
     }
     
-    # it is an error if isInPAR is set to TRUE in a non-X chromosome
     if(!is.null(snpInfo$isInPAR))
     {
         parChrs <- unique(snpInfo$chrId[snpInfo$isInPar])
@@ -40,6 +41,23 @@ buildPennCNVInputFiles <- function(
                 "chromosome, but TRUE isInPar values were found on chromosomes: ",
                 paste(parChrs, collapse=", "))
         }
+    }
+    
+    # validate invariant parameters
+    if(!inherits(invariantProbeInfo, "data.frame") ||
+        !all(c("probeIndex", "probesetId") %in% names(invariantProbeInfo)))
+    {
+        stop("You must supply a \"invariantProbeInfo\" data frame parameter which has ",
+            "at a minimum the \"probeIndex\", and \"probesetId\" ",
+            "components. Please see the help documentation for more details.")
+    }
+    
+    if(!inherits(invariantProbesetInfo, "data.frame") ||
+        !all(c("probesetId", "chrId", "positionBp") %in% names(invariantProbesetInfo)))
+    {
+        stop("You must supply a \"invariantProbesetInfo\" data frame parameter which has ",
+            "at a minimum the \"probesetId\", \"chrId\" and \"positionBp\"",
+            "components. Please see the help documentation for more details.")
     }
     
     # if the user passes us a list (or data frame) rather than a vector of file
