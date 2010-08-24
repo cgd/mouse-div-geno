@@ -903,7 +903,7 @@ simpleCNV <- function(
         
         for(chr in names(cnvs))
         {
-            allCnvsByChr[[chr]] <- cbind(allCnvsByChr[[chr]], cnvs)
+            allCnvsByChr[[chr]] <- cbind(allCnvsByChr[[chr]], cnvs[[chr]])
         }
     }
     
