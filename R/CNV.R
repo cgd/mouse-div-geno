@@ -32,17 +32,6 @@ buildPennCNVInputFiles <- function(
             "components. Please see the help documentation for more details.")
     }
     
-    if(!is.null(snpInfo$isInPAR))
-    {
-        parChrs <- unique(snpInfo$chrId[snpInfo$isInPar])
-        if(!all(parChrs == "X"))
-        {
-            stop("snpInfo$isInPar should only ever be TRUE on the \"X\" ",
-                "chromosome, but TRUE isInPar values were found on chromosomes: ",
-                paste(parChrs, collapse=", "))
-        }
-    }
-    
     # validate invariant parameters
     if(!inherits(invariantProbeInfo, "data.frame") ||
         !all(c("probeIndex", "probesetId") %in% names(invariantProbeInfo)))
@@ -786,17 +775,6 @@ simpleCNV <- function(
         stop("You must supply a \"snpInfo\" data frame parameter which has ",
             "at a minimum the \"snpId\", \"chrId\" and \"positionBp\"",
             "components. Please see the help documentation for more details.")
-    }
-    
-    if(!is.null(snpInfo$isInPAR))
-    {
-        parChrs <- unique(snpInfo$chrId[snpInfo$isInPar])
-        if(!all(parChrs == "X"))
-        {
-            stop("snpInfo$isInPar should only ever be TRUE on the \"X\" ",
-                "chromosome, but TRUE isInPar values were found on chromosomes: ",
-                paste(parChrs, collapse=", "))
-        }
     }
     
     # validate invariant parameters
