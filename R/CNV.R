@@ -738,19 +738,19 @@ calcLRRAndBAF <- function(intensityConts, intensityAvgs, genos)
         # the genotype for all samples is AA
         if (uniqueGenos == 1) {
             BAF <- rep(0, sampleCount)
-            LRR <- log2(intensityAvgs/medianAvgsPerGeno[1])
+            LRR <- log2(intensityAvgs/medianAvgsPerGeno)
         }
         
         # the genotype for all samples is AB
         else if (uniqueGenos == 2) {
             BAF <- rep(0.5, sampleCount)
-            LRR <- log2(intensityAvgs/medianAvgsPerGeno[2])
+            LRR <- log2(intensityAvgs/medianAvgsPerGeno)
         }
         
         # the genotype for all samples is BB
         else if (uniqueGenos == 3) {
             BAF <- rep(1, sampleCount)
-            LRR <- log2(intensityAvgs/medianAvgsPerGeno[3])
+            LRR <- log2(intensityAvgs/medianAvgsPerGeno)
         }
     }
     
