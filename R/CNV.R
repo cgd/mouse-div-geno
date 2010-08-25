@@ -183,6 +183,7 @@ buildPennCNVInputFiles <- function(
         rm(msList)
     }
     
+    # initialize the connections for BAF & LRR files and write the header rows
     lrrAndBafBaseNames <- paste(fileBaseWithoutExtension(celFiles), ".txt", sep = "")
     lrrAndBafOutputFiles <- file.path(outdir, lrrAndBafBaseNames)
     if(!allowOverwrite && any(file.exists(lrrAndBafOutputFiles)))
@@ -202,9 +203,31 @@ buildPennCNVInputFiles <- function(
     }
     
     lrrAndBafConnections <- lapply(as.list(lrrAndBafOutputFiles), file, "wt")
-    pfbConnection <- file(pfbOutputFile, "wt")
+    names(lrrAndBafConnections) <- fileBaseWithoutExtension(celFiles)
+    for(celName in names(lrrAndBafConnections))
+    {
+        con <- lrrAndBafConnections[[celName]]
+        header <- c(
+            "Name",
+            paste(celName, "B Allele Freq", sep = "."),
+            paste(celName, "Log R Ratio", sep = "."))
+        write.table(
+            matrix(header, nrow = 1),
+            file = con,
+            quote = FALSE,
+            sep = "\t",
+            row.names = FALSE,
+            col.names = FALSE)
+    }
     
-    # TODO write the headers!!!!!!!!!!!!!!!!!!!!!!!
+    pfbConnection <- file(pfbOutputFile, "wt")
+    write.table(
+        matrix(c("Name", "Chr", "Position", "PFB"), nrow = 1),
+        file = pfbConnection,
+        quote = FALSE,
+        sep = "\t",
+        row.names = FALSE,
+        col.names = FALSE)
     
     if(verbose)
     {
@@ -409,10 +432,10 @@ appendToPennCNVForInvariants <- function(
         write.table(
             data.frame(probesetInfo$probesetId, lrrs[, sampleIndex], bafs),
             file = lrrAndBafConnections[[sampleIndex]],
+            quote = FALSE,
             sep = "\t",
             row.names = FALSE,
-            col.names = FALSE,
-            qmethod = "double")
+            col.names = FALSE)
     }
     
     # write the PFB (Population frequency of B allele) file using mean BAF in
@@ -420,10 +443,10 @@ appendToPennCNVForInvariants <- function(
     write.table(
         data.frame(probesetInfo$probesetId, probesetInfo$chrId, probesetInfo$positionBp, bafs),
         file = pfbConnection,
+        quote = FALSE,
         sep = "\t",
         row.names = FALSE,
-        col.names = FALSE,
-        qmethod = "double")
+        col.names = FALSE)
 }
 
 # append PennCNV data for the given LRR/BAF files and the PFB file using SNP
@@ -485,10 +508,10 @@ appendToPennCNVForSNPs <- function(
         write.table(
             data.frame(snpInfo$snpId, lrrs[, sampleIndex], bafs[, sampleIndex]),
             file = lrrAndBafConnections[[sampleIndex]],
+            quote = FALSE,
             sep = "\t",
             row.names = FALSE,
-            col.names = FALSE,
-            qmethod = "double")
+            col.names = FALSE)
     }
     
     # write the PFB (Population frequency of B allele) file using mean BAF in
@@ -496,10 +519,10 @@ appendToPennCNVForSNPs <- function(
     write.table(
         data.frame(snpInfo$snpId, snpInfo$chrId, snpInfo$positionBp, apply(bafs, 1, mean)),
         file = pfbConnection,
+        quote = FALSE,
         sep = "\t",
         row.names = FALSE,
-        col.names = FALSE,
-        qmethod = "double")
+        col.names = FALSE)
 }
 
 # calculates LRR and BAF values for a single SNP position
