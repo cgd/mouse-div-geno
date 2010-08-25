@@ -6,7 +6,9 @@ buildPennCNVInputFiles <- function(
     genotypes, snpProbeInfo, snpInfo, snpReferenceDistribution = NULL,
     invariantProbeInfo, invariantProbesetInfo, invariantReferenceDistribution = NULL,
     transformMethod = c("CCStrans", "MAtrans"), celFiles = getwd(),
-    chromosomes = c(1:19, "X", "Y", "M"), cacheDir = tempdir(),
+    chromosomes = c(1:19, "X", "Y", "M"),
+    chromosomeRenameMap = list(X = 20, Y = 21, M = 22),
+    cacheDir = tempdir(),
     retainCache = FALSE, verbose = FALSE,
     probesetChunkSize = 1000)
 {
@@ -215,6 +217,13 @@ buildPennCNVInputFiles <- function(
         chrIndices <- which(snpInfo$chrId == currChr)
         chrGenos <- genotypes[chrIndices, ]
         chrSnpInfo <- snpInfo[chrIndices, ]
+        
+        if(currChr %in% names(chromosomeRenameMap))
+        {
+            chrRename <- chromosomeRenameMap[[currChr]]
+            chrSnpInfo$chrId <- rep(as.character(chrRename), length(chrSnpInfo$chrId))
+        }
+        
         for(chunkIndex in 1 : length(chrChunks[[currChr]]))
         {
             chunk <- chrChunks[[currChr]][[chunkIndex]]
@@ -312,6 +321,13 @@ buildPennCNVInputFiles <- function(
     for(currChr in invariantChromosomes)
     {
         chrInvariantProbesetInfo <- invariantProbesetInfo[invariantProbesetInfo$chrId == currChr, ]
+        
+        if(currChr %in% names(chromosomeRenameMap))
+        {
+            chrRename <- chromosomeRenameMap[[currChr]]
+            chrInvariantProbesetInfo$chrId <- rep(as.character(chrRename), length(chrInvariantProbesetInfo$chrId))
+        }
+        
         for(chunkIndex in 1 : length(invariantChrChunks[[currChr]]))
         {
             chunk <- invariantChrChunks[[currChr]][[chunkIndex]]
