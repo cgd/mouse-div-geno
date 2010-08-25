@@ -809,6 +809,8 @@ simpleCNV <- function(
     
     # make sure that the chromosome vector is not numeric
     # TODO is toupper the right thing to do here? (I do it in MDgenotype.R too)
+    # TODO change code to deal correctly with a case where there is SNP
+    #      data but no exon data and vice-versa
     chromosomes <- toupper(as.character(chromosomes))
     
     snpChromosomes <- unique(snpInfo$chrId)
@@ -819,7 +821,8 @@ simpleCNV <- function(
             paste(setdiff(chromosomes, snpChromosomes), collapse = ", "),
             ". These chromosomes will be skipped.")
     }
-    snpChromosomes <- intersect(chromosomes, snpChromosomes)
+    chromosomes <- intersect(chromosomes, snpChromosomes)
+    rm(snpChromosomes)
     
     invariantChromosomes <- unique(invariantProbesetInfo$chrId)
     if(!all(chromosomes %in% invariantChromosomes))
@@ -829,8 +832,13 @@ simpleCNV <- function(
             paste(setdiff(chromosomes, invariantChromosomes), collapse = ", "),
             ". These chromosomes will be skipped.")
     }
-    invariantChromosomes <- unique(chromosomes, invariantChromosomes)
-    rm(chromosomes)
+    chromosomes <- unique(chromosomes, invariantChromosomes)
+    rm(invariantChromosomes)
+    
+    if(length(chromosomes) == 0)
+    {
+        stop("Stopping CNV analysis. There are no chromosomes to process")
+    }
     
     if(verbose)
     {
@@ -840,6 +848,7 @@ simpleCNV <- function(
     # the reference intensities
     refIntensities <- normalizeForSimpleCNV(
         referenceCelFile,
+        chromosomes,
         snpProbeInfo, snpInfo, snpReferenceDistribution,
         invariantProbeInfo, invariantProbesetInfo, invariantReferenceDistribution,
         verbose)
@@ -865,6 +874,7 @@ simpleCNV <- function(
             # normalizes intensities and sorts by position
             currIntensities <- normalizeForSimpleCNV(
                 currCelFile,
+                chromosomes,
                 snpProbeInfo, snpInfo, snpReferenceDistribution,
                 invariantProbeInfo, invariantProbesetInfo, invariantReferenceDistribution,
                 verbose)
@@ -962,6 +972,7 @@ inferCNVFromIntensity <- function(
 
 normalizeForSimpleCNV <- function(
     celFileName,
+    chromosomes,
     snpProbeInfo, snpInfo, snpReferenceDistribution,
     invariantProbeInfo, invariantProbesetInfo, invariantReferenceDistribution,
     verbose)
@@ -1049,14 +1060,10 @@ normalizeForSimpleCNV <- function(
         stop("Failed to match up SNP probe IDs")
     highSnpInt <- highSnpInt[snpIdOrdering]
     
-    # TODO make this more efficient!!
-    allChrs <- unique(c(
-            as.character(snpInfo$chrId),
-            as.character(invariantProbesetInfo$chrId)))
     combinedIntensities <- list()
-    for(chr in allChrs)
+    for(chr in chromosomes)
     {
-        # combine the SNP and invariant intensities, and sort by position
+        # combine the SNP and invariant intensities, then sort by position
         chrInvIndices <- which(invariantProbesetInfo$chrId == chr)
         chrSnpIndices <- which(snpInfo$chrId == chr)
         
