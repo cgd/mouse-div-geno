@@ -83,31 +83,34 @@ dir.create(outcache)
 load("MouseDivData.RData")
 
 # genotype in serial and save the results to "serialGenoResults.csv"
+cat("Running mouseDivGenotype in serial and saving to serialGenoResults.csv\n")
 mouseDivGenotype(
     snpProbeInfo = snpProbeInfo, snpInfo = snpInfo, referenceDistribution=reference,
-    transformMethod="CCStrans", chromosomes=c("19", "X", "Y"), celFiles=celfiledir,
+    transformMethod="CCStrans", chromosomes=c("19", "X", "Y"), celFiles=expandCelFiles(celfiledir),
     cacheDir = outcache, verbose=T, cluster=NULL,
     processResultsFunction = createAppendResultsToCSVFunction("serialGenoResults.csv"))
 
-# Run in parallel on 2 cores (increase 2 cores if you have more on your machine)
-# and save the results to "serialGenoResults.csv"
+# Run in parallel on 2 cores (increase cores if you have more on your machine)
+# and save the results to "parallelGenoResults.csv"
 library("snow")
 setDefaultClusterOptions(outfile = "/dev/tty")
 numCores <- 2
 cl <- makeSOCKcluster(rep("localhost", numCores))
 clusterEvalQ(cl, library("MouseDivGeno"))
 
+cat("Running MouseDivGenotype in parallel and saving to parallelGenoResults.csv\n")
 mouseDivGenotype(
     snpProbeInfo = snpProbeInfo, snpInfo = snpInfo, referenceDistribution=reference,
-    transformMethod="CCStrans", chromosomes=c("19", "X", "Y"), celFiles=celfiledir,
+    transformMethod="CCStrans", chromosomes=c("19", "X", "Y"), celFiles=expandCelFiles(celfiledir),
     cacheDir = outcache, verbose=T, cluster=cl,
     processResultsFunction = createAppendResultsToCSVFunction("parallelGenoResults.csv"))
 
 # Run again in parallel but this time save the resulting R object to file rather
 # than using the processResultsFunction argument
+cat("Running MouseDivGenotype in parallel and saving to genoVinoResult-TIME_STAMP.RData.csv\n")
 genoVinoResult <- mouseDivGenotype(
     snpProbeInfo = snpProbeInfo, snpInfo = snpInfo, referenceDistribution=reference,
-    transformMethod="CCStrans", chromosomes=c("19", "X", "Y"), celFiles=celfiledir,
+    transformMethod="CCStrans", chromosomes=c("19", "X", "Y"), celFiles=expandCelFiles(celfiledir),
     cacheDir = outcache, verbose=T, cluster=cl,
     processResultsFunction = NULL)
 timeStampFileName <- file.path(
