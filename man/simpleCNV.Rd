@@ -145,4 +145,4 @@ rm(simpleCNVResultNotClustered)
   }
 }
 
-\keyword{genotype}
+\keyword{CNV}
