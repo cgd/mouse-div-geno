@@ -93,7 +93,11 @@ mouseDivGenotype <- function(
         # them as all 0's
         meanIntensityXPerArray <- rep(0, length(celFiles))
         meanIntensityYPerArray <- rep(0, length(celFiles))
+        names(meanIntensityXPerArray) <- celFiles
+        names(meanIntensityYPerArray) <- celFiles
+        
         meanIntensityPerAutosome <- rep(0, length(allAutosomes))
+        names(meanIntensityPerAutosome) <- allAutosomes
     }
     
     # figure out how many chunks there will be per chromosome. The reason we
