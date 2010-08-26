@@ -1,20 +1,21 @@
 \author{Hyuna Yang}
-\name{MouseDivGenotype}
-\alias{MouseDivGenotype}
+\name{mouseDivGenotype}
+\alias{mouseDivGenotype}
 \title{Genotype the Mouse Diversity Array}
 \description{
   This function reads the .CEL files, normalizes the intensities, genotypes and vinotypes the Mouse Diversity Array. It also provides the input files used for the pennCNV (Wang, et al, 2007, a software to detect the copy number variance. Refer to CNV.R for detail information for detecting CNV.).  
 
-  This function is highly tailored to Mouse Diversity Array, and if you want to genotype other types of arrays, refer to \code{\link[MouseDivGeno]{genotypethis}} function. All annotation files (allid, ABid, chrid) to run this function can be obtained from \url{http://genomedynamics.org/tools/MouseDivGeno/CDFfiles}. Coefficients to normalize the array (\code{snpProbeInfo$correction} and \code{referenceDistribution}) or hint file used to genotype the array (\code{snpInfo$snpHetHint}) were calculated based on 350 training .CEL files, and they can be obtained from the \url{http://genomedynamics.org/tools/MouseDivGeno/CDFfiles}.  
+  This function is highly tailored to Mouse Diversity Array. All annotation data required to use this function can be obtained from \url{http://genomedynamics.org/tools/MouseDivGeno/CDFfiles}. Coefficients to normalize the array (\code{snpProbeInfo$correction} and \code{referenceDistribution}) or hint file used to genotype the array (\code{snpInfo$snpHetHint}) were calculated based on 350 training .CEL files, and they can be obtained from the \url{http://genomedynamics.org/tools/MouseDivGeno/CDFfiles}.  
 
 }
 \usage{
-MouseDivGenotype(
+mouseDivGenotype(
     snpProbeInfo, snpInfo, referenceDistribution = NULL,
-    transformMethod = c("CCStrans", "MAtrans"), celFiles = getwd(),
+    transformMethod = c("CCStrans", "MAtrans"),
+    celFiles = expandCelFiles(getwd()),
     chromosomes = c(1:19, "X", "Y", "M"), cacheDir = tempdir(),
-    verbose = FALSE, cluster = NULL, probesetChunkSize=1000,
-    processResultsFunction = NULL)
+    retainCache = FALSE, verbose = FALSE, cluster = NULL,
+    probesetChunkSize = 1000, processResultsFunction = NULL)
 }
 
 \arguments{
@@ -45,16 +46,17 @@ MouseDivGenotype(
   
   \item{celFiles}{this parameter should be one of the following:
         \itemize{
-            \item{the name of a directory containing CEL files that should be processed}
-            \item{a vector of CEL file names to process}
-            \item{a matrix or data-frame where the first column contains CEL file names and the second column contains gender (\dQuote{MALE} or \dQuote{FEMALE})}
+            \item{a vector of CEL files to process. In this case sample gender will be inferred}
+            \item{a data-frame with a character "fileName" column and a boolean "isMale" column.}
         }
   }
   \item{chromosomes}{character vector of chromosome IDs that you want to genotype. These should correspond to the values in \code{snpInfo$chrId}. Eg: \code{chromosomes=c(1 : 19, "X", "Y", "M")}.}
   \item{cacheDir}{directory used to store intermediate results. By default a temporary directory is used. You can reuse a cache directory to save time in the normalization steps (this function will only perform CEL file normalization if it does not find the data that it needs in the cache)}
-    \item{cluster}{a cluster object as created by the \pkg{SNOW} package. If this value is non-NULL then this function will run genotyping computations in parallel on the given cluster}
-    \item{probesetChunkSize}{determines how many SNPs will be processed at a time (in a single chunk). Keeping this number low reduces memory utilization and makes paralellism more fine-grained at the cost of managing more chunk objects. The default value provides a reasonable tradeoff}  
-    \item{processResultsFunction}{an optional function argument which can process results chunk-by-chunk. Typically you should use the \code{createAppendResultsToCSVFunction} to create this function (see example below). Normally this parameter will just provide a convenient way to save results to a CSV file, but it can also be an important way to save memory if you are processing many CEL files in a single run (because results are processed chunk-by-chunk there is no longer a need to accumulate results for a single return value. Instead this function just returns NULL when \code{processResultsFunction} is non-NULL)}
+  \item{retainCache}{defaults to \code{FALSE}. If \code{FALSE} the data cache is deleted before returning. Setting this value to \code{TRUE} could save processing time on subsequent calls}
+  \item{verbose}{if set to \code{TRUE} status information will be printed while the function executes}
+  \item{cluster}{a cluster object as created by the \pkg{SNOW} package. If this value is non-NULL then this function will run genotyping computations in parallel on the given cluster}
+  \item{probesetChunkSize}{determines how many SNPs will be processed at a time (in a single chunk). Keeping this number low reduces memory utilization and makes paralellism more fine-grained at the cost of managing more chunk objects. The default value provides a reasonable tradeoff}  
+  \item{processResultsFunction}{an optional function argument which can process results chunk-by-chunk. Typically you should use the \code{createAppendResultsToCSVFunction} to create this function (see example below). Normally this parameter will just provide a convenient way to save results to a CSV file, but it can also be an important way to save memory if you are processing many CEL files in a single run (because results are processed chunk-by-chunk there is no longer a need to accumulate results for a single return value. Instead this function just returns NULL when \code{processResultsFunction} is non-NULL)}
 }
 
 \value{
@@ -81,7 +83,7 @@ dir.create(outcache)
 load("MouseDivData.RData")
 
 # genotype in serial and save the results to "serialGenoResults.csv"
-MouseDivGenotype(
+mouseDivGenotype(
     snpProbeInfo = snpProbeInfo, snpInfo = snpInfo, referenceDistribution=reference,
     transformMethod="CCStrans", chromosomes=c("19", "X", "Y"), celFiles=celfiledir,
     cacheDir = outcache, verbose=T, cluster=NULL,
@@ -95,7 +97,7 @@ numCores <- 2
 cl <- makeSOCKcluster(rep("localhost", numCores))
 clusterEvalQ(cl, library("MouseDivGeno"))
 
-MouseDivGenotype(
+mouseDivGenotype(
     snpProbeInfo = snpProbeInfo, snpInfo = snpInfo, referenceDistribution=reference,
     transformMethod="CCStrans", chromosomes=c("19", "X", "Y"), celFiles=celfiledir,
     cacheDir = outcache, verbose=T, cluster=cl,
@@ -103,7 +105,7 @@ MouseDivGenotype(
 
 # Run again in parallel but this time save the resulting R object to file rather
 # than using the processResultsFunction argument
-genoVinoResult <- MouseDivGenotype(
+genoVinoResult <- mouseDivGenotype(
     snpProbeInfo = snpProbeInfo, snpInfo = snpInfo, referenceDistribution=reference,
     transformMethod="CCStrans", chromosomes=c("19", "X", "Y"), celFiles=celfiledir,
     cacheDir = outcache, verbose=T, cluster=cl,
