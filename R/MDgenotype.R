@@ -8,7 +8,7 @@
 #
 #########################################################################
 
-MouseDivGenotype <- function(
+mouseDivGenotype <- function(
     snpProbeInfo, snpInfo, referenceDistribution = NULL,
     transformMethod = c("CCStrans", "MAtrans"),
     celFiles = expandCelFiles(getwd()),
@@ -103,7 +103,7 @@ MouseDivGenotype <- function(
     for(currChr in allChr)
     {
         chrProbesetCount <- sum(snpInfo$chrId == currChr)
-        chrChunks[[currChr]] <- chunkIndices(chrProbesetCount, probesetChunkSize)
+        chrChunks[[currChr]] <- .chunkIndices(chrProbesetCount, probesetChunkSize)
     }
     
     # loop through all the CELL files. We need to read and normalize the CEL
@@ -114,7 +114,7 @@ MouseDivGenotype <- function(
         # normalization work unless it's necessary
         makeMsList <- function()
         {
-            normalizeCelFileByChr(
+            .normalizeCelFileByChr(
                 celfile,
                 verbose,
                 snpProbeInfo,
@@ -129,7 +129,7 @@ MouseDivGenotype <- function(
         {
             for(chunkIndex in 1 : length(chrChunks[[currChr]]))
             {
-                chunkFile <- chunkFileName(cacheDir, "snp", celfile, currChr, probesetChunkSize, chunkIndex)
+                chunkFile <- .chunkFileName(cacheDir, "snp", celfile, currChr, probesetChunkSize, chunkIndex)
                 chunkFileAlreadyExists <- file.exists(chunkFile)
                 if(!chunkFileAlreadyExists)
                 {
@@ -196,7 +196,7 @@ MouseDivGenotype <- function(
         meanIntensityXPerArray <- meanIntensityXPerArray / sum(snpInfo$chrId == "X")
         meanIntensityYPerArray <- meanIntensityYPerArray / sum(snpInfo$chrId == "Y")
         
-        isMale <- inferGender(
+        isMale <- .inferGender(
             meanIntensityXPerArray,
             meanIntensityYPerArray,
             meanIntensityPerAutosome)
@@ -238,7 +238,7 @@ MouseDivGenotype <- function(
             SS <- NULL
             for (i in 1:nfile)
             {
-                chunkFile <- chunkFileName(cacheDir, "snp", celFiles[i], chri, probesetChunkSize, chunkIndex)
+                chunkFile <- .chunkFileName(cacheDir, "snp", celFiles[i], chri, probesetChunkSize, chunkIndex)
                 load(chunkFile)
                 MM <- cbind(MM, mChunk)
                 SS <- cbind(SS, sChunk)
@@ -268,7 +268,7 @@ MouseDivGenotype <- function(
                 if(length(argLists) >= length(cluster) || chunkIndex == length(chrChunks[[chri]]))
                 {
                     # parallel apply using snow then reset the arg list
-                    chunkResultsList <- parLapply(cluster, argLists, applyGenotypeAnyChrChunk)
+                    chunkResultsList <- parLapply(cluster, argLists, .applyGenotypeAnyChrChunk)
                     for(i in 1 : length(chunkResultsList))
                     {
                         chunkResult <- chunkResultsList[[i]]
@@ -295,7 +295,7 @@ MouseDivGenotype <- function(
                             
                             for(k in 1 : length(chunkResult))
                             {
-                                colnames(chunkResult[[k]]) <- fileBaseWithoutExtension(celFiles)
+                                colnames(chunkResult[[k]]) <- .fileBaseWithoutExtension(celFiles)
                             }
                             processResultsFunction(chunkProbesetInfo, chunkResult)
                         }
@@ -308,7 +308,7 @@ MouseDivGenotype <- function(
             }
             else
             {
-                chunkResult <- genotypeAnyChrChunk(
+                chunkResult <- .genotypeAnyChrChunk(
                     chr = chri,
                     ms = MM,
                     ss = SS,
@@ -334,7 +334,7 @@ MouseDivGenotype <- function(
                     
                     for(k in 1 : length(chunkResult))
                     {
-                        colnames(chunkResult[[k]]) <- fileBaseWithoutExtension(celFiles)
+                        colnames(chunkResult[[k]]) <- .fileBaseWithoutExtension(celFiles)
                     }
                     processResultsFunction(chunkProbesetInfo, chunkResult)
                 }
@@ -378,7 +378,7 @@ MouseDivGenotype <- function(
         {
             results[[i]] <- results[[i]][snpOrdering, ]
             rownames(results[[i]]) <- snpIdsInOrder
-            colnames(results[[i]]) <- fileBaseWithoutExtension(celFiles)
+            colnames(results[[i]]) <- .fileBaseWithoutExtension(celFiles)
         }
     }
     
@@ -396,7 +396,7 @@ MouseDivGenotype <- function(
             {
                 for(chunkIndex in 1 : length(chrChunks[[currChr]]))
                 {
-                    chunkFile <- chunkFileName(cacheDir, "snp", celfile, currChr, probesetChunkSize, chunkIndex)
+                    chunkFile <- .chunkFileName(cacheDir, "snp", celfile, currChr, probesetChunkSize, chunkIndex)
                     if(file.exists(chunkFile))
                     {
                         file.remove(chunkFile)
@@ -411,9 +411,9 @@ MouseDivGenotype <- function(
 
 # this apply function is defined to take a list in order to allow us to take
 # advantage of the snow package's apply functions
-applyGenotypeAnyChrChunk <- function(argList)
+.applyGenotypeAnyChrChunk <- function(argList)
 {
-    genotypeAnyChrChunk(
+    .genotypeAnyChrChunk(
         argList$chr,
         argList$ms,
         argList$ss,

@@ -1,11 +1,11 @@
 useDynLib(
 	MouseDivGeno,
-	calc_expectation_two_genos_from_r,
-	calc_expectation_three_genos_from_r,
-	maximize_expectation_two_genos_from_r,
-	maximize_expectation_three_genos_from_r,
-	run_em_from_r,
-	vdist_from_r)
+	.calc_expectation_two_genos_from_r         = calc_expectation_two_genos_from_r,
+	.calc_expectation_three_genos_from_r       = calc_expectation_three_genos_from_r,
+	.maximize_expectation_two_genos_from_r     = maximize_expectation_two_genos_from_r,
+	.maximize_expectation_three_genos_from_r   = maximize_expectation_three_genos_from_r,
+	.run_em_from_r                             = run_em_from_r,
+	.vdist_from_r                              = vdist_from_r)
 
 import(affyio, preprocessCore, cluster)
 

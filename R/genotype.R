@@ -96,7 +96,7 @@ genotype <- function(nm, ns, hint1, trans) {
         #======== test 2 ====== based on one dimension at this time rather than two
         #startTime <- proc.time()[3]
         
-        emResult <- em2Genos(c(hint[1], hint[3]), nm[!rmid])
+        emResult <- .em2Genos(c(hint[1], hint[3]), nm[!rmid])
         T <- round(emResult$T, 4)
         tgeno2 <- rep(-1, nsize)
         geno2 <- rep(-1, lnrmid)
@@ -144,14 +144,14 @@ genotype <- function(nm, ns, hint1, trans) {
         else {
             if (any(tgeno2 == -1))
                 # use vdist to give membership (TODO why divided by 5)
-                tgeno2 <- vdist(adata[, 1], adata[, 2]/5, tgeno2)
+                tgeno2 <- .vdist(adata[, 1], adata[, 2]/5, tgeno2)
             
             tscore2 <- silhouette(match(tgeno2[!rmid], unique(tgeno2[!rmid])), dist(nm[!rmid]))
             if(any(is.na(tscore2))) stop("Internal Error: silhouette score is NA")
             
             if (istwo) {
                 # test if it's one group or two group
-                geno <- test12(tscore2, nm, tgeno2, rmid, thres, iig, nsize)
+                geno <- .test12(tscore2, nm, tgeno2, rmid, thres, iig, nsize)
                 v1 <- vinotype(nm, ns, geno)
                 vino <- v1$vino
                 conf <- v1$conf
@@ -164,7 +164,7 @@ genotype <- function(nm, ns, hint1, trans) {
         
         if (!istwo) {
             #======== test 3
-            emResult <- em3Genos(hint, nm[!rmid])
+            emResult <- .em3Genos(hint, nm[!rmid])
             T <- round(emResult$T, 4)
             tgeno3 <- rep(-1, nsize)
             geno3 <- rep(-1, lnrmid)
@@ -190,7 +190,7 @@ genotype <- function(nm, ns, hint1, trans) {
             if (any(is.na(out))) {
                 # we need to fall back on the 2 vs 1 group test
                 if (!isone) 
-                  geno <- test12(tscore2, nm, tgeno2, rmid, thres, iig, nsize)
+                  geno <- .test12(tscore2, nm, tgeno2, rmid, thres, iig, nsize)
                 v1 <- vinotype(nm, ns, geno)
                 vino <- v1$vino
                 conf <- v1$conf
@@ -204,7 +204,7 @@ genotype <- function(nm, ns, hint1, trans) {
                 if (length(unique(tgeno3[tgeno3 != -1])) < 3) {
                     # we need to fall back on the 2 vs 1 group test
                   if (!isone) 
-                    geno <- test12(tscore2, nm, tgeno2, rmid, thres, iig, nsize)
+                    geno <- .test12(tscore2, nm, tgeno2, rmid, thres, iig, nsize)
                   v1 <- vinotype(nm, ns, geno)
                   vino <- v1$vino
                   conf <- v1$conf
@@ -214,17 +214,17 @@ genotype <- function(nm, ns, hint1, trans) {
                   if (any(tgeno3 == -1)) {
                     # use vdist to assign membership where prev geno test did
                     # not succeed
-                    tgeno3 <- vdist(adata[, 1], adata[, 2]/5, tgeno3)
+                    tgeno3 <- .vdist(adata[, 1], adata[, 2]/5, tgeno3)
                   }
                   tscore3 <- silhouette(match(tgeno3[!rmid], unique(tgeno3[!rmid])), dist(nm[!rmid]))
                   if (isone) {
-                    geno <- test13(tscore3, nm, tgeno3, rmid, geno)
+                    geno <- .test13(tscore3, nm, tgeno3, rmid, geno)
                     v1 <- vinotype(nm, ns, geno)
                     vino <- v1$vino
                     conf <- v1$conf
                   }
                   else {
-                    geno <- test123(tscore2, tscore3, nm, tgeno2, tgeno3, rmid, thres, iig, nsize)
+                    geno <- .test123(tscore2, tscore3, nm, tgeno2, tgeno3, rmid, thres, iig, nsize)
                     v1 <- vinotype(nm, ns, geno)
                     vino <- v1$vino
                     conf <- v1$conf
@@ -239,7 +239,7 @@ genotype <- function(nm, ns, hint1, trans) {
 }
 
 # Run the EM algorithm for 3 genotypes
-em3Genos.using_r <- function(hint, nmSubset)
+.em3Genos.using_r <- function(hint, nmSubset)
 {
     # TODO ask hyuna why sigma is 0.1 for three genotypes and 0.01 for two
     otheta1 <- list(
@@ -260,9 +260,9 @@ em3Genos.using_r <- function(hint, nmSubset)
         iter <- iter + 1
         
         # T is a matrix of # samples x 3 groups
-        T <- E.step3(theta1, nmSubset)
+        T <- .E.step3(theta1, nmSubset)
         T[is.na(T)] <- 1/3
-        theta1 <- M.step3(T, nmSubset)
+        theta1 <- .M.step3(T, nmSubset)
         ok1 <- TRUE
         
         # determines the stopping condition of EM algo (analogous to
@@ -287,13 +287,13 @@ em3Genos.using_r <- function(hint, nmSubset)
     list(T = T, tau = theta1$tau)
 }
 
-em3Genos.using_c <- function(hint, nmSubset)
+.em3Genos.using_c <- function(hint, nmSubset)
 {
     sample_count <- as.integer(length(nmSubset))
     geno_count <- as.integer(3)
     
     c_call <- .C(
-        name = run_em_from_r,
+        name = .run_em_from_r,
         init_sigma = as.double(0.1),
         mus = as.double(hint),
         expectation_matrix = matrix(0.0, nrow = sample_count, ncol = geno_count),
@@ -305,9 +305,9 @@ em3Genos.using_c <- function(hint, nmSubset)
     list(T = c_call$expectation_matrix, tau = c_call$taus)
 }
 
-em3Genos <- em3Genos.using_c
+.em3Genos <- .em3Genos.using_c
 
-em2Genos.using_r <- function(hint, nmSubset)
+.em2Genos.using_r <- function(hint, nmSubset)
 {
     # Start with priors
     theta1 <- list(
@@ -331,9 +331,9 @@ em2Genos.using_r <- function(hint, nmSubset)
         
         # probability that belongs to group 1 vs prob group 2
         # T matrix is # samples x 2 groups
-        T <- E.step2(theta1, nmSubset)
+        T <- .E.step2(theta1, nmSubset)
         T[is.na(T)] <- 0.5
-        theta1 <- M.step2(T, nmSubset)
+        theta1 <- .M.step2(T, nmSubset)
         ok1 <- TRUE
         
         # Determines the stopping condition of EM algo.
@@ -358,13 +358,13 @@ em2Genos.using_r <- function(hint, nmSubset)
     list(T = T, tau = theta1$tau)
 }
 
-em2Genos.using_c <- function(hint, nmSubset)
+.em2Genos.using_c <- function(hint, nmSubset)
 {
     sample_count <- as.integer(length(nmSubset))
     geno_count <- as.integer(2)
     
     c_call <- .C(
-        name = run_em_from_r,
+        name = .run_em_from_r,
         init_sigma = as.double(0.01),
         mus = as.double(hint),
         expectation_matrix = matrix(0.0, nrow = sample_count, ncol = geno_count),
@@ -376,7 +376,7 @@ em2Genos.using_c <- function(hint, nmSubset)
     list(T = c_call$expectation_matrix, tau = c_call$taus)
 }
 
-em2Genos <- em2Genos.using_c
+.em2Genos <- .em2Genos.using_c
 
 # genotyping for probesets that we know are homozygous a priori
 genotypeHomozygous <- function(nm, ns, trans) {
@@ -414,7 +414,7 @@ genotypeHomozygous <- function(nm, ns, trans) {
     else {
         adata <- cbind(nm, ns/(max(ns) - min(ns)))
         #======== test 2
-        emResult <- em2Genos(hint, nm[!rmid])
+        emResult <- .em2Genos(hint, nm[!rmid])
         T <- round(emResult$T, 4)
         geno <- rep(-1, nsize)
         geno2 <- rep(-1, lnrmid)
@@ -439,7 +439,7 @@ genotypeHomozygous <- function(nm, ns, trans) {
         else {
             if (any(geno == -1))
                 # TODO why divided by 2?
-                geno <- vdist(adata[, 1], adata[, 2]/2, geno)
+                geno <- .vdist(adata[, 1], adata[, 2]/2, geno)
             keepthis <- tapply(nm, geno, mean)
             if (keepthis[1] > keepthis[2]) 
                 geno[geno == 2] <- 3
@@ -456,7 +456,7 @@ genotypeHomozygous <- function(nm, ns, trans) {
 }
 
 # test three groups (the tscore parameters are silhoutte scores)
-test123 <- function(tscore2, tscore3, nm, tgeno2, tgeno3, rmid, thres, iig, nsize) {
+.test123 <- function(tscore2, tscore3, nm, tgeno2, tgeno3, rmid, thres, iig, nsize) {
     if (length(tscore3) < 3) {
         # the score is not available
         mscore3 <- 0
@@ -483,13 +483,13 @@ test123 <- function(tscore2, tscore3, nm, tgeno2, tgeno3, rmid, thres, iig, nsiz
         geno <- tgeno3
     }
     else {
-        geno <- test12(tscore2, nm, tgeno2, rmid, thres, iig, nsize)
+        geno <- .test12(tscore2, nm, tgeno2, rmid, thres, iig, nsize)
     }
     
     geno
 }
 
-test13 <- function(tscore3, nm, tgeno3, rmid, geno) {
+.test13 <- function(tscore3, nm, tgeno3, rmid, geno) {
     if (length(tscore3) < 3) {
         # the score is not available
         mscore3 <- 0
@@ -510,7 +510,7 @@ test13 <- function(tscore3, nm, tgeno3, rmid, geno) {
 }
 
 # test two groups
-test12 <- function(tscore2, nm, tgeno, rmid, thres, iig, nsize) {
+.test12 <- function(tscore2, nm, tgeno, rmid, thres, iig, nsize) {
     if (length(tscore2) < 3) {
         # the score is not available
         mscore <- 0
@@ -561,7 +561,7 @@ test12 <- function(tscore2, nm, tgeno, rmid, thres, iig, nsize) {
 
 # vdist performs hierarchical clustering (our fallback function when we are
 # left with unassigned genotypes)
-vdist.using_r <- function(ta, tb, t2) {
+.vdist.using_r <- function(ta, tb, t2) {
     # the list of unassigned geno indices
     la <- which(t2 == -1)
     
@@ -604,9 +604,9 @@ vdist.using_r <- function(ta, tb, t2) {
     t2
 }
 
-vdist.using_c <- function(ta, tb, t2) {
+.vdist.using_c <- function(ta, tb, t2) {
     c_call <- .C(
-        name = vdist_from_r,
+        name = .vdist_from_r,
         vectors_length = as.integer(length(t2)),
         ta = as.double(ta),
         tb = as.double(tb),
@@ -614,9 +614,9 @@ vdist.using_c <- function(ta, tb, t2) {
     c_call$t2
 }
 
-vdist <- vdist.using_c
+.vdist <- .vdist.using_c
 
-E.step3.using_r <- function(theta, data) {
+.E.step3.using_r <- function(theta, data) {
     i1 <- rep(0, length(data))
     i2 <- i1
     i3 <- i1
@@ -629,10 +629,10 @@ E.step3.using_r <- function(theta, data) {
     t(apply(cbind(i1, i2, i3), 1, function(x) x/sum(x)))
 }
 
-E.step3.using_c <- function(theta, data) {
+.E.step3.using_c <- function(theta, data) {
     data_len <- length(data)
     c_call <- .C(
-        name = calc_expectation_three_genos_from_r,
+        name = .calc_expectation_three_genos_from_r,
         as.double(data),
         as.integer(data_len),
         as.double(theta$tau),
@@ -647,9 +647,9 @@ E.step3.using_c <- function(theta, data) {
     c_call$expectation_matrix
 }
 
-E.step3 <- E.step3.using_c
+.E.step3 <- .E.step3.using_c
 
-M.step3.using_r <- function(T, data) {
+.M.step3.using_r <- function(T, data) {
     mu1 <- NA
     mu2 <- NA
     mu3 <- NA
@@ -672,11 +672,11 @@ M.step3.using_r <- function(T, data) {
     list(tau = tau, mu1 = mu1, mu2 = mu2, mu3 = mu3, sigma1 = sigma1, sigma2 = sigma2, sigma3 = sigma3)
 }
 
-M.step3.using_c <- function(T, data)
+.M.step3.using_c <- function(T, data)
 {
     data_len <- length(data)
     c_call <- .C(
-        name = maximize_expectation_three_genos_from_r,
+        name = .maximize_expectation_three_genos_from_r,
         T,
         data,
         as.integer(data_len),
@@ -693,9 +693,9 @@ M.step3.using_c <- function(T, data)
         sigma3 = c_call$sigmas[3])
 }
 
-M.step3 <- M.step3.using_c
+.M.step3 <- .M.step3.using_c
 
-E.step2.using_r <- function(theta, data) {
+.E.step2.using_r <- function(theta, data) {
     i1 <- rep(0, length(data))
     i2 <- i1
     if (theta$tau[1] > 0) 
@@ -705,10 +705,10 @@ E.step2.using_r <- function(theta, data) {
     t(apply(cbind(i1, i2), 1, function(x) x/sum(x)))
 }
 
-E.step2.using_c <- function(theta, data) {
+.E.step2.using_c <- function(theta, data) {
     data_len <- length(data)
     c_call <- .C(
-        name = calc_expectation_two_genos_from_r,
+        name = .calc_expectation_two_genos_from_r,
         as.double(data),
         as.integer(data_len),
         as.double(theta$tau),
@@ -721,13 +721,13 @@ E.step2.using_c <- function(theta, data) {
     c_call$expectation_matrix
 }
 
-E.step2 <- E.step2.using_c
+.E.step2 <- .E.step2.using_c
 
-M.step2.using_c <- function(T, data)
+.M.step2.using_c <- function(T, data)
 {
     data_len <- length(data)
     c_call <- .C(
-        name = maximize_expectation_two_genos_from_r,
+        name = .maximize_expectation_two_genos_from_r,
         T,
         data,
         as.integer(data_len),
@@ -742,7 +742,7 @@ M.step2.using_c <- function(T, data)
         sigma2 = c_call$sigmas[2])
 }
 
-M.step2.using_r <- function(T, data) {
+.M.step2.using_r <- function(T, data) {
     mu1 <- NA
     mu2 <- NA
     sigma1 <- NA
@@ -759,4 +759,4 @@ M.step2.using_r <- function(T, data) {
     list(tau = tau, mu1 = mu1, mu2 = mu2, sigma1 = sigma1, sigma2 = sigma2)
 }
 
-M.step2 <- M.step2.using_c
+.M.step2 <- .M.step2.using_c

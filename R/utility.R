@@ -99,7 +99,7 @@ createAppendResultsToCSVFunction <- function(fileName)
 #### biweight midcovariance from Wilcox(1997)
 #### code from Dr.RichHerrington at
 #### http://www.unt.edu/benchmarks/archives/2001/december01/rss.htm
-bicov <- function(x, y) {
+.bicov <- function(x, y) {
     mx <- median(x)
     my <- median(y)
     ux <- abs((x - mx)/(9 * qnorm(0.75) * mad(x)))
@@ -115,7 +115,7 @@ bicov <- function(x, y) {
 }
 
 #### Calculate biweight midcorrelation
-bivar <- function(x) {
+.bivar <- function(x) {
     mx <- median(x)
     ux <- abs((x - mx)/(9 * qnorm(0.75) * mad(x)))
     aval <- ifelse(ux <= 1, 1, 0)

@@ -92,9 +92,9 @@ vinotype <- function(nm, ns, geno) {
             # ss[[ik]] becomes the covariance matrix for the current genotype's
             # nm and ns values
             ssm <- matrix(0, 2, 2)
-            ssm[1, 1] <- bivar(nnm)
-            ssm[2, 2] <- bivar(nns)
-            ssm[1, 2] <- bicov(nnm, nns)
+            ssm[1, 1] <- .bivar(nnm)
+            ssm[2, 2] <- .bivar(nns)
+            ssm[1, 2] <- .bicov(nnm, nns)
             ssm[2, 1] <- ssm[1, 2]
             ss[[ik]] <- ssm
             
@@ -208,7 +208,7 @@ vinotype <- function(nm, ns, geno) {
     
     if (any(vino == 1) & any(vino == -1)) {
         # pick up remaining vinos using vdist clustering
-        vino <- vdist(nm/5, ns/(2 * (max(ns) - min(ns))), vino)
+        vino <- .vdist(nm/5, ns/(2 * (max(ns) - min(ns))), vino)
     }
     
     list(vino = vino, conf = mdd)

@@ -134,7 +134,7 @@ buildPennCNVInputFiles <- function(
     for(currChr in snpChromosomes)
     {
         chrProbesetCount <- sum(snpInfo$chrId == currChr)
-        chrChunks[[currChr]] <- chunkIndices(chrProbesetCount, probesetChunkSize)
+        chrChunks[[currChr]] <- .chunkIndices(chrProbesetCount, probesetChunkSize)
     }
     
     for(celfile in celFiles)
@@ -143,7 +143,7 @@ buildPennCNVInputFiles <- function(
         # normalization work unless it's necessary
         makeMsList <- function()
         {
-            normalizeCelFileByChr(
+            .normalizeCelFileByChr(
                 celfile,
                 verbose,
                 snpProbeInfo,
@@ -158,7 +158,7 @@ buildPennCNVInputFiles <- function(
         {
             for(chunkIndex in 1 : length(chrChunks[[currChr]]))
             {
-                chunkFile <- chunkFileName(cacheDir, "snp", celfile, currChr, probesetChunkSize, chunkIndex)
+                chunkFile <- .chunkFileName(cacheDir, "snp", celfile, currChr, probesetChunkSize, chunkIndex)
                 chunkFileAlreadyExists <- file.exists(chunkFile)
                 
                 if(!chunkFileAlreadyExists)
@@ -184,7 +184,7 @@ buildPennCNVInputFiles <- function(
     }
     
     # initialize the connections for BAF & LRR files and write the header rows
-    lrrAndBafBaseNames <- paste(fileBaseWithoutExtension(celFiles), ".txt", sep = "")
+    lrrAndBafBaseNames <- paste(.fileBaseWithoutExtension(celFiles), ".txt", sep = "")
     lrrAndBafOutputFiles <- file.path(outdir, lrrAndBafBaseNames)
     if(!allowOverwrite && any(file.exists(lrrAndBafOutputFiles)))
     {
@@ -203,7 +203,7 @@ buildPennCNVInputFiles <- function(
     }
     
     lrrAndBafConnections <- lapply(as.list(lrrAndBafOutputFiles), file, "wt")
-    names(lrrAndBafConnections) <- fileBaseWithoutExtension(celFiles)
+    names(lrrAndBafConnections) <- .fileBaseWithoutExtension(celFiles)
     for(celName in names(lrrAndBafConnections))
     {
         con <- lrrAndBafConnections[[celName]]
@@ -263,14 +263,14 @@ buildPennCNVInputFiles <- function(
                 celfile <- celFiles[fileIndex]
                 
                 # loads mChunk and sChunk into scope
-                chunkFile <- chunkFileName(cacheDir, "snp", celfile, currChr, probesetChunkSize, chunkIndex)
+                chunkFile <- .chunkFileName(cacheDir, "snp", celfile, currChr, probesetChunkSize, chunkIndex)
                 load(chunkFile)
                 
                 mMatrix[, fileIndex] <- mChunk
                 sMatrix[, fileIndex] <- sChunk
             }
             
-            appendToPennCNVForSNPs(
+            .appendToPennCNVForSNPs(
                 snpInfo = chrSnpInfo[chunkIndices, ],
                 intensityConts = mMatrix,
                 intensityAvgs = sMatrix,
@@ -289,7 +289,7 @@ buildPennCNVInputFiles <- function(
     for(currChr in invariantChromosomes)
     {
         chrProbesetCount <- sum(invariantProbesetInfo$chrId == currChr)
-        invariantChrChunks[[currChr]] <- chunkIndices(chrProbesetCount, probesetChunkSize)
+        invariantChrChunks[[currChr]] <- .chunkIndices(chrProbesetCount, probesetChunkSize)
     }
 
     # append the invariant LRR/BAF values
@@ -298,7 +298,7 @@ buildPennCNVInputFiles <- function(
         makeNormInvariantList <- function()
         {
             #TODO remember to add invariantProbesetInfo !!!!!!!!!!!!!!!!!!!!!!!!!!!
-            normalizeCelFileForInvariants(
+            .normalizeCelFileForInvariants(
                 celfile,
                 verbose,
                 invariantProbeInfo,
@@ -312,7 +312,7 @@ buildPennCNVInputFiles <- function(
         {
             for(chunkIndex in 1 : length(invariantChrChunks[[currChr]]))
             {
-                chunkFile <- chunkFileName(cacheDir, "invariant", celfile, currChr, probesetChunkSize, chunkIndex)
+                chunkFile <- .chunkFileName(cacheDir, "invariant", celfile, currChr, probesetChunkSize, chunkIndex)
                 chunkFileAlreadyExists <- file.exists(chunkFile)
                 
                 if(!chunkFileAlreadyExists)
@@ -366,13 +366,13 @@ buildPennCNVInputFiles <- function(
                 celfile <- celFiles[fileIndex]
                 
                 # loads intensityChunk into scope
-                chunkFile <- chunkFileName(cacheDir, "invariant", celfile, currChr, probesetChunkSize, chunkIndex)
+                chunkFile <- .chunkFileName(cacheDir, "invariant", celfile, currChr, probesetChunkSize, chunkIndex)
                 load(chunkFile)
                 
                 intensityMatrix[, fileIndex] <- intensityChunk
             }
             
-            appendToPennCNVForInvariants(
+            .appendToPennCNVForInvariants(
                 probesetInfo = chrInvariantProbesetInfo[chunkIndices, ],
                 probesetIntensities = intensityMatrix,
                 lrrAndBafConnections = lrrAndBafConnections,
@@ -402,7 +402,7 @@ buildPennCNVInputFiles <- function(
 #       per sample)
 #   pfbConnection:
 #       the connection to use for the PBF file.
-appendToPennCNVForInvariants <- function(
+.appendToPennCNVForInvariants <- function(
     probesetInfo,
     probesetIntensities,
     lrrAndBafConnections,
@@ -427,6 +427,7 @@ appendToPennCNVForInvariants <- function(
     # set all BAFs to 2 indicating that it's not a polymorphic probeset
     bafs <- rep(2, probesetCount)
     lrrs <- log2(probesetIntensities / apply(probesetIntensities, 1, mean))
+    
     for(sampleIndex in 1 : sampleCount)
     {
         write.table(
@@ -452,6 +453,7 @@ appendToPennCNVForInvariants <- function(
 # append PennCNV data for the given LRR/BAF files and the PFB file using SNP
 # data (thes files should already have a header in place since this function
 # will not create one)
+#
 # PARAMETERS:
 #   snpInfo:
 #       a data frame with a row per SNP. this parameter should have the
@@ -470,7 +472,7 @@ appendToPennCNVForInvariants <- function(
 #       per sample)
 #   pfbConnection:
 #       the connection to use for the PBF file.
-appendToPennCNVForSNPs <- function(
+.appendToPennCNVForSNPs <- function(
     snpInfo,
     intensityConts,
     intensityAvgs,
@@ -494,7 +496,7 @@ appendToPennCNVForSNPs <- function(
     lrrs <- matrix(0.0, nrow = snpCount, ncol = sampleCount)
     for(snpIndex in 1 : snpCount)
     {
-        bafAndLrr <- calcLRRAndBAF(
+        bafAndLrr <- .calcLRRAndBAF(
             intensityConts[snpIndex, ],
             intensityAvgs[snpIndex, ],
             genotypes[snpIndex, ])
@@ -526,6 +528,7 @@ appendToPennCNVForSNPs <- function(
 }
 
 # calculates LRR and BAF values for a single SNP position
+#
 # PARAMETERS:
 #   intensityConts:
 #       per-sample intensity contrasts (A allele vs B allele)
@@ -533,10 +536,11 @@ appendToPennCNVForSNPs <- function(
 #       per-sample intensity averages (A averaged with B)
 #   genos:
 #       per-sample genotypes 1 = AA, 2 = AB, 3 = BB
+#
 # RETURNS:
 #   A data.frame object with B-Allele Frequency (BAF) and Log R Ratio (LRR)
 #   components. The row count of this dataframe will equal length(genos)
-calcLRRAndBAF <- function(intensityConts, intensityAvgs, genos)
+.calcLRRAndBAF <- function(intensityConts, intensityAvgs, genos)
 {
     sampleCount <- length(genos)
     uniqueGenos <- sort(unique(genos))
@@ -568,7 +572,7 @@ calcLRRAndBAF <- function(intensityConts, intensityAvgs, genos)
         {
             medianContPerGeno[genoIndex] <- median(currIntensityConts)
             medianAvgsPerGeno[genoIndex] <- median(currIntensityAvgs)
-            contVariancePerGeno[genoIndex] <- bivar(currIntensityConts)
+            contVariancePerGeno[genoIndex] <- .bivar(currIntensityConts)
         }
     }
     
@@ -757,7 +761,7 @@ calcLRRAndBAF <- function(intensityConts, intensityAvgs, genos)
     data.frame(BAF = BAF, LRR = LRR)
 }
 
-normalizeCelFileForInvariants <- function(
+.normalizeCelFileForInvariants <- function(
     celFileName,
     verbose,
     invariantProbeInfo,
@@ -885,7 +889,7 @@ simpleCNV <- function(
     }
     
     # the reference intensities
-    refIntensities <- normalizeForSimpleCNV(
+    refIntensities <- .normalizeForSimpleCNV(
         referenceCelFile,
         chromosomes,
         snpProbeInfo, snpInfo, snpReferenceDistribution,
@@ -911,7 +915,7 @@ simpleCNV <- function(
         else
         {
             # normalizes intensities and sorts by position
-            currIntensities <- normalizeForSimpleCNV(
+            currIntensities <- .normalizeForSimpleCNV(
                 currCelFile,
                 chromosomes,
                 snpProbeInfo, snpInfo, snpReferenceDistribution,
@@ -927,7 +931,7 @@ simpleCNV <- function(
                     {
                         cat("inferring CNVs for chromosome ", chr, " of ", currCelFile, "\n")
                     }
-                    cnvs[[chr]] <- inferCNVFromIntensity(
+                    cnvs[[chr]] <- .inferCNVFromIntensity(
                         currIntensities[[chr]],
                         refIntensities[[chr]])
                 }
@@ -946,7 +950,7 @@ simpleCNV <- function(
                     currIntensities,
                     refIntensities,
                     SIMPLIFY = FALSE)
-                cnvs <- parLapply(cluster, combinedIntList, applyInferCNVFromIntensity)
+                cnvs <- parLapply(cluster, combinedIntList, .applyInferCNVFromIntensity)
             }
         }
         
@@ -959,18 +963,18 @@ simpleCNV <- function(
     # give column names based on the CEL file
     for(chr in names(allCnvsByChr))
     {
-        colnames(allCnvsByChr[[chr]]) <- fileBaseWithoutExtension(celFiles)
+        colnames(allCnvsByChr[[chr]]) <- .fileBaseWithoutExtension(celFiles)
     }
     
     allCnvsByChr
 }
 
-applyInferCNVFromIntensity <- function(combinedInt)
+.applyInferCNVFromIntensity <- function(combinedInt)
 {
-    inferCNVFromIntensity(combinedInt$testInt, combinedInt$refInt)
+    .inferCNVFromIntensity(combinedInt$testInt, combinedInt$refInt)
 }
 
-inferCNVFromIntensity <- function(
+.inferCNVFromIntensity <- function(
     intensities,
     refIntensities,
     sameStateProb = 0.9999,
@@ -1009,7 +1013,7 @@ inferCNVFromIntensity <- function(
     estimatedCNVStates
 }
 
-normalizeForSimpleCNV <- function(
+.normalizeForSimpleCNV <- function(
     celFileName,
     chromosomes,
     snpProbeInfo, snpInfo, snpReferenceDistribution,

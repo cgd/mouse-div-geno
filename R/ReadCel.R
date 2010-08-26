@@ -5,7 +5,7 @@
 #
 #########################################################################
 
-inferGender <- function(
+.inferGender <- function(
     meanIntensityXPerArray,
     meanIntensityYPerArray,
     meanIntensityPerAutosome)
@@ -43,30 +43,30 @@ inferGender <- function(
     isMale
 }
 
-ccstrans <- function(a, b, k = 4) {
+.ccstrans <- function(a, b, k = 4) {
     x <- asinh(k * (a - b)/(a + b))/asinh(k)
     y <- (log2(a) + log2(b))/2
     list(x = x, y = y)
 }
 
-genotypeAnyChrChunk <- function(chr, ms, ss, hint, parIndices, trans, isMale)
+.genotypeAnyChrChunk <- function(chr, ms, ss, hint, parIndices, trans, isMale)
 {
     if(chr == "X")
     {
-        genotypeXChromosomeChunk(ms, ss, hint, parIndices, trans, isMale)
+        .genotypeXChromosomeChunk(ms, ss, hint, parIndices, trans, isMale)
     }
     else if(chr == "Y")
     {
-        genotypeYChromosomeChunk(ms, ss, hint, trans, isMale)
+        .genotypeYChromosomeChunk(ms, ss, hint, trans, isMale)
     }
     else if(chr == "M")
     {
-        genotypeHomozygousChunk(ms, ss, trans)
+        .genotypeHomozygousChunk(ms, ss, trans)
     }
     else
     {
         # chr is an autosome
-        genotypeChunk(ms, ss, hint, trans)
+        .genotypeChunk(ms, ss, hint, trans)
     }
 }
 
@@ -74,7 +74,7 @@ genotypeAnyChrChunk <- function(chr, ms, ss, hint, parIndices, trans, isMale)
 # columns map to arrays (CEL files). This function is useful for genotyping
 # autosomes and other sections of the genome where it is possible to have 3
 # genotyping outcomes. Otherwise use genotypeHomozygousChunk
-genotypeChunk <- function(ms, ss, hint, trans)
+.genotypeChunk <- function(ms, ss, hint, trans)
 {
     numArrays <- ncol(ms)
     numProbesets <- nrow(ms)
@@ -112,7 +112,7 @@ genotypeChunk <- function(ms, ss, hint, trans)
 # columns map to arrays (CEL files). This function is useful for genotyping
 # the parts of the genome where you do not expect to observe heterozygous
 # alleles
-genotypeHomozygousChunk <- function(ms, ss, trans)
+.genotypeHomozygousChunk <- function(ms, ss, trans)
 {
     numArrays <- ncol(ms)
     numProbesets <- nrow(ms)
@@ -138,7 +138,7 @@ genotypeHomozygousChunk <- function(ms, ss, trans)
     chunkResult
 }
 
-genotypeXChromosomeChunk <- function(ms, ss, hint, parIndices, trans, isMale)
+.genotypeXChromosomeChunk <- function(ms, ss, hint, parIndices, trans, isMale)
 {
     numArrays <- ncol(ms)
     numProbesets <- nrow(ms)
@@ -186,7 +186,7 @@ genotypeXChromosomeChunk <- function(ms, ss, hint, parIndices, trans, isMale)
         
         # we are going to treat the female probesets just like autosomes for
         # the purposes of geno/vinotyping
-        normalFemaleResult <- genotypeChunk(
+        normalFemaleResult <- .genotypeChunk(
             normalFemaleMs,
             normalFemaleSs,
             normalHint,
@@ -205,7 +205,7 @@ genotypeXChromosomeChunk <- function(ms, ss, hint, parIndices, trans, isMale)
         normalMaleMs <- ms[normalIndices, maleColumns, drop = FALSE]
         normalMaleSs <- ss[normalIndices, maleColumns, drop = FALSE]
         
-        normalMaleResult <- genotypeHomozygousChunk(
+        normalMaleResult <- .genotypeHomozygousChunk(
             normalMaleMs,
             normalMaleSs,
             trans)
@@ -224,7 +224,7 @@ genotypeXChromosomeChunk <- function(ms, ss, hint, parIndices, trans, isMale)
         parSs <- ss[parIndices, , drop = FALSE]
         parHint <- hint[parIndices]
         
-        parResult <- genotypeChunk(
+        parResult <- .genotypeChunk(
             parMs,
             parSs,
             parHint,
@@ -239,7 +239,7 @@ genotypeXChromosomeChunk <- function(ms, ss, hint, parIndices, trans, isMale)
     results
 }
 
-genotypeYChromosomeChunk <- function(ms, ss, hint, trans, isMale)
+.genotypeYChromosomeChunk <- function(ms, ss, hint, trans, isMale)
 {
     numArrays <- ncol(ms)
     numProbesets <- nrow(ms)
@@ -253,7 +253,7 @@ genotypeYChromosomeChunk <- function(ms, ss, hint, trans, isMale)
     
     maleMs <- ms[, maleColumns, drop = FALSE]
     maleSs <- ss[, maleColumns, drop = FALSE]
-    maleResult <- genotypeHomozygousChunk(maleMs, maleSs, trans)
+    maleResult <- .genotypeHomozygousChunk(maleMs, maleSs, trans)
     
     # TODO using NA for invalid values here. make sure that's consistent with
     #      the rest of the code
@@ -272,7 +272,7 @@ genotypeYChromosomeChunk <- function(ms, ss, hint, trans, isMale)
 # reads in the given CEL file, partitions it into groups defined by groupLevels
 # then breaks up those groups into chunk sizes no bigger than maxChunkSize
 # groups should be factors where
-normalizeCelFileByChr <- function(
+.normalizeCelFileByChr <- function(
     celFileName,
     verbose,
     snpProbeInfo,
@@ -312,7 +312,7 @@ normalizeCelFileByChr <- function(
     
     if (trans == "CCStrans") {
         # fixed K??
-        res <- ccstrans(2^allAint, 2^allBint)
+        res <- .ccstrans(2^allAint, 2^allBint)
         M <- res$x
         S <- res$y
     }
@@ -346,7 +346,7 @@ normalizeCelFileByChr <- function(
     msList
 }
 
-chunkIndices <- function(to, by) {
+.chunkIndices <- function(to, by) {
     chunks <- list()
     chunkNumber <- 0
     for(chunkStart in seq(from = 1, to = to, by = by))
@@ -365,15 +365,15 @@ chunkIndices <- function(to, by) {
 }
 
 # TODO we need more parameters to make sure this is really meaningfully unique
-chunkFileName <- function(baseDir, kind, celFileName, chrName, chunkSize, chunkIndex)
+.chunkFileName <- function(baseDir, kind, celFileName, chrName, chunkSize, chunkIndex)
 {
-    fileBase <- fileBaseWithoutExtension(celFileName)
+    fileBase <- .fileBaseWithoutExtension(celFileName)
     chunkFile <- paste(fileBase, "-", kind, "-", chrName, "-", chunkSize, "-", chunkIndex, ".RData", sep="")
     
     file.path(baseDir, chunkFile)
 }
 
-fileBaseWithoutExtension <- function(celFileName)
+.fileBaseWithoutExtension <- function(celFileName)
 {
     sub("\\.[^\\.]*$", "", basename(celFileName))
 }
