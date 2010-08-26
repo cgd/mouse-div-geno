@@ -5,7 +5,7 @@ buildPennCNVInputFiles <- function(
     outdir = getwd(), allowOverwrite = FALSE,
     genotypes, snpProbeInfo, snpInfo, snpReferenceDistribution = NULL,
     invariantProbeInfo, invariantProbesetInfo, invariantReferenceDistribution = NULL,
-    transformMethod = c("CCStrans", "MAtrans"), celFiles = getwd(),
+    transformMethod = c("CCStrans", "MAtrans"), celFiles = expandCelFiles(getwd()),
     chromosomes = c(1:19, "X", "Y", "M"),
     chromosomeRenameMap = list(X = 20, Y = 21, M = 22),
     cacheDir = tempdir(),
@@ -795,7 +795,7 @@ buildPennCNVInputFiles <- function(
 simpleCNV <- function(
     snpProbeInfo, snpInfo, snpReferenceDistribution = NULL,
     invariantProbeInfo, invariantProbesetInfo, invariantReferenceDistribution = NULL,
-    celFiles = getwd(),
+    celFiles = expandCelFiles(getwd()),
     referenceCelFile,
     chromosomes = c(1:19, "X", "Y", "M"),
     verbose = FALSE,
