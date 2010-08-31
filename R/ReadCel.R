@@ -336,7 +336,7 @@
         numCurrRows <- length(currRows)
         if(numCurrRows == 0)
         {
-            stop("Failed to find any probes on chromosome ", chri);
+            stop("Failed to find any probes on chromosome ", chri)
         }
         
         msList[[chri]]$M <- M[currRows]
