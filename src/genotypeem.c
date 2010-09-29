@@ -17,9 +17,9 @@
  * @param taus
  *          TODO fill in doc
  * @param mus
-            TODO fill in doc
+ *          TODO fill in doc
  * @param sigmas
-            TODO fill in doc
+ *          TODO fill in doc
  * @param expectation_matrix
  *          this matrix is destructively updated with the expectation that
  *          a data item belongs to a genotype. These probabilities can be
