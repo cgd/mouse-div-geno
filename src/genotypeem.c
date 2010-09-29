@@ -319,7 +319,7 @@ void run_em(
                 break;
             }
             
-            if(tau > 0 && abs(mu - old_mu) >= EM_THRESHOLD)
+            if(tau > 0 && fabs(mu - old_mu) >= EM_THRESHOLD)
             {
                 ok = 1;
             }
