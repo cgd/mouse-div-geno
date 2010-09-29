@@ -1,8 +1,8 @@
 plotSNP <- function(nm, ns, geno, vino, main = "", xlab = "Contrast", ylab = "Average Intensity") {
     plot(nm, ns, xlab = xlab, ylab = ylab, main = main)
-    points(nm[geno == 1], ns[geno == 1], col = 2) 			# red
-    points(nm[geno == 2], ns[geno == 2], col = 3) 			# green
-    points(nm[geno == 3], ns[geno == 3], col = 4) 			# blue
+    points(nm[geno == 1], ns[geno == 1], col = 2)           # red
+    points(nm[geno == 2], ns[geno == 2], col = 3)           # green
+    points(nm[geno == 3], ns[geno == 3], col = 4)           # blue
     points(nm[vino == 1], ns[vino == 1], pch = 19, col = 6) # filled point
 }
 
