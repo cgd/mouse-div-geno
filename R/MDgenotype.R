@@ -11,7 +11,7 @@
 mouseDivGenotype <- function(
     snpProbeInfo, snpInfo, referenceDistribution = NULL,
     transformMethod = c("CCStrans", "MAtrans"),
-    celFiles = expandCelFiles(getwd()),
+    celFiles = expandCelFiles(getwd()), confScoreThreshold = 1e-05,
     chromosomes = c(1:19, "X", "Y", "M"), cacheDir = tempdir(),
     retainCache = FALSE, verbose = FALSE, cluster = NULL,
     probesetChunkSize = 1000, processResultsFunction = NULL)
@@ -268,7 +268,8 @@ mouseDivGenotype <- function(
                     hint = chrHint[chunkRange],
                     parIndices = which(chrPAR[chunkRange]),
                     trans = transformMethod,
-                    isMale = isMale)
+                    isMale = isMale,
+                    confScoreThreshold = confScoreThreshold)
                 if(length(argLists) >= length(cluster) || chunkIndex == length(chrChunks[[chri]]))
                 {
                     # parallel apply using snow then reset the arg list
@@ -319,7 +320,8 @@ mouseDivGenotype <- function(
                     hint = chrHint[chunkRange],
                     parIndices = which(chrPAR[chunkRange]),
                     trans = transformMethod,
-                    isMale = isMale)
+                    isMale = isMale,
+                    confScoreThreshold = confScoreThreshold)
                 if(is.null(processResultsFunction))
                 {
                     # we only accumulate results if there is no function
@@ -424,5 +426,6 @@ mouseDivGenotype <- function(
         argList$hint,
         argList$parIndices,
         argList$trans,
-        argList$isMale)
+        argList$isMale,
+        argList$confScoreThreshold)
 }

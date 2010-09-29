@@ -49,24 +49,24 @@
     list(x = x, y = y)
 }
 
-.genotypeAnyChrChunk <- function(chr, ms, ss, hint, parIndices, trans, isMale)
+.genotypeAnyChrChunk <- function(chr, ms, ss, hint, parIndices, trans, isMale, confScoreThreshold)
 {
     if(chr == "X")
     {
-        .genotypeXChromosomeChunk(ms, ss, hint, parIndices, trans, isMale)
+        .genotypeXChromosomeChunk(ms, ss, hint, parIndices, trans, isMale, confScoreThreshold)
     }
     else if(chr == "Y")
     {
-        .genotypeYChromosomeChunk(ms, ss, hint, trans, isMale)
+        .genotypeYChromosomeChunk(ms, ss, hint, trans, isMale, confScoreThreshold)
     }
     else if(chr == "M")
     {
-        .genotypeHomozygousChunk(ms, ss, trans)
+        .genotypeHomozygousChunk(ms, ss, trans, confScoreThreshold)
     }
     else
     {
         # chr is an autosome
-        .genotypeChunk(ms, ss, hint, trans)
+        .genotypeChunk(ms, ss, hint, trans, confScoreThreshold)
     }
 }
 
@@ -74,7 +74,7 @@
 # columns map to arrays (CEL files). This function is useful for genotyping
 # autosomes and other sections of the genome where it is possible to have 3
 # genotyping outcomes. Otherwise use genotypeHomozygousChunk
-.genotypeChunk <- function(ms, ss, hint, trans)
+.genotypeChunk <- function(ms, ss, hint, trans, confScoreThreshold)
 {
     numArrays <- ncol(ms)
     numProbesets <- nrow(ms)
@@ -104,6 +104,11 @@
         chunkResult <- mapply(rbind, chunkResult, currVals, SIMPLIFY = FALSE)
     }
     
+    if(!is.na(confScoreThreshold) && !is.null(confScoreThreshold))
+    {
+        chunkResult$geno[chunkResult$conf < confScoreThreshold] <- -1
+    }
+    
     # TODO restore rownames and colnames to chunk result
     chunkResult
 }
@@ -112,7 +117,7 @@
 # columns map to arrays (CEL files). This function is useful for genotyping
 # the parts of the genome where you do not expect to observe heterozygous
 # alleles
-.genotypeHomozygousChunk <- function(ms, ss, trans)
+.genotypeHomozygousChunk <- function(ms, ss, trans, confScoreThreshold)
 {
     numArrays <- ncol(ms)
     numProbesets <- nrow(ms)
@@ -134,11 +139,16 @@
         chunkResult <- mapply(rbind, chunkResult, currVals, SIMPLIFY = FALSE)
     }
     
+    if(!is.na(confScoreThreshold) && !is.null(confScoreThreshold))
+    {
+        chunkResult$geno[chunkResult$conf < confScoreThreshold] <- -1
+    }
+    
     # TODO restore rownames to chunk result
     chunkResult
 }
 
-.genotypeXChromosomeChunk <- function(ms, ss, hint, parIndices, trans, isMale)
+.genotypeXChromosomeChunk <- function(ms, ss, hint, parIndices, trans, isMale, confScoreThreshold)
 {
     numArrays <- ncol(ms)
     numProbesets <- nrow(ms)
@@ -190,7 +200,8 @@
             normalFemaleMs,
             normalFemaleSs,
             normalHint,
-            trans)
+            trans,
+            confScoreThreshold)
         results <- initializeNamesIfMissing(results, names(normalFemaleResult))
         for(itemName in names(normalFemaleResult))
         {
@@ -208,7 +219,8 @@
         normalMaleResult <- .genotypeHomozygousChunk(
             normalMaleMs,
             normalMaleSs,
-            trans)
+            trans,
+            confScoreThreshold)
         results <- initializeNamesIfMissing(results, names(normalMaleResult))
         for(itemName in names(normalMaleResult))
         {
@@ -228,7 +240,8 @@
             parMs,
             parSs,
             parHint,
-            trans)
+            trans,
+            confScoreThreshold)
         results <- initializeNamesIfMissing(results, names(parResult))
         for(itemName in names(parResult))
         {
@@ -239,7 +252,7 @@
     results
 }
 
-.genotypeYChromosomeChunk <- function(ms, ss, hint, trans, isMale)
+.genotypeYChromosomeChunk <- function(ms, ss, hint, trans, isMale, confScoreThreshold)
 {
     numArrays <- ncol(ms)
     numProbesets <- nrow(ms)
@@ -253,7 +266,7 @@
     
     maleMs <- ms[, maleColumns, drop = FALSE]
     maleSs <- ss[, maleColumns, drop = FALSE]
-    maleResult <- .genotypeHomozygousChunk(maleMs, maleSs, trans)
+    maleResult <- .genotypeHomozygousChunk(maleMs, maleSs, trans, confScoreThreshold)
     
     # TODO using NA for invalid values here. make sure that's consistent with
     #      the rest of the code
