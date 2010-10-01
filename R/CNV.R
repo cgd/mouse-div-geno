@@ -193,6 +193,8 @@ buildPennCNVInputFiles <- function(
              ". In order to procede you can either set allowOverwrite to TRUE or ",
              "you can manually delete the files.")
     }
+    lrrAndBafOutputFiles <- as.list(lrrAndBafOutputFiles)
+    names(lrrAndBafOutputFiles) <- .fileBaseWithoutExtension(celFiles)
     
     pfbOutputFile <- file.path(outdir, "pfbdata.txt")
     if(!allowOverwrite && file.exists(pfbOutputFile))
@@ -202,11 +204,10 @@ buildPennCNVInputFiles <- function(
             "you can manually delete the files.")
     }
     
-    lrrAndBafConnections <- lapply(as.list(lrrAndBafOutputFiles), file, "wt")
-    names(lrrAndBafConnections) <- .fileBaseWithoutExtension(celFiles)
-    for(celName in names(lrrAndBafConnections))
+    # write the header row for LRR and BAF files
+    for(celName in names(lrrAndBafOutputFiles))
     {
-        con <- lrrAndBafConnections[[celName]]
+        con <- file(lrrAndBafOutputFiles[[celName]], "wt")
         header <- c(
             "Name",
             paste(celName, "B Allele Freq", sep = "."),
@@ -218,6 +219,7 @@ buildPennCNVInputFiles <- function(
             sep = "\t",
             row.names = FALSE,
             col.names = FALSE)
+        close(con)
     }
     
     pfbConnection <- file(pfbOutputFile, "wt")
@@ -275,7 +277,7 @@ buildPennCNVInputFiles <- function(
                 intensityConts = mMatrix,
                 intensityAvgs = sMatrix,
                 genotypes = chrGenos[chunkIndices, ],
-                lrrAndBafConnections = lrrAndBafConnections,
+                lrrAndBafOutputFiles = lrrAndBafOutputFiles,
                 pfbConnection = pfbConnection)
         }
     }
@@ -375,16 +377,11 @@ buildPennCNVInputFiles <- function(
             .appendToPennCNVForInvariants(
                 probesetInfo = chrInvariantProbesetInfo[chunkIndices, ],
                 probesetIntensities = intensityMatrix,
-                lrrAndBafConnections = lrrAndBafConnections,
+                lrrAndBafOutputFiles = lrrAndBafOutputFiles,
                 pfbConnection = pfbConnection)
         }
     }
     
-    # close all of the open connections
-    for(con in lrrAndBafConnections)
-    {
-        close(con)
-    }
     close(pfbConnection)
 }
 
@@ -397,19 +394,19 @@ buildPennCNVInputFiles <- function(
 #       following components: probesetId, chrId, positionBp
 #   probesetIntensities:
 #       the summerized intensities per-probeset
-#   lrrAndBafConnection:
-#       vector of connections to append to for LRR and BAF data (one connection
-#       per sample)
+#   lrrAndBafOutputFiles:
+#       vector of file names to append to for LRR and BAF data to (one
+#       file name per sample)
 #   pfbConnection:
 #       the connection to use for the PBF file.
 .appendToPennCNVForInvariants <- function(
     probesetInfo,
     probesetIntensities,
-    lrrAndBafConnections,
+    lrrAndBafOutputFiles,
     pfbConnection)
 {
     probesetCount <- nrow(probesetInfo)
-    sampleCount <- length(lrrAndBafConnections)
+    sampleCount <- length(lrrAndBafOutputFiles)
     
     if(!all(c("probesetId", "chrId", "positionBp") %in% names(probesetInfo)))
     {
@@ -417,11 +414,14 @@ buildPennCNVInputFiles <- function(
              "probesetId, chrId, positionBp")
     }
     
-    if(!all(sapply(lrrAndBafConnections, inherits, "connection")) ||
-       !inherits(pfbConnection, "connection"))
+    if(!inherits(pfbConnection, "connection"))
     {
-        stop("both lrrAndBafConnections and pfbConnection should inherit from ",
-             "the \"connection\" class")
+        stop("pfbConnection should inherit from the \"connection\" class")
+    }
+    
+    if(!all(sapply(lrrAndBafOutputFiles, inherits, "character")))
+    {
+        stop("all lrrAndBafOutputFiles should inherit from the \"character\" class")
     }
     
     # set all BAFs to 2 indicating that it's not a polymorphic probeset
@@ -430,13 +430,15 @@ buildPennCNVInputFiles <- function(
     
     for(sampleIndex in 1 : sampleCount)
     {
+        con <- file(lrrAndBafOutputFiles[[sampleIndex]], "at")
         write.table(
             data.frame(probesetInfo$probesetId, lrrs[, sampleIndex], bafs),
-            file = lrrAndBafConnections[[sampleIndex]],
+            file = con,
             quote = FALSE,
             sep = "\t",
             row.names = FALSE,
             col.names = FALSE)
+        close(con)
     }
     
     # write the PFB (Population frequency of B allele) file using mean BAF in
@@ -467,9 +469,9 @@ buildPennCNVInputFiles <- function(
 #   genotypes:
 #       a matrix of genotype codes which has a column per sample and a row
 #       per SNP
-#   lrrAndBafConnection:
-#       vector of connections to append to for LRR and BAF data (one connection
-#       per sample)
+#   lrrAndBafOutputFiles:
+#       vector of file names to append to for LRR and BAF data to (one
+#       file name per sample)
 #   pfbConnection:
 #       the connection to use for the PBF file.
 .appendToPennCNVForSNPs <- function(
@@ -477,18 +479,21 @@ buildPennCNVInputFiles <- function(
     intensityConts,
     intensityAvgs,
     genotypes,
-    lrrAndBafConnections,
+    lrrAndBafOutputFiles,
     pfbConnection)
 {
-    if(!all(sapply(lrrAndBafConnections, inherits, "connection")) ||
-       !inherits(pfbConnection, "connection"))
+    if(!inherits(pfbConnection, "connection"))
     {
-        stop("both lrrAndBafConnections and pfbConnection should inherit from ",
-            "the \"connection\" class")
+        stop("pfbConnection should inherit from the \"connection\" class")
+    }
+    
+    if(!all(sapply(lrrAndBafOutputFiles, inherits, "character")))
+    {
+        stop("all lrrAndBafOutputFiles should inherit from the \"character\" class")
     }
     
     snpCount <- nrow(snpInfo)
-    sampleCount <- length(lrrAndBafConnections)
+    sampleCount <- length(lrrAndBafOutputFiles)
     
     # preallocate BAF and LRR matrices for speed then calculate BAF and LRR for
     # each SNP
@@ -507,13 +512,15 @@ buildPennCNVInputFiles <- function(
     # write the LRR/BAF files per-sample
     for(sampleIndex in 1 : sampleCount)
     {
+        con <- file(lrrAndBafOutputFiles[[sampleIndex]], "at")
         write.table(
             data.frame(snpInfo$snpId, lrrs[, sampleIndex], bafs[, sampleIndex]),
-            file = lrrAndBafConnections[[sampleIndex]],
+            file = con,
             quote = FALSE,
             sep = "\t",
             row.names = FALSE,
             col.names = FALSE)
+        close(con)
     }
     
     # write the PFB (Population frequency of B allele) file using mean BAF in
