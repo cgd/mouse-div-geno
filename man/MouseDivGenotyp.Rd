@@ -36,7 +36,7 @@ mouseDivGenotype(
         \itemize{
             \item{\code{snpId}: the ID of this SNP}
             \item{\code{chrId}: the chromosome that this SNP belongs to. Like \dQuote{15} or \dQuote{X}}
-            \item{\code{snpHetHint} (optional): provides a hint for the normalized mean intensity of heterozygotes}
+            \item{\code{snpHetHint} (optional): provides a hint for the normalized mean intensity of heterozygous SNPs}
             \item{\code{isPAR} (optional): if \code{TRUE} this indicates that this SNP is in the pseudoautosomal region (PAR). This should only be set to \code{TRUE} for SNPs where \code{snpInfo$chrId == "X"}}
         }
     }
