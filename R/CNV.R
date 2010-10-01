@@ -1014,12 +1014,12 @@ simpleCNV <- function(
     a <- intensities / refIntensities
     m <- mean(a)
     
-    if(stdDev == NULL)
+    if(is.null(stdDev))
     {
         stdDev <- sqrt(var(a))
     }
     
-    if(th == NULL)
+    if(is.null(th))
     {
         th <- 2.58 * stdDev
     }
