@@ -799,6 +799,22 @@ buildPennCNVInputFiles <- function(
     chrIntensityList
 }
 
+# a little function to make sure that we turn any item which is not a list into
+# a list (which makes some algorithms more general/consistent)
+.listify <- function(x)
+{
+    if(is.na(x) || is.null(x))
+    {
+        x <- list()
+    }
+    else if(inherits(x, "data.frame") || !is.list(x))
+    {
+        x <- list(x)
+    }
+    
+    x
+}
+
 simpleCNV <- function(
     snpProbeInfo, snpInfo, snpReferenceDistribution = NULL,
     invariantProbeInfo, invariantProbesetInfo, invariantReferenceDistribution = NULL,
@@ -827,21 +843,50 @@ simpleCNV <- function(
             "components. Please see the help documentation for more details.")
     }
     
-    # validate invariant parameters
-    if(!inherits(invariantProbeInfo, "data.frame") ||
-        !all(c("probeIndex", "probesetId") %in% names(invariantProbeInfo)))
+    # make the invariant data all lists for consistency
+    invariantProbeInfo <- .listify(invariantProbeInfo)
+    invariantProbesetInfo <- .listify(invariantProbesetInfo)
+    invariantReferenceDistribution <- .listify(invariantReferenceDistribution)
+    if(length(invariantReferenceDistribution) == 0)
     {
-        stop("You must supply a \"invariantProbeInfo\" data frame parameter which has ",
-            "at a minimum the \"probeIndex\", and \"probesetId\" ",
-            "components. Please see the help documentation for more details.")
+        for(i in 1 : length(invariantProbeInfo))
+        {
+            invariantReferenceDistribution[[i]] <- NULL
+        }
     }
     
-    if(!inherits(invariantProbesetInfo, "data.frame") ||
-        !all(c("probesetId", "chrId", "positionBp") %in% names(invariantProbesetInfo)))
+    invariantGroupCount <- length(invariantProbeInfo)
+    if(invariantGroupCount != length(invariantProbesetInfo) ||
+       invariantGroupCount != length(invariantReferenceDistribution))
     {
-        stop("You must supply a \"invariantProbesetInfo\" data frame parameter which has ",
-            "at a minimum the \"probesetId\", \"chrId\" and \"positionBp\"",
-            "components. Please see the help documentation for more details.")
+        stop("there is a missmatch between the \"invariantProbeInfo\", ",
+            "\"invariantProbesetInfo\", \"invariantReferenceDistribution\"")
+    }
+    
+    for(i in 1 : invariantGroupCount)
+    {
+        if(!inherits(invariantProbeInfo[[i]], "data.frame") ||
+            !all(c("probeIndex", "probesetId") %in% names(invariantProbeInfo[[i]])))
+        {
+            stop("You must supply a \"invariantProbeInfo\" data frame parameter which has ",
+                "at a minimum the \"probeIndex\", and \"probesetId\" ",
+                "components. Please see the help documentation for more details.")
+        }
+        
+        if(!inherits(invariantProbesetInfo[[i]], "data.frame") ||
+            !all(c("probesetId", "chrId", "positionBp") %in% names(invariantProbesetInfo[[i]])))
+        {
+            stop("You must supply a \"invariantProbesetInfo\" data frame parameter which has ",
+                "at a minimum the \"probesetId\", \"chrId\" and \"positionBp\"",
+                "components. Please see the help documentation for more details.")
+        }
+        
+        if(!is.null(invariantReferenceDistribution[[i]]) &&
+            !is.numeric(invariantReferenceDistribution[[i]]))
+        {
+            stop("The \"invariantReferenceDistribution\" should either be ",
+                "numeric or NULL")
+        }
     }
     
     # if the user passes us a list (or data frame) rather than a vector of file
@@ -874,7 +919,9 @@ simpleCNV <- function(
     chromosomes <- intersect(chromosomes, snpChromosomes)
     rm(snpChromosomes)
     
-    invariantChromosomes <- unique(invariantProbesetInfo$chrId)
+    invariantChromosomes <- as.character(unique(unlist(
+            lapply(invariantProbesetInfo, function(x) {x$chrId}),
+            use.names=F)))
     if(!all(chromosomes %in% invariantChromosomes))
     {
         warning(
@@ -896,7 +943,7 @@ simpleCNV <- function(
     }
     
     # the reference intensities
-    refIntensities <- .normalizeForSimpleCNV(
+    refIntensities <- normalizeForSimpleCNV(
         referenceCelFile,
         chromosomes,
         snpProbeInfo, snpInfo, snpReferenceDistribution,
@@ -922,7 +969,7 @@ simpleCNV <- function(
         else
         {
             # normalizes intensities and sorts by position
-            currIntensities <- .normalizeForSimpleCNV(
+            currIntensities <- normalizeForSimpleCNV(
                 currCelFile,
                 chromosomes,
                 snpProbeInfo, snpInfo, snpReferenceDistribution,
@@ -1031,7 +1078,7 @@ simpleCNV <- function(
     estimatedCNVStates
 }
 
-.normalizeForSimpleCNV <- function(
+normalizeForSimpleCNV <- function(
     celFileName,
     chromosomes,
     snpProbeInfo, snpInfo, snpReferenceDistribution,
@@ -1040,22 +1087,28 @@ simpleCNV <- function(
 {
     if(verbose) cat("Reading and normalizing CEL file: ", celFileName, "\n", sep="")
     
+    invariantGroupCount <- length(invariantProbeInfo)
+    
     # extract log2(mean intensity) for each probe
     celData <- read.celfile(celFileName, intensity.means.only = TRUE)
     celData <- log2(as.matrix(celData[["INTENSITY"]][["MEAN"]]))
     
     # normalize invariants
-    invY <- celData[invariantProbeInfo$probeIndex, , drop = FALSE]
-    if(length(invariantProbeInfo$correction) > 0)
-        # C+G and fragment length correction for Y
-        invY <- invY + invariantProbeInfo$correction
-    if(length(invariantReferenceDistribution) > 0)
-        invY <- normalize.quantiles.use.target(invY, target = invariantReferenceDistribution)
-    
-    invY <- subColSummarizeMedian(matrix(invY, ncol = 1), invariantProbeInfo$probesetId)
-    
-    # "vectorize" invY
-    invY <- invY[ , 1, drop = TRUE]
+    invY <- list()
+    for(i in 1 : invariantGroupCount)
+    {
+        invY[[i]] <- celData[invariantProbeInfo[[i]]$probeIndex, , drop = FALSE]
+        if(length(invariantProbeInfo[[i]]$correction) > 0)
+            # C+G and fragment length correction for Y
+            invY[[i]] <- invY[[i]] + invariantProbeInfo[[i]]$correction
+        if(length(invariantReferenceDistribution[[i]]) > 0)
+            invY[[i]] <- normalize.quantiles.use.target(invY[[i]], target = invariantReferenceDistribution[[i]])
+        
+        invY[[i]] <- subColSummarizeMedian(matrix(invY[[i]], ncol = 1), invariantProbeInfo[[i]]$probesetId)
+        
+        # "vectorize" invY[[i]]
+        invY[[i]] <- invY[[i]][ , 1, drop = TRUE]
+    }
     
     # normalize SNPs
     snpY <- celData[snpProbeInfo$probeIndex, , drop = FALSE]
@@ -1091,24 +1144,19 @@ simpleCNV <- function(
     aGreaterProbeIndices <- which(snpProbeInfo$snpId[snpProbeInfo$isAAllele] %in% aGreaterIds)
     highProbeInt <- bProbeInt
     highProbeInt[aGreaterProbeIndices, ] <- aProbeInt[aGreaterProbeIndices, ]
-    #TODO pick a better name than invariantReferenceDistribution
-    highProbeInt <- normalize.quantiles.use.target(highProbeInt, target = invariantReferenceDistribution)
+    #TODO using invariantReferenceDistribution[[1]] here seems questionable
+    #     Hyuna's data uses the exact same ref distribution for the two classes
+    #     of invariants that we deal with. Investigate whether it's possible
+    #     for us to rely on this always being true (in which case
+    #     invariantReferenceDistribution could just be a single vector rather
+    #     than a list of vectors)
+    highProbeInt <- normalize.quantiles.use.target(highProbeInt, target = invariantReferenceDistribution[[1]])
     highSnpInt <- subColSummarizeMedian(
         matrix(highProbeInt, ncol = 1),
         snpProbeInfo$snpId[snpProbeInfo$isAAllele])
     
     # "vectorize" highSnpInt
     highSnpInt <- highSnpInt[ , 1, drop = TRUE]
-    
-    if(length(invariantProbesetInfo$probesetId) != length(invY))
-    {
-        stop("internal error: vector lengths should match but they do not")
-    }
-    
-    invIdOrdering <- match(invariantProbesetInfo$probesetId, names(invY))
-    if(any(is.na(invIdOrdering)))
-        stop("Failed to match up invariant probe IDs")
-    invY <- invY[invIdOrdering]
     
     if(length(snpInfo$snpId) != length(highSnpInt))
     {
@@ -1121,16 +1169,33 @@ simpleCNV <- function(
         stop("Failed to match up SNP probe IDs")
     highSnpInt <- highSnpInt[snpIdOrdering]
     
+    for(i in 1 : invariantGroupCount)
+    {
+        if(length(invariantProbesetInfo[[i]]$probesetId) != length(invY[[i]]))
+        {
+            stop("internal error: vector lengths should match but they do not")
+        }
+        
+        invIdOrdering <- match(invariantProbesetInfo[[i]]$probesetId, names(invY[[i]]))
+        if(any(is.na(invIdOrdering)))
+            stop("Failed to match up invariant probe IDs")
+        invY[[i]] <- invY[[i]][invIdOrdering]
+    }
+    
     combinedIntensities <- list()
     for(chr in chromosomes)
     {
         # combine the SNP and invariant intensities, then sort by position
-        chrInvIndices <- which(invariantProbesetInfo$chrId == chr)
+        chrInvInt <- NULL
+        chrInvPos <- NULL
+        for(i in 1 : invariantGroupCount)
+        {
+            chrInvIndices <- which(invariantProbesetInfo[[i]]$chrId == chr)
+            chrInvInt <- c(chrInvInt, invY[[i]][chrInvIndices])
+            chrInvPos <- c(chrInvPos, invariantProbesetInfo[[i]]$positionBp[chrInvIndices])
+        }
+        
         chrSnpIndices <- which(snpInfo$chrId == chr)
-        
-        chrInvInt <- invY[chrInvIndices]
-        chrInvPos <- invariantProbesetInfo$positionBp[chrInvIndices]
-        
         chrSnpInt <- highSnpInt[chrSnpIndices]
         chrSnpPos <- snpInfo$positionBp[chrSnpIndices]
         
