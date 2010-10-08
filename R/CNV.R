@@ -1032,8 +1032,7 @@ simpleCNV <- function(
     intensities,
     refIntensities,
     sameStateProb = 0.9999,
-    th = NULL,
-    stdDev = NULL)
+    th = 0.1)
 {
     library(HiddenMarkov)
     
@@ -1060,18 +1059,7 @@ simpleCNV <- function(
     
     a <- intensities / refIntensities
     m <- mean(a)
-    
-    if(is.null(stdDev))
-    {
-        stdDev <- sqrt(var(a))
-    }
-    
-    if(is.null(th))
-    {
-        th <- 2.58 * stdDev
-    }
-    
-    b <- dthmm(a, pi, delta, "norm", list(mean = c(m - th, m, m + th), sd = rep(stdDev, 3)))
+    b <- dthmm(a, pi, delta, "norm", list(mean = c(m - th, m, m + th), sd = rep(0.05, 3)))
     
     estimatedCNVStates <- Viterbi(b)
     names(estimatedCNVStates) <- names(intensities)
