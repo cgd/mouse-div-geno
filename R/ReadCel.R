@@ -104,7 +104,7 @@
         chunkResult <- mapply(rbind, chunkResult, currVals, SIMPLIFY = FALSE)
     }
     
-    if(!is.na(confScoreThreshold) && !is.null(confScoreThreshold))
+    if(confScoreThreshold > 0)
     {
         chunkResult$geno[chunkResult$conf < confScoreThreshold] <- -1
     }
@@ -139,7 +139,7 @@
         chunkResult <- mapply(rbind, chunkResult, currVals, SIMPLIFY = FALSE)
     }
     
-    if(!is.na(confScoreThreshold) && !is.null(confScoreThreshold))
+    if(confScoreThreshold > 0)
     {
         chunkResult$geno[chunkResult$conf < confScoreThreshold] <- -1
     }
