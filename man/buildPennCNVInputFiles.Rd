@@ -20,8 +20,17 @@ buildPennCNVInputFiles(
 
 \arguments{
     \item{outdir}{the directory to write PennCNV input files to}
-    \item{allowOverwrite}{determines if this function is allowed to overwrite exising PennCNV input}
-    \item{genotypes}{genotype data as returned by the mouseDivGenotype function}
+    
+    \item{allowOverwrite}{
+        determines if this function is allowed to overwrite exising PennCNV
+        input
+    }
+    
+    \item{genotypes}{
+        genotype data as returned by the mouseDivGenotype function
+        genotypes must match the order of the SNPs in snpProbeInfo
+    }
+    
     \item{snpProbeInfo}{
         A data-frame containing probe-level data for the SNPs we are performing CNV on.
         The data-frame should contain the following components:
@@ -43,11 +52,20 @@ buildPennCNVInputFiles(
             \item{\code{isPAR} (optional): if \code{TRUE} this indicates that this SNP is in the pseudoautosomal region (PAR). This should only be set to \code{TRUE} for SNPs where \code{snpInfo$chrId == "X"}}
         }
     }
-  \item{snpReferenceDistribution}{Reference distribution used for the quantile normalization. If there is an evidence that the density distribution of samples follows more than one distribution or different from that of classical laboratory strain, this normalization should not be used and leave as a default i.e. \code{referenceDistribution = NULL}.}
-  
+    
+    \item{snpReferenceDistribution}{
+        A numeric vector which is the reference distribution used for the
+        quantile normalization. If there is an evidence that the density
+        distribution of samples follows more than one distribution or different
+        from that of classical laboratory strain, this normalization should not
+        be used and leave as a default i.e. \code{referenceDistribution = NULL}.
+    }
+    
     \item{invariantProbeInfo}{
-        A data-frame containing probe-level data for the invariants we are performing CNV on.
-        The data-frame should contain the following components:
+        A data-frame containing probe-level data for the invariants we are
+        performing CNV on, or a list of data frames where each data frame in the
+        list represents an invariant group which should be normalized seperately
+        from the others. The data-frame should contain the following components:
         \itemize{
             \item{\code{probesetId}: the ID of the probeset that this probe belongs to. These IDs should correspond to the same component in the \code{invariantProbesetInfo} argument}
             \item{\code{probeIndex}: the index for the probe (used to get intensity data)}
@@ -55,7 +73,10 @@ buildPennCNVInputFiles(
         }
     }
     \item{invariantProbesetInfo}{
-        A data-frame containing probeset-level data for the invariants we are performing CNV on.
+        A data-frame containing probeset-level data for the invariants we are
+        performing CNV on, or a list of data frames where each data frame in the
+        list represents an invariant group which should be normalized seperately
+        from the others.
         The data-frame should contain the following components:
         \itemize{
             \item{\code{probesetId}: the ID of this probeset}
@@ -63,7 +84,12 @@ buildPennCNVInputFiles(
             \item{\code{positionBp}: the chromosome position in base pairs}
         }
     }
-  \item{invariantReferenceDistribution}{Reference distribution used for the quantile normalization.}
+    \item{invariantReferenceDistribution}{
+        A numeric vector which is the reference distribution used for the
+        quantile normalization, or a list of vectors where each data frame in
+        the list represents an invariant group which should be normalized
+        seperately from the others.
+    }
   \item{transformMethod}{The MouseDivGenotype package genotype the array based on contrast and summation, and offers two transformations to obtain contrast; CCS and MA transformation. CCS (contrast centers stretch) transformation proposed by BRLMM-P algorithm obtains contrast via asinh(K*(A-B)/(A+B))/asinh(K), where A and B is intensity of A and B allele and K is a hyperparameter. MA transformation obtains contrast by log2(A) - log2(B). In both cases summation is defined by (log2(A) + log2(B))/2}
   \item{celFiles}{the vector of CEL files to process}
   \item{chromosomes}{character vector of chromosome IDs that you want to CNV. These should correspond to the values in \code{snpInfo$chrId}. Eg: \code{chromosomes=c(1 : 19, "X", "Y", "M")}.}
