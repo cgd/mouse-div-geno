@@ -143,8 +143,8 @@ genotype <- function(nm, ns, hint1, trans) {
         }
         else {
             if (any(tgeno2 == -1))
-                # use vdist to give membership (TODO why divided by 5)
-                tgeno2 <- .vdist(adata[, 1], adata[, 2]/5, tgeno2)
+                # use vdist to give membership
+                tgeno2 <- .vdist(adata[, 1], adata[, 2] / 5, tgeno2)
             
             tscore2 <- silhouette(match(tgeno2[!rmid], unique(tgeno2[!rmid])), dist(nm[!rmid]))
             if(any(is.na(tscore2))) stop("Internal Error: silhouette score is NA")
@@ -241,7 +241,6 @@ genotype <- function(nm, ns, hint1, trans) {
 # Run the EM algorithm for 3 genotypes
 .em3Genos.using_r <- function(hint, nmSubset)
 {
-    # TODO ask hyuna why sigma is 0.1 for three genotypes and 0.01 for two
     otheta1 <- list(
         tau = c(1/3, 1/3, 1/3),
         mu1 = hint[1],
@@ -438,8 +437,7 @@ genotypeHomozygous <- function(nm, ns, trans) {
         }
         else {
             if (any(geno == -1))
-                # TODO why divided by 2?
-                geno <- .vdist(adata[, 1], adata[, 2]/2, geno)
+                geno <- .vdist(adata[, 1], adata[, 2] / 2, geno)
             keepthis <- tapply(nm, geno, mean)
             if (keepthis[1] > keepthis[2]) 
                 geno[geno == 2] <- 3

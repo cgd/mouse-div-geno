@@ -94,8 +94,7 @@
     chunkResult <- list(geno = NULL, vino = NULL, conf = NULL)
     for(probesetIndex in 1 : numProbesets)
     {
-        # TODO genotype sometimes returns results with colnames and sometimes
-        #      not. try to understand why this is happening
+        # TODO genotype sometimes returns results with colnames and sometimes not.
         currVals <- genotype(
             ms[probesetIndex, ],
             ss[probesetIndex, ],
@@ -188,7 +187,7 @@
     results <- list()
     
     # we can treat the females like autosomes for the purposes of genotyping
-    if(length(femaleColumns) >= 2) # TODO what if it is equal to 1? still OK i guess?
+    if(length(femaleColumns) >= 2) # TODO is this OK if it is equal to 1?
     {
         normalFemaleMs <- ms[normalIndices, femaleColumns, drop = FALSE]
         normalFemaleSs <- ss[normalIndices, femaleColumns, drop = FALSE]
@@ -211,7 +210,7 @@
     }
     
     # the non-PAR male probesets will get genotyped as homozygous
-    if(length(maleColumns) >= 2) # TODO what if it is equal to 1? what should we do then??
+    if(length(maleColumns) >= 2) # TODO is this OK if it is equal to 1?
     {
         normalMaleMs <- ms[normalIndices, maleColumns, drop = FALSE]
         normalMaleSs <- ss[normalIndices, maleColumns, drop = FALSE]
@@ -267,9 +266,6 @@
     maleMs <- ms[, maleColumns, drop = FALSE]
     maleSs <- ss[, maleColumns, drop = FALSE]
     maleResult <- .genotypeHomozygousChunk(maleMs, maleSs, trans, confScoreThreshold)
-    
-    # TODO using NA for invalid values here. make sure that's consistent with
-    #      the rest of the code
     
     # fill in the female columns using NA so that the dimensions of the
     # input data match the dimensions of the output data

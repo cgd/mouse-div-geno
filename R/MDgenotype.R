@@ -165,7 +165,6 @@ mouseDivGenotype <- function(
                     
                     if(currChr %in% allAutosomes)
                     {
-                        # TODO is as.double needed? (use is.double to check)
                         meanIntensityPerAutosome[currChr] <-
                             meanIntensityPerAutosome[currChr] + sum(as.double(sChunk))
                     }

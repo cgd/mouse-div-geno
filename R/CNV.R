@@ -1,6 +1,3 @@
-# TODO make sure it's well documented that the SNPs in "genotypes must match the
-#      order of the SNPs in snpProbeInfo (otherwise we should do something
-#      allowing for SNP IDs to be used... actually this is what we should do)
 buildPennCNVInputFiles <- function(
     outdir = getwd(), allowOverwrite = FALSE,
     genotypes, snpProbeInfo, snpInfo, snpReferenceDistribution = NULL,
@@ -334,7 +331,6 @@ buildPennCNVInputFiles <- function(
         {
             makeNormInvariantList <- function()
             {
-                #TODO remember to add invariantProbesetInfo !!!!!!!!!!!!!!!!!!!!!!!!!!!
                 .normalizeCelFileForInvariants(
                     celfile,
                     verbose,
