@@ -964,7 +964,7 @@ simpleCNV <- function(
     }
     
     # the reference intensities
-    refIntensities <- normalizeForSimpleCNV(
+    refIntensities <- .normalizeForSimpleCNV(
         referenceCelFile,
         chromosomes,
         snpProbeInfo, snpInfo, snpReferenceDistribution,
@@ -990,7 +990,7 @@ simpleCNV <- function(
         else
         {
             # normalizes intensities and sorts by position
-            currIntensities <- normalizeForSimpleCNV(
+            currIntensities <- .normalizeForSimpleCNV(
                 currCelFile,
                 chromosomes,
                 snpProbeInfo, snpInfo, snpReferenceDistribution,
@@ -1087,7 +1087,7 @@ simpleCNV <- function(
     estimatedCNVStates
 }
 
-normalizeForSimpleCNV <- function(
+.normalizeForSimpleCNV <- function(
     celFileName,
     chromosomes,
     snpProbeInfo, snpInfo, snpReferenceDistribution,
