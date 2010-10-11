@@ -557,7 +557,6 @@ buildPennCNVInputFiles <- function(
     
     medianContPerGeno <- numeric(uniqueGenoCount)
     medianAvgsPerGeno <- numeric(uniqueGenoCount)
-    contVariancePerGeno <- numeric(uniqueGenoCount)
     for(genoIndex in 1 : uniqueGenoCount)
     {
         genoCode <- uniqueGenos[genoIndex]
@@ -570,35 +569,13 @@ buildPennCNVInputFiles <- function(
         {
             medianContPerGeno[genoIndex] <- currIntensityConts
             medianAvgsPerGeno[genoIndex] <- currIntensityAvgs
-            
-            # there's no valid variance for the single-genotype case. So,
-            # we'll set it to NA for now and fix it later.
-            contVariancePerGeno[genoIndex] <- NA
         }
         else
         {
             medianContPerGeno[genoIndex] <- median(currIntensityConts)
             medianAvgsPerGeno[genoIndex] <- median(currIntensityAvgs)
-            contVariancePerGeno[genoIndex] <- .bivar(currIntensityConts)
         }
     }
-    
-    naVars <- is.na(contVariancePerGeno)
-    naVarIndices <- which(naVars)
-    validVarIndices <- which(!naVars)
-    
-    # the genotypes with only a single sample will be given the average
-    # variance of the other genotypes
-    averagedVariances <- sum(contVariancePerGeno[validVarIndices]) / length(validVarIndices)
-    contVariancePerGeno[naVarIndices] <- averagedVariances
-    
-    # shrink the variances toward the averaged variances
-    for(genoIndex in validVarIndices)
-    {
-        contVariancePerGeno[genoIndex] <-
-            0.5 * (averagedVariances + contVariancePerGeno[genoIndex])
-    }
-    contStdDevs <- sqrt(contVariancePerGeno)
     
     # all three genotypes should be represented
     if (uniqueGenoCount == 3) {
