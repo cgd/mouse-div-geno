@@ -618,8 +618,8 @@ buildPennCNVInputFiles <- function(
         # ----BB----AB-xx-AA----
         tmp <- intensityConts < medianContPerGeno[aaIndex] & intensityConts > medianContPerGeno[abIndex]
         if (any(tmp)) {
-            k1 <- (medianContPerGeno[aaIndex] - intensityConts[tmp])/contStdDevs[aaIndex]
-            k2 <- (intensityConts[tmp] - medianContPerGeno[abIndex])/contStdDevs[abIndex]
+            k1 <- medianContPerGeno[aaIndex] - intensityConts[tmp]
+            k2 <- intensityConts[tmp] - medianContPerGeno[abIndex]
             BAF[tmp] <- 0.5 * k1/(k1 + k2)
             LRR[tmp] <- log2(intensityAvgs[tmp]/((k2 * medianAvgsPerGeno[aaIndex] + k1 * medianAvgsPerGeno[abIndex])/(k1 + k2)))
         }
@@ -628,8 +628,8 @@ buildPennCNVInputFiles <- function(
         # ----BB-xxxAB----AA----
         tmp <- intensityConts <= medianContPerGeno[abIndex] & intensityConts > medianContPerGeno[bbIndex]
         if (any(tmp)) {
-            k1 <- (medianContPerGeno[abIndex] - intensityConts[tmp])/contStdDevs[abIndex]
-            k2 <- (intensityConts[tmp] - medianContPerGeno[bbIndex])/contStdDevs[bbIndex]
+            k1 <- medianContPerGeno[abIndex] - intensityConts[tmp]
+            k2 <- intensityConts[tmp] - medianContPerGeno[bbIndex]
             BAF[tmp] <- 0.5 + 0.5 * k1/(k1 + k2)
             LRR[tmp] <- log2(intensityAvgs[tmp]/((k2 * medianAvgsPerGeno[abIndex] + k1 * medianAvgsPerGeno[bbIndex])/(k1 + k2)))
         }
@@ -664,8 +664,8 @@ buildPennCNVInputFiles <- function(
             # ----BB-xxxABxxx-AA----
             tmp <- intensityConts < medianContPerGeno[aaIndex] & intensityConts > medianContPerGeno[bbIndex]
             if (any(tmp)) {
-                k1 <- (medianContPerGeno[aaIndex] - intensityConts[tmp])/contStdDevs[aaIndex]
-                k3 <- (intensityConts[tmp] - medianContPerGeno[bbIndex])/contStdDevs[bbIndex]
+                k1 <- medianContPerGeno[aaIndex] - intensityConts[tmp]
+                k3 <- intensityConts[tmp] - medianContPerGeno[bbIndex]
                 BAF[tmp] <- k1/(k1 + k3)
                 LRR[tmp] <- log2(intensityAvgs[tmp]/((k3 * medianAvgsPerGeno[aaIndex] + k1 * medianAvgsPerGeno[bbIndex])/(k1 + k3)))
             }
@@ -696,8 +696,8 @@ buildPennCNVInputFiles <- function(
             # ----BB-xx-AB----AA----
             tmp <- intensityConts < medianContPerGeno[abIndex] & intensityConts > medianContPerGeno[bbIndex]
             if (any(tmp)) {
-                k2 <- (medianContPerGeno[abIndex] - intensityConts[tmp])/contStdDevs[abIndex]
-                k3 <- (intensityConts[tmp] - medianContPerGeno[bbIndex])/contStdDevs[bbIndex]
+                k2 <- medianContPerGeno[abIndex] - intensityConts[tmp]
+                k3 <- intensityConts[tmp] - medianContPerGeno[bbIndex]
                 BAF[tmp] <- 0.5 + 0.5 * k2/(k2 + k3)
                 LRR[tmp] <- log2(intensityAvgs[tmp]/((k3 * medianAvgsPerGeno[abIndex] + k2 * medianAvgsPerGeno[bbIndex])/(k2 + k3)))
             }
@@ -728,8 +728,8 @@ buildPennCNVInputFiles <- function(
             # ----BB----AB-xx-AA----
             tmp <- intensityConts < medianContPerGeno[aaIndex] & intensityConts > medianContPerGeno[abIndex]
             if (any(tmp)) {
-                k1 <- (medianContPerGeno[aaIndex] - intensityConts[tmp])/contStdDevs[aaIndex]
-                k2 <- (intensityConts[tmp] - medianContPerGeno[abIndex])/contStdDevs[abIndex]
+                k1 <- medianContPerGeno[aaIndex] - intensityConts[tmp]
+                k2 <- intensityConts[tmp] - medianContPerGeno[abIndex]
                 BAF[tmp] <- 0.5 * k1/(k1 + k2)
                 LRR[tmp] <- log2(intensityAvgs[tmp]/((k1 * medianAvgsPerGeno[abIndex] + k2 * medianAvgsPerGeno[aaIndex])/(k1 + k2)))
             }
