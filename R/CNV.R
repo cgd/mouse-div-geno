@@ -34,21 +34,50 @@ buildPennCNVInputFiles <- function(
             "components. Please see the help documentation for more details.")
     }
     
-    # validate invariant parameters
-    if(!inherits(invariantProbeInfo, "data.frame") ||
-        !all(c("probeIndex", "probesetId") %in% names(invariantProbeInfo)))
+    # make the invariant data all lists for consistency
+    invariantProbeInfo <- .listify(invariantProbeInfo)
+    invariantProbesetInfo <- .listify(invariantProbesetInfo)
+    invariantReferenceDistribution <- .listify(invariantReferenceDistribution)
+    invariantGroupCount <- length(invariantProbeInfo)
+    if(length(invariantReferenceDistribution) == 0)
     {
-        stop("You must supply a \"invariantProbeInfo\" data frame parameter which has ",
-            "at a minimum the \"probeIndex\", and \"probesetId\" ",
-            "components. Please see the help documentation for more details.")
+        for(i in 1 : invariantGroupCount)
+        {
+            invariantReferenceDistribution[[i]] <- NULL
+        }
     }
     
-    if(!inherits(invariantProbesetInfo, "data.frame") ||
-        !all(c("probesetId", "chrId", "positionBp") %in% names(invariantProbesetInfo)))
+    if(invariantGroupCount != length(invariantProbesetInfo) ||
+       invariantGroupCount != length(invariantReferenceDistribution))
     {
-        stop("You must supply a \"invariantProbesetInfo\" data frame parameter which has ",
-            "at a minimum the \"probesetId\", \"chrId\" and \"positionBp\"",
-            "components. Please see the help documentation for more details.")
+        stop("there is a missmatch between the \"invariantProbeInfo\", ",
+            "\"invariantProbesetInfo\", \"invariantReferenceDistribution\"")
+    }
+    
+    for(i in 1 : invariantGroupCount)
+    {
+        if(!inherits(invariantProbeInfo[[i]], "data.frame") ||
+            !all(c("probeIndex", "probesetId") %in% names(invariantProbeInfo[[i]])))
+        {
+            stop("You must supply a \"invariantProbeInfo\" data frame parameter which has ",
+                "at a minimum the \"probeIndex\", and \"probesetId\" ",
+                "components. Please see the help documentation for more details.")
+        }
+        
+        if(!inherits(invariantProbesetInfo[[i]], "data.frame") ||
+            !all(c("probesetId", "chrId", "positionBp") %in% names(invariantProbesetInfo[[i]])))
+        {
+            stop("You must supply a \"invariantProbesetInfo\" data frame parameter which has ",
+                "at a minimum the \"probesetId\", \"chrId\" and \"positionBp\"",
+                "components. Please see the help documentation for more details.")
+        }
+        
+        if(!is.null(invariantReferenceDistribution[[i]]) &&
+            !is.numeric(invariantReferenceDistribution[[i]]))
+        {
+            stop("The \"invariantReferenceDistribution\" should either be ",
+                "numeric or NULL")
+        }
     }
     
     # if the user passes us a list (or data frame) rather than a vector of file
@@ -113,15 +142,19 @@ buildPennCNVInputFiles <- function(
     }
     snpChromosomes <- intersect(chromosomes, snpChromosomes)
     
-    invariantChromosomes <- unique(invariantProbesetInfo$chrId)
-    if(!all(chromosomes %in% invariantChromosomes))
+    invariantChromosomes <- list()
+    for(i in 1 : invariantGroupCount)
     {
-        warning(
-            "Invariant data for the following requested chromosomes are not available: ",
-            paste(setdiff(chromosomes, invariantChromosomes), collapse = ", "),
-            ". These chromosomes will be skipped.")
+        invariantChromosomes[[i]] <- unique(invariantProbesetInfo[[i]]$chrId)
+        if(!all(chromosomes %in% invariantChromosomes[[i]]))
+        {
+            warning(
+                "Invariant data for the following requested chromosomes are not available: ",
+                paste(setdiff(chromosomes, invariantChromosomes[[i]]), collapse = ", "),
+                ". These chromosomes will be skipped.")
+        }
+        invariantChromosomes[[i]] <- intersect(chromosomes, invariantChromosomes[[i]])
     }
-    invariantChromosomes <- unique(chromosomes, invariantChromosomes)
     rm(chromosomes)
     
     if(verbose)
@@ -287,98 +320,113 @@ buildPennCNVInputFiles <- function(
         cat("processing CEL files for invariant probes\n")
     }
     
-    invariantChrChunks <- list()
-    for(currChr in invariantChromosomes)
-    {
-        chrProbesetCount <- sum(invariantProbesetInfo$chrId == currChr)
-        invariantChrChunks[[currChr]] <- .chunkIndices(chrProbesetCount, probesetChunkSize)
-    }
-
     # append the invariant LRR/BAF values
-    for(celfile in celFiles)
+    for(i in 1 : invariantGroupCount)
     {
-        makeNormInvariantList <- function()
+        invariantChrChunks <- list()
+        for(currChr in invariantChromosomes[[i]])
         {
-            #TODO remember to add invariantProbesetInfo !!!!!!!!!!!!!!!!!!!!!!!!!!!
-            .normalizeCelFileForInvariants(
-                celfile,
-                verbose,
-                invariantProbeInfo,
-                invariantProbesetInfo,
-                invariantChromosomes,
-                invariantReferenceDistribution)
+            chrProbesetCount <- sum(invariantProbesetInfo[[i]]$chrId == currChr)
+            invariantChrChunks[[currChr]] <- .chunkIndices(chrProbesetCount, probesetChunkSize)
         }
-        normInvariantList <- NULL
         
-        for(currChr in invariantChromosomes)
+        for(celfile in celFiles)
         {
-            for(chunkIndex in 1 : length(invariantChrChunks[[currChr]]))
+            makeNormInvariantList <- function()
             {
-                chunkFile <- .chunkFileName(cacheDir, "invariant", celfile, currChr, probesetChunkSize, chunkIndex)
-                chunkFileAlreadyExists <- file.exists(chunkFile)
-                
-                if(!chunkFileAlreadyExists)
+                #TODO remember to add invariantProbesetInfo !!!!!!!!!!!!!!!!!!!!!!!!!!!
+                .normalizeCelFileForInvariants(
+                    celfile,
+                    verbose,
+                    invariantProbeInfo[[i]],
+                    invariantProbesetInfo[[i]],
+                    invariantChromosomes[[i]],
+                    invariantReferenceDistribution[[i]])
+            }
+            normInvariantList <- NULL
+            
+            for(currChr in invariantChromosomes[[i]])
+            {
+                for(chunkIndex in 1 : length(invariantChrChunks[[currChr]]))
                 {
-                    # if we haven't yet normalized the CEL file we'll have to
-                    # do that now
-                    if(is.null(normInvariantList))
+                    chunkFile <- .chunkFileName(
+                        cacheDir,
+                        paste("invariant", i, sep = ""),
+                        celfile,
+                        currChr,
+                        probesetChunkSize,
+                        chunkIndex)
+                    chunkFileAlreadyExists <- file.exists(chunkFile)
+                    
+                    if(!chunkFileAlreadyExists)
                     {
-                        normInvariantList <- makeNormInvariantList()
+                        # if we haven't yet normalized the CEL file we'll have to
+                        # do that now
+                        if(is.null(normInvariantList))
+                        {
+                            normInvariantList <- makeNormInvariantList()
+                        }
+                        
+                        chunk <- invariantChrChunks[[currChr]][[chunkIndex]]
+                        probesetIndices <- chunk$start : chunk$end
+                        intensityChunk <- normInvariantList[[currChr]][probesetIndices]
+                        
+                        save(intensityChunk = intensityChunk, file = chunkFile)
                     }
-                    
-                    chunk <- invariantChrChunks[[currChr]][[chunkIndex]]
-                    probesetIndices <- chunk$start : chunk$end
-                    intensityChunk <- normInvariantList[[currChr]][probesetIndices]
-                    
-                    save(intensityChunk = intensityChunk, file = chunkFile)
                 }
             }
+            
+            rm(normInvariantList)
         }
         
-        rm(normInvariantList)
-    }
-    
-    if(verbose)
-    {
-        cat("generating PennCNV input for invariant probes\n")
-    }
-    
-    for(currChr in invariantChromosomes)
-    {
-        chrInvariantProbesetInfo <- invariantProbesetInfo[invariantProbesetInfo$chrId == currChr, ]
-        
-        if(currChr %in% names(chromosomeRenameMap))
+        if(verbose)
         {
-            chrRename <- chromosomeRenameMap[[currChr]]
-            chrInvariantProbesetInfo$chrId <- rep(as.character(chrRename), length(chrInvariantProbesetInfo$chrId))
+            cat("generating PennCNV input for invariant probes\n")
         }
         
-        for(chunkIndex in 1 : length(invariantChrChunks[[currChr]]))
+        for(currChr in invariantChromosomes[[i]])
         {
-            chunk <- invariantChrChunks[[currChr]][[chunkIndex]]
-            chunkIndices <- chunk$start : chunk$end
-            chunkSize <- 1 + chunk$end - chunk$start
+            chrInvariantProbesetInfo <- invariantProbesetInfo[[i]][invariantProbesetInfo[[i]]$chrId == currChr, ]
             
-            # pre-allocate intensity matrix
-            intensityMatrix <- matrix(0, nrow = chunkSize, ncol = length(celFiles))
-            
-            # stitch together the intensity chunks
-            for(fileIndex in 1 : length(celFiles))
+            if(currChr %in% names(chromosomeRenameMap))
             {
-                celfile <- celFiles[fileIndex]
-                
-                # loads intensityChunk into scope
-                chunkFile <- .chunkFileName(cacheDir, "invariant", celfile, currChr, probesetChunkSize, chunkIndex)
-                load(chunkFile)
-                
-                intensityMatrix[, fileIndex] <- intensityChunk
+                chrRename <- chromosomeRenameMap[[currChr]]
+                chrInvariantProbesetInfo$chrId <- rep(as.character(chrRename), length(chrInvariantProbesetInfo$chrId))
             }
             
-            .appendToPennCNVForInvariants(
-                probesetInfo = chrInvariantProbesetInfo[chunkIndices, ],
-                probesetIntensities = intensityMatrix,
-                lrrAndBafOutputFiles = lrrAndBafOutputFiles,
-                pfbConnection = pfbConnection)
+            for(chunkIndex in 1 : length(invariantChrChunks[[currChr]]))
+            {
+                chunk <- invariantChrChunks[[currChr]][[chunkIndex]]
+                chunkIndices <- chunk$start : chunk$end
+                chunkSize <- 1 + chunk$end - chunk$start
+                
+                # pre-allocate intensity matrix
+                intensityMatrix <- matrix(0, nrow = chunkSize, ncol = length(celFiles))
+                
+                # stitch together the intensity chunks
+                for(fileIndex in 1 : length(celFiles))
+                {
+                    celfile <- celFiles[fileIndex]
+                    
+                    # loads intensityChunk into scope
+                    chunkFile <- .chunkFileName(
+                        cacheDir,
+                        paste("invariant", i, sep = ""),
+                        celfile,
+                        currChr,
+                        probesetChunkSize,
+                        chunkIndex)
+                    load(chunkFile)
+                    
+                    intensityMatrix[, fileIndex] <- intensityChunk
+                }
+                
+                .appendToPennCNVForInvariants(
+                    probesetInfo = chrInvariantProbesetInfo[chunkIndices, ],
+                    probesetIntensities = intensityMatrix,
+                    lrrAndBafOutputFiles = lrrAndBafOutputFiles,
+                    pfbConnection = pfbConnection)
+            }
         }
     }
     
@@ -824,15 +872,15 @@ simpleCNV <- function(
     invariantProbeInfo <- .listify(invariantProbeInfo)
     invariantProbesetInfo <- .listify(invariantProbesetInfo)
     invariantReferenceDistribution <- .listify(invariantReferenceDistribution)
+    invariantGroupCount <- length(invariantProbeInfo)
     if(length(invariantReferenceDistribution) == 0)
     {
-        for(i in 1 : length(invariantProbeInfo))
+        for(i in 1 : invariantGroupCount)
         {
             invariantReferenceDistribution[[i]] <- NULL
         }
     }
     
-    invariantGroupCount <- length(invariantProbeInfo)
     if(invariantGroupCount != length(invariantProbesetInfo) ||
        invariantGroupCount != length(invariantReferenceDistribution))
     {
