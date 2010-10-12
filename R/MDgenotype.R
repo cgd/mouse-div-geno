@@ -85,7 +85,7 @@ mouseDivGenotype <- function(
     
     # we must infer gender if we don't yet have it and we need to
     # genotype either sex chromosome
-    genderInferenceRequired <- is.null(isMale) && any(c("X", "Y") %in% chromosomes)
+    genderInferenceRequired <- is.null(isMale)
     if(genderInferenceRequired)
     {
         # in order to be able to infer gender we'll need per-array
@@ -411,6 +411,7 @@ mouseDivGenotype <- function(
         }
     }
     
+    results$isMale <- isMale
     results
 }
 

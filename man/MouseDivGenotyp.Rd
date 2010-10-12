@@ -69,6 +69,7 @@ mouseDivGenotype(
     \item{geno}{a matrix with a row per SNP and a column per CEL file. -1 = No call, 1 = AA, 2 = AB, and 3 = BB}
     \item{vino}{a matrix with a row per SNP and a column per CEL file. 1 indicates VINO, any other value indicates no-VINO}
     \item{conf}{a matrix with a row per SNP and a column per CEL file. These values are confidence scores based on Mohalanobis distance with chi-squre distribution approximation. Smaller confidence score implies less reliable data.}
+    \item{isMale}{A per-CEL-file vector of logicals indicating which were genotyped as male. If gender was supplied via the CEL files parameter then this value will match that otherwise it will be the inferred gender values.}
 }
 
 \examples{
