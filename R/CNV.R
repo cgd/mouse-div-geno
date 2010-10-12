@@ -240,8 +240,8 @@ buildPennCNVInputFiles <- function(
         con <- file(lrrAndBafOutputFiles[[celName]], "wt")
         header <- c(
             "Name",
-            paste(celName, "B Allele Freq", sep = "."),
-            paste(celName, "Log R Ratio", sep = "."))
+            paste(celName, "Log R Ratio", sep = "."),
+            paste(celName, "B Allele Freq", sep = "."))
         write.table(
             matrix(header, nrow = 1),
             file = con,
