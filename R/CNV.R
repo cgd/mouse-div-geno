@@ -593,6 +593,15 @@ buildPennCNVInputFiles <- function(
 #   components. The row count of this dataframe will equal length(genos)
 .calcLRRAndBAF <- function(intensityConts, intensityAvgs, genos)
 {
+    # remove the NA's and -1's genotypes first
+    validGenos <- sapply(genos, function(geno) {!is.na(geno) && geno != -1})
+    if(!all(validGenos))
+    {
+        intensityConts <- intensityConts[validGenos]
+        intensityAvgs <- intensityAvgs[validGenos]
+        genos <- genos[validGenos]
+    }
+    
     sampleCount <- length(genos)
     uniqueGenos <- sort(unique(genos))
     uniqueGenoCount <- length(uniqueGenos)
@@ -784,6 +793,18 @@ buildPennCNVInputFiles <- function(
             BAF <- rep(1, sampleCount)
             LRR <- log2(intensityAvgs/medianAvgsPerGeno)
         }
+    }
+    
+    # fill in 0's for the NA's and -1's genotypes
+    if(!all(validGenos))
+    {
+        newBAF <- rep(0, length(validGenos))
+        newBAF[validGenos] <- BAF
+        BAF <- newBAF
+        
+        newLRR <- rep(0, length(validGenos))
+        newLRR[validGenos] <- LRR
+        LRR <- newLRR
     }
     
     data.frame(BAF = BAF, LRR = LRR)
