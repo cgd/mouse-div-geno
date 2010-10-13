@@ -31,6 +31,29 @@ buildPennCNVInputFiles <- function(
             "components. Please see the help documentation for more details.")
     }
     
+    # if we have a list (or data frame) pull out the file names and gender info
+    # if it's in there
+    isMale <- NULL
+    if(is.list(celFiles))
+    {
+        if(!("fileName" %in% names(celFiles)))
+        {
+            stop("failed to find \"fileName\" component in the \"celFiles\" list")
+        }
+        
+        if("isMale" %in% names(celFiles))
+        {
+            isMale <- celFiles$isMale
+        }
+        celFiles <- celFiles$fileName
+    }
+    
+    # if all are the same sex there is no need to separate
+    if(!is.null(isMale) && (all(isMale) || !any(isMale)))
+    {
+        isMale <- NULL
+    }
+    
     # make the invariant data all lists for consistency
     invariantProbeInfo <- .listify(invariantProbeInfo)
     invariantProbesetInfo <- .listify(invariantProbesetInfo)
@@ -307,6 +330,7 @@ buildPennCNVInputFiles <- function(
                 intensityConts = mMatrix,
                 intensityAvgs = sMatrix,
                 genotypes = chrGenos[chunkIndices, ],
+                isMale = if(currChr == "X") isMale else NULL,
                 lrrAndBafOutputFiles = lrrAndBafOutputFiles,
                 pfbConnection = pfbConnection)
         }
@@ -513,6 +537,9 @@ buildPennCNVInputFiles <- function(
 #   genotypes:
 #       a matrix of genotype codes which has a column per sample and a row
 #       per SNP
+#   isMale:
+#       if non NULL this vector is used to partition the samples into different
+#       two different groups for LRR and BAF calculation
 #   lrrAndBafOutputFiles:
 #       vector of file names to append to for LRR and BAF data to (one
 #       file name per sample)
@@ -523,6 +550,7 @@ buildPennCNVInputFiles <- function(
     intensityConts,
     intensityAvgs,
     genotypes,
+    isMale,
     lrrAndBafOutputFiles,
     pfbConnection)
 {
@@ -543,14 +571,38 @@ buildPennCNVInputFiles <- function(
     # each SNP
     bafs <- matrix(0.0, nrow = snpCount, ncol = sampleCount)
     lrrs <- matrix(0.0, nrow = snpCount, ncol = sampleCount)
-    for(snpIndex in 1 : snpCount)
+    if(is.null(isMale))
     {
-        bafAndLrr <- .calcLRRAndBAF(
-            intensityConts[snpIndex, ],
-            intensityAvgs[snpIndex, ],
-            genotypes[snpIndex, ])
-        bafs[snpIndex, ] <- bafAndLrr$BAF
-        lrrs[snpIndex, ] <- bafAndLrr$LRR
+        for(snpIndex in 1 : snpCount)
+        {
+            # calc BAF and LRR for all samples together
+            bafAndLrr <- .calcLRRAndBAF(
+                intensityConts[snpIndex, ],
+                intensityAvgs[snpIndex, ],
+                genotypes[snpIndex, ])
+            bafs[snpIndex, ] <- bafAndLrr$BAF
+            lrrs[snpIndex, ] <- bafAndLrr$LRR
+        }
+    }
+    else
+    {
+        for(snpIndex in 1 : snpCount)
+        {
+            # calc BAF and LRR for male and female samples seperately
+            bafAndLrr <- .calcLRRAndBAF(
+                intensityConts[snpIndex, isMale],
+                intensityAvgs[snpIndex, isMale],
+                genotypes[snpIndex, isMale])
+            bafs[snpIndex, isMale] <- bafAndLrr$BAF
+            lrrs[snpIndex, isMale] <- bafAndLrr$LRR
+            
+            bafAndLrr <- .calcLRRAndBAF(
+                intensityConts[snpIndex, !isMale],
+                intensityAvgs[snpIndex, !isMale],
+                genotypes[snpIndex, !isMale])
+            bafs[snpIndex, !isMale] <- bafAndLrr$BAF
+            lrrs[snpIndex, !isMale] <- bafAndLrr$LRR
+        }
     }
     
     # write the LRR/BAF files per-sample
