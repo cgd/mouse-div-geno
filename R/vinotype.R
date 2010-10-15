@@ -211,5 +211,7 @@ vinotype <- function(nm, ns, geno) {
         vino <- .vdist(nm/5, ns/(2 * (max(ns) - min(ns))), vino)
     }
     
+    vino[vino != 1] <- 0
+    
     list(vino = vino, conf = 1 - mdd)
 }
