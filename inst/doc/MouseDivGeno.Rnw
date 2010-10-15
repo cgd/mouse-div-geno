@@ -30,13 +30,9 @@ First we need to load some data into scope which will give us probe and probeset
 level information about the Mouse Diversity Array platform that we are going
 to use for genotyping. You can obtain this data from (TODO: add link here)
 
-<<echo=FALSE>>=
-setwd("../..")
-@
-
 %<<keep.source = TRUE>>=
 <<keep.source = TRUE, eval=FALSE>>=
-load("MouseDivData.RData")
+load("../../../MouseDivData.RData")
 ls()
 @
 
@@ -80,7 +76,7 @@ genoVinoResult <- mouseDivGenotype(
     referenceDistribution   = snpReferenceDistribution,
     transformMethod         = "CCStrans",
     chromosomes             = c(19, "X", "Y", "M"),
-    celFiles                = expandCelFiles("celFiles"),
+    celFiles                = expandCelFiles("../../../celFiles"),
     confScoreThreshold      = 0,
     cluster                 = cl,
     probesetChunkSize       = 3000)
@@ -130,14 +126,14 @@ In order to generate the LRR and BAF files we can construct a command like:
 %<<keep.source = TRUE, results = hide>>=
 <<keep.source = TRUE, eval=FALSE>>=
 library("MouseDivGeno")
-dir.create("lrr-baf-output")
+dir.create("../../../lrr-baf-output")
 
 celfiles <- data.frame(
-    fileName = expandCelFiles("celFiles"),
+    fileName = expandCelFiles("../../../celFiles"),
     isMale = genoVinoResult$isMale,
     stringsAsFactors = FALSE)
 buildPennCNVInputFiles(
-    outdir                          = "lrr-baf-output",
+    outdir                          = "../../../lrr-baf-output",
     allowOverwrite                  = TRUE,
     genotypes                       = genoVinoResult$geno,
     snpProbeInfo                    = snpProbeInfo,
@@ -171,8 +167,8 @@ simpleCNVResult <- simpleCNV(
     invariantProbeInfo              = invariantProbeInfo,
     invariantProbesetInfo           = invariantProbesetInfo,
     invariantReferenceDistribution  = invariantReferenceDistribution,
-    celFiles                        = expandCelFiles("celFiles"),
-    referenceCelFile                = "celFiles/SNP_mDIV_A7-7_081308.CEL",
+    celFiles                        = expandCelFiles("../../../celFiles"),
+    referenceCelFile                = "../../../celFiles/SNP_mDIV_A7-7_081308.CEL",
     chromosomes                     = c("19"))
 @
 
