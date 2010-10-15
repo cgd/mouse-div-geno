@@ -18,13 +18,13 @@ options(keep.source = TRUE, width = 60)
 This package can be used to
 
 \begin{itemize}
-\item genotype MouseDiversity CEL files
+\item genotype Mouse Diversity Array CEL files
 \item generate LRR and BAF output from CEL files which is suitable as input for
     the PennCNV program
 \item generate CNV calls using our simpleCNV function
 \end{itemize}
 
-\section{Genotyping}
+\section{Genotyping and Vinotyping}
 
 First we need to load some data into scope which will give us probe and probeset
 level information about the Mouse Diversity Array platform that we are going
@@ -34,41 +34,164 @@ to use for genotyping. You can obtain this data from (TODO: add link here)
 setwd("../..")
 @
 
-<<>>=
+%<<keep.source = TRUE>>=
+<<keep.source = TRUE, eval=FALSE>>=
 load("MouseDivData.RData")
 ls()
 @
 
-For the purposes of genotyping we only care about the "snp" data so let's take
+For the purposes of genotyping we only care about the "snp" data so we will take
 a close look at these objects.
 
 \begin{itemize}
-\item snpProbeInfo: this data frame contains all of the probe-level information
+\item \verb#snpProbeInfo#: this data frame contains all of the probe-level information
 about snp probes in the mouse diversity platform:
-<<>>=
+%<<keep.source = TRUE>>=
+<<keep.source = TRUE, eval=FALSE>>=
 snpProbeInfo[1 : 2, ]
 @ 
-\item snpInfo: this data frame contains SNP-level information:
-<<>>=
+\item \verb#snpInfo#: this data frame contains SNP-level information:
+%<<keep.source = TRUE>>=
+<<keep.source = TRUE, eval=FALSE>>=
 snpInfo[1 : 2, ]
 @
-\item snpReferenceDistribution: a numeric vector which is the reference
+\item \verb#snpReferenceDistribution#: a numeric vector which is the reference
 distribution used for the quantile normalization of SNP intensities
 \end{itemize}
 
 Now we're ready to genotype our CEL files. To do this we will use the
-mouseDivGenotype function. By default the mouseDivGenotype function will
+\verb#mouseDivGenotype(...)# function. By default the \verb#mouseDivGenotype(...)# function will
 run in serial (ie. it will only use a single CPU core), however you can use the
 SNOW package in order to run in parallel. The following example will use
-the SNOW package to run the genotyping code on two cores:
+the SNOW package to run the genotyping code on two cores, but you can of course
+remove all of the SNOW/cluster code and the example will produce the same
+result:
+
+%<<keep.source = TRUE, results=hide>>=
+<<keep.source = TRUE, eval=FALSE>>=
+library("MouseDivGeno")
+library("snow")
+numCores <- 2
+cl <- makeSOCKcluster(rep("localhost", numCores))
+clusterEvalQ(cl, library("MouseDivGeno"))
+genoVinoResult <- mouseDivGenotype(
+    snpProbeInfo            = snpProbeInfo,
+    snpInfo                 = snpInfo,
+    referenceDistribution   = snpReferenceDistribution,
+    transformMethod         = "CCStrans",
+    chromosomes             = c(19, "X", "Y", "M"),
+    celFiles                = expandCelFiles("celFiles"),
+    confScoreThreshold      = 0,
+    cluster                 = cl,
+    probesetChunkSize       = 3000)
+stopCluster(cl)
+@
+
+The \verb#genoVinoResult# object contains the genotype calls, vinotype calls and
+confidence values for every SNP along with an isMale vector which indicates for
+each CEL file whether the sample was inferred as male or female (the
+\verb#mouseDivGenotype(...)# documentation shows how you can provide gender information
+using the \verb#celFiles# argument if you know it a priori). Here is a small subset
+of the output to give you an idea of what it looks like:
+
+%<<keep.source = TRUE>>=
+<<keep.source = TRUE, eval=FALSE>>=
+genoVinoResult$geno[1 : 2, 10 : 12]
+genoVinoResult$vino[1 : 2, 10 : 12]
+genoVinoResult$conf[1 : 2, 10 : 12]
+genoVinoResult$conf[1 : 2, 10 : 12]
+genoVinoResult$isMale[10 : 12]
+@
 
 \section{Generating LRR and BAF for PennCNV}
 
-TODO text here
+We will use the genotype data that we generated above along with the SNP and
+invariant data that we have already loaded in order to calculate LRR and BAF
+values. Before we start let's take a look at what is in the invariant data. One
+thing that you'll notice right away is that the invariant data types are lists
+of data frames rather than simple data frames. The reason for doing this is so
+that we could segregate the exons into two groups based on quality metrics and
+normalize them separately rather than normalizing them as a single group:
+
+%<<keep.source = TRUE>>=
+<<keep.source = TRUE, eval=FALSE>>=
+lapply(invariantProbeInfo, dim)
+lapply(invariantProbeInfo, function(x) x[1 : 2, ])
+lapply(invariantProbesetInfo, dim)
+lapply(invariantProbesetInfo, function(x) x[1 : 2, ])
+lapply(invariantReferenceDistribution, length)
+@
+
+See the documentation for \verb#buildPennCNVInputFiles(...)# for a more detailed
+explaination of these input parameters.
+
+In order to generate the LRR and BAF files we can construct a command like:
+
+%<<keep.source = TRUE, results = hide>>=
+<<keep.source = TRUE, eval=FALSE>>=
+library("MouseDivGeno")
+dir.create("lrr-baf-output")
+
+celfiles <- data.frame(
+    fileName = expandCelFiles("celFiles"),
+    isMale = genoVinoResult$isMale,
+    stringsAsFactors = FALSE)
+buildPennCNVInputFiles(
+    outdir                          = "lrr-baf-output",
+    allowOverwrite                  = TRUE,
+    genotypes                       = genoVinoResult$geno,
+    snpProbeInfo                    = snpProbeInfo,
+    snpInfo                         = snpInfo,
+    snpReferenceDistribution        = snpReferenceDistribution,
+    invariantProbeInfo              = invariantProbeInfo,
+    invariantProbesetInfo           = invariantProbesetInfo,
+    invariantReferenceDistribution  = invariantReferenceDistribution,
+    transformMethod                 = "CCStrans",
+    celFiles                        = celfiles,
+    chromosomes                     = c("19", "X", "Y", "M"),
+    probesetChunkSize               = 3000)
+@
+
+When this command completes successfully the \verb#lrr-baf-output# directory should
+contain the resulting LRR/BAF files along with a single \verb#pfbdata.txt# file.
 
 \section{Simple CNV}
 
-TODO text here
+The \verb#simpleCNV(...)# function provides a simplified and fully self-contained way to
+call CNVs. In order to do this you must choose one CEL file to represent the
+"reference" that CNV calls will be made against:
+
+%<<keep.source = TRUE>>=
+<<keep.source = TRUE, eval=FALSE>>=
+library("MouseDivGeno")
+simpleCNVResult <- simpleCNV(
+    snpProbeInfo                    = snpProbeInfo,
+    snpInfo                         = snpInfo,
+    snpReferenceDistribution        = snpReferenceDistribution,
+    invariantProbeInfo              = invariantProbeInfo,
+    invariantProbesetInfo           = invariantProbesetInfo,
+    invariantReferenceDistribution  = invariantReferenceDistribution,
+    celFiles                        = expandCelFiles("celFiles"),
+    referenceCelFile                = "celFiles/SNP_mDIV_A7-7_081308.CEL",
+    chromosomes                     = c("19"))
+@
+
+Now that we have calculated the CNVs for chromosome 19 we can ask questions
+like:
+
+"Over all samples what percent of SNPs and invariants did we call as a CNV?"
+
+%<<keep.source = TRUE>>=
+<<keep.source = TRUE, eval=FALSE>>=
+sum(simpleCNVResult$`19` != 2) / length(simpleCNVResult$`19`)
+@
+
+and, "Which probesets did we call as CNVs for sample \verb#SNP_mDIV_B4-15_081308#?"
+
+%<<keep.source = TRUE>>=
+<<keep.source = TRUE, eval=FALSE>>=
+which(simpleCNVResult$`19`[, "SNP_mDIV_B4-15_081308"] != 2)
+@
 
 % TODO: include a real bibliography. The following is just an example
 %       bibliography
