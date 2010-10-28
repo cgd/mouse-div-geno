@@ -95,7 +95,6 @@ of the output to give you an idea of what it looks like:
 genoVinoResult$geno[1 : 2, 10 : 12]
 genoVinoResult$vino[1 : 2, 10 : 12]
 genoVinoResult$conf[1 : 2, 10 : 12]
-genoVinoResult$conf[1 : 2, 10 : 12]
 genoVinoResult$isMale[10 : 12]
 @
 
