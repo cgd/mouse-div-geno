@@ -7,7 +7,7 @@
 # geno : genotype obtained from genotype() function. 1 = AA, 2 = AB, 3 = BB
 #
 # output :
-# vino : 1 = vino 2 and 0 non vino (0 and 2 are space holder, and do not have any meaning)
+# vino : 1 indicates vino (all others should be zero)
 # <example>
 # load('MM'); load('SS');
 # nm = MM[1,]; ns = SS[1,]
