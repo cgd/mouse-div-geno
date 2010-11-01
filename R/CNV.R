@@ -916,7 +916,8 @@ simpleCNV <- function(
     referenceCelFile,
     chromosomes = c(1:19, "X", "Y", "M"),
     verbose = FALSE,
-    cluster = NULL)
+    cluster = NULL,
+    summaryOutputFile = NULL)
 {
     snpCount <- nrow(snpInfo)
     
@@ -936,6 +937,8 @@ simpleCNV <- function(
             "at a minimum the \"snpId\", \"chrId\" and \"positionBp\"",
             "components. Please see the help documentation for more details.")
     }
+    combinedInfo <- cbind(snpInfo[, c("snpId", "chrId", "positionBp")], 0)
+    colnames(combinedInfo) <- c("ID", "chrId", "positionBp", "type")
     
     # make the invariant data all lists for consistency
     invariantProbeInfo <- .listify(invariantProbeInfo)
@@ -957,10 +960,38 @@ simpleCNV <- function(
             "\"invariantProbesetInfo\", \"invariantReferenceDistribution\"")
     }
     
+    # initialize the summary output
+    if(!is.null(summaryOutputFile))
+    {
+        if(is.character(summaryOutputFile))
+        {
+            summaryOutputFile <- file(summaryOutputFile, "wt")
+        }
+        invStrs <- paste("Number of exon", 1 : invariantGroupCount, sep = "")
+        invStrs <- paste(invStrs, " sets", sep = "")
+        summaryHeader <- c(
+                "Name",
+                "Status",
+                "Chromosome",
+                "StartPosition",
+                "EndPosition", 
+                "Number of Probe sets",
+                "Size",
+                "Number of SNP probe sets",
+                invStrs,
+                "Mean intensity of reference sample",
+                "Mean intensity of sample")
+        write.table(
+                rbind(summaryHeader),
+                file = summaryOutputFile,
+                row.names = FALSE,
+                col.names = FALSE)
+    }
+    
     for(i in 1 : invariantGroupCount)
     {
         if(!inherits(invariantProbeInfo[[i]], "data.frame") ||
-            !all(c("probeIndex", "probesetId") %in% names(invariantProbeInfo[[i]])))
+           !all(c("probeIndex", "probesetId") %in% names(invariantProbeInfo[[i]])))
         {
             stop("You must supply a \"invariantProbeInfo\" data frame parameter which has ",
                 "at a minimum the \"probeIndex\", and \"probesetId\" ",
@@ -968,12 +999,15 @@ simpleCNV <- function(
         }
         
         if(!inherits(invariantProbesetInfo[[i]], "data.frame") ||
-            !all(c("probesetId", "chrId", "positionBp") %in% names(invariantProbesetInfo[[i]])))
+           !all(c("probesetId", "chrId", "positionBp") %in% names(invariantProbesetInfo[[i]])))
         {
             stop("You must supply a \"invariantProbesetInfo\" data frame parameter which has ",
                 "at a minimum the \"probesetId\", \"chrId\" and \"positionBp\" ",
                 "components. Please see the help documentation for more details.")
         }
+        newInfo <- cbind(invariantProbesetInfo[[i]][, c("probesetId", "chrId", "positionBp")], i)
+        colnames(newInfo) <- c("ID", "chrId", "positionBp", "type")
+        combinedInfo <- rbind(combinedInfo, newInfo)
         
         if(!is.null(invariantReferenceDistribution[[i]]) &&
             !is.numeric(invariantReferenceDistribution[[i]]))
@@ -1035,6 +1069,15 @@ simpleCNV <- function(
     {
         cat("processing CEL files\n")
     }
+    
+    combinedInfoByChr <- list()
+    for(chr in chromosomes)
+    {
+        info <- combinedInfo[combinedInfo$chrId == chr, , drop = FALSE]
+        info <- info[order(info$positionBp, as.character(info$ID)), , drop = FALSE]
+        combinedInfoByChr[[chr]] <- info
+    }
+    rm(combinedInfo)
     
     # the reference intensities
     refIntensities <- .normalizeForSimpleCNV(
@@ -1103,12 +1146,44 @@ simpleCNV <- function(
                     SIMPLIFY = FALSE)
                 cnvs <- parLapply(cluster, combinedIntList, .applyInferCNVFromIntensity)
             }
+            
+            if(!is.null(summaryOutputFile))
+            {
+                if(verbose)
+                {
+                    cat("Summarizing results for ", currCelFile, "\n", sep = "")
+                }
+                for(chr in names(currIntensities))
+                {
+                    summaryTbl <- .summarizeSimpleCNV(
+                            .fileBaseWithoutExtension(currCelFile),
+                            chr,
+                            cnvs[[chr]],
+                            combinedInfoByChr[[chr]],
+                            invariantGroupCount,
+                            currIntensities[[chr]],
+                            refIntensities[[chr]])
+                    if(!is.null(summaryTbl))
+                    {
+                        write.table(
+                                summaryTbl,
+                                file = summaryOutputFile,
+                                row.names = FALSE,
+                                col.names = FALSE)
+                    }
+                }
+            }
         }
         
         for(chr in names(cnvs))
         {
             allCnvsByChr[[chr]] <- cbind(allCnvsByChr[[chr]], cnvs[[chr]])
         }
+    }
+    
+    if(!is.null(summaryOutputFile))
+    {
+        close(summaryOutputFile)
     }
     
     # give column names based on the CEL file
@@ -1286,10 +1361,69 @@ simpleCNV <- function(
         
         combinedInt <- c(chrInvInt, chrSnpInt)
         combinedPos <- c(chrInvPos, chrSnpPos)
-        combinedInt <- combinedInt[order(combinedPos)]
+        combinedInt <- combinedInt[order(combinedPos, names(combinedInt))]
         
         combinedIntensities[[chr]] <- combinedInt
     }
     
     combinedIntensities
+}
+
+.summarizeSimpleCNV <- function(sampleName, chr, cnvs, combinedInfo, numInvariantGroups, currIntensities, refIntensities)
+{
+    combinedInfo <- combinedInfo[combinedInfo[ , "ID"] %in% names(cnvs), ]
+    if(nrow(combinedInfo) != length(cnvs) ||
+       nrow(combinedInfo) != length(refIntensities) ||
+       nrow(combinedInfo) != length(currIntensities) ||
+       any(combinedInfo[ , "ID"] != names(cnvs)) ||
+       any(combinedInfo[ , "ID"] != names(refIntensities)) ||
+       any(combinedInfo[ , "ID"] != names(currIntensities)))
+    {
+        stop("internal error: missmatch between probeset IDs in .summarizeSimpleCNV")
+    }
+    
+    # use rle function which will give us $lengths and $values for all
+    # of the contiguous CNV groupings
+    contigCNV <- rle(cnvs)
+    grpStart <- 1
+    cnvSummary <- NULL
+    for(i in 1 : length(contigCNV$lengths))
+    {
+        val <- contigCNV$values[i]
+        len <- contigCNV$lengths[i]
+        grpEnd <- grpStart + len - 1
+        if(val %in% c(1, 3))
+        {
+            startPos <- combinedInfo[, "positionBp"][grpStart]
+            endPos <- combinedInfo[, "positionBp"][grpEnd]
+            types <- combinedInfo[grpStart : grpEnd, "type"]
+            nextRow <- list(
+                    sampleName,
+                    if (val == 1) "loss" else "gain",
+                    chr,
+                    startPos,
+                    endPos,
+                    len,
+                    endPos + 1 - startPos,
+                    sum(types == 0))
+            for(invIndex in 1 : numInvariantGroups)
+            {
+                nextRow[[length(nextRow) + 1]] <- sum(types == invIndex)
+            }
+            nextRow[[length(nextRow) + 1]] <- mean(refIntensities[grpStart : grpEnd])
+            nextRow[[length(nextRow) + 1]] <- mean(currIntensities[grpStart : grpEnd])
+            
+            if(is.null(cnvSummary))
+            {
+                cnvSummary <- as.data.frame(nextRow, stringsAsFactors = FALSE)
+            }
+            else
+            {
+                cnvSummary <- rbind(cnvSummary, nextRow)
+            }
+        }
+        grpStart <- grpEnd + 1
+    }
+    
+    cnvSummary
 }

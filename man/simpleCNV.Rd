@@ -14,7 +14,8 @@ simpleCNV(
     referenceCelFile,
     chromosomes = c(1:19, "X", "Y", "M"),
     verbose = FALSE,
-    cluster = NULL)
+    cluster = NULL,
+    summaryOutputFile = NULL)
 }
 
 \arguments{
@@ -95,6 +96,14 @@ simpleCNV(
   \item{chromosomes}{character vector of chromosome IDs that you want to CNV. These should correspond to the values in \code{snpInfo$chrId}. Eg: \code{chromosomes=c(1 : 19, "X", "Y", "M")}.}
   \item{verbose}{if set to \code{TRUE} status information will be printed while the function executes}
   \item{cluster}{a cluster object as created by the \pkg{SNOW} package. If this value is non-NULL then this function will run CNV computations in parallel on the given cluster}
+  \item{summaryOutputFile}{the file that you would like to write a summary-level
+      CNV table to. NULL (the default) indicates that no summary file should be
+      generated. If a valid filename is given the output table will have the
+      following columns:
+      Name, Status, Chromosome, StartPosition, EndPosition,
+      Number of Probe sets, Size, Number of SNP probe sets,
+      Number of exon1 sets, Number of exon2 sets,
+      Mean intensity of reference sample, Mean intensity of sample}
 }
 
 \value{
