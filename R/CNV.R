@@ -27,7 +27,7 @@ buildPennCNVInputFiles <- function(
        !all(c("snpId", "chrId", "positionBp") %in% names(snpInfo)))
     {
         stop("You must supply a \"snpInfo\" data frame parameter which has ",
-            "at a minimum the \"snpId\", \"chrId\" and \"positionBp\"",
+            "at a minimum the \"snpId\", \"chrId\" and \"positionBp\" ",
             "components. Please see the help documentation for more details.")
     }
     
@@ -88,7 +88,7 @@ buildPennCNVInputFiles <- function(
             !all(c("probesetId", "chrId", "positionBp") %in% names(invariantProbesetInfo[[i]])))
         {
             stop("You must supply a \"invariantProbesetInfo\" data frame parameter which has ",
-                "at a minimum the \"probesetId\", \"chrId\" and \"positionBp\"",
+                "at a minimum the \"probesetId\", \"chrId\" and \"positionBp\" ",
                 "components. Please see the help documentation for more details.")
         }
         
@@ -971,7 +971,7 @@ simpleCNV <- function(
             !all(c("probesetId", "chrId", "positionBp") %in% names(invariantProbesetInfo[[i]])))
         {
             stop("You must supply a \"invariantProbesetInfo\" data frame parameter which has ",
-                "at a minimum the \"probesetId\", \"chrId\" and \"positionBp\"",
+                "at a minimum the \"probesetId\", \"chrId\" and \"positionBp\" ",
                 "components. Please see the help documentation for more details.")
         }
         
@@ -1086,7 +1086,10 @@ simpleCNV <- function(
             }
             else
             {
-                cat("Applying cluster resources to infer CNVs for ", currCelFile, "\n")
+                if(verbose)
+                {
+                    cat("Applying cluster resources to infer CNVs for ", currCelFile, "\n")
+                }
                 
                 # we need to do some strange data massaging here so that we
                 # can apply cluster resources
