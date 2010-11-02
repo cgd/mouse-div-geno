@@ -13,8 +13,8 @@
 }
 
 \arguments{
-  \item{nm}{A vector of contrast intensities of a SNP.}
-  \item{ns}{A vector of contrast intensities of a SNP.}
+  \item{nm}{A vector of intensity contrasts for a single SNP.}
+  \item{ns}{A vector of intensity averages for a single SNP.}
   \item{hint1}{A mean of AB group contrast intensities.}
   \item{trans}{CCStrans or MAtrans.}
 }
