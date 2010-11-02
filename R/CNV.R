@@ -196,11 +196,11 @@ buildPennCNVInputFiles <- function(
         # normalization work unless it's necessary
         makeMsList <- function()
         {
-            .normalizeCelFileByChr(
+            normalizeCelFileByChr(
                 celfile,
-                verbose,
                 snpProbeInfo,
                 snpInfo,
+                verbose,
                 snpChromosomes,
                 snpReferenceDistribution,
                 transformMethod)

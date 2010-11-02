@@ -5,7 +5,7 @@
 #
 #########################################################################
 
-.inferGender <- function(
+inferGender <- function(
     meanIntensityXPerArray,
     meanIntensityYPerArray,
     meanIntensityPerAutosome)
@@ -49,7 +49,7 @@
     list(x = x, y = y)
 }
 
-.genotypeAnyChrChunk <- function(chr, ms, ss, hint, parIndices, trans, isMale, confScoreThreshold)
+genotypeAnyChrChunk <- function(chr, ms, ss, hint = NULL, parIndices = NULL, trans, isMale = NULL, confScoreThreshold = 1e-05)
 {
     if(chr == "X")
     {
@@ -281,16 +281,18 @@
 # reads in the given CEL file, partitions it into groups defined by groupLevels
 # then breaks up those groups into chunk sizes no bigger than maxChunkSize
 # groups should be factors where
-.normalizeCelFileByChr <- function(
+normalizeCelFileByChr <- function(
     celFileName,
-    verbose,
     snpProbeInfo,
-    snpProbesetInfo,
-    allChr,
-    referenceDistribution,
-    trans)
+    snpInfo,
+    verbose = FALSE,
+    chromosomes = c(as.character(1 : 19), "X", "Y", "M"),
+    referenceDistribution = NULL,
+    transformMethod = c("CCStrans", "MAtrans"))
 {
     if(verbose) cat("Reading and normalizing CEL file: ", celFileName, "\n", sep="")
+    
+    transformMethod <- match.arg(transformMethod)
     
     celData <- read.celfile(celFileName, intensity.means.only = TRUE)
     y <- log2(as.matrix(celData[["INTENSITY"]][["MEAN"]][snpProbeInfo$probeIndex]))
@@ -319,26 +321,26 @@
              "for the B alleles but they do not.")
     }
     
-    if (trans == "CCStrans") {
+    if (transformMethod == "CCStrans") {
         # fixed K??
         res <- .ccstrans(2^allAint, 2^allBint)
         M <- res$x
         S <- res$y
     }
-    else if (trans == "MAtrans") {
+    else if (transformMethod == "MAtrans") {
         # then prior??
         M <- allAint - allBint
         S <- (allAint + allBint)/2
     }
     else {
-        stop(paste("bad transformation argument:", trans))
+        stop(paste("bad transformation argument:", transformMethod))
     }
     
     # divide CEL file up into chromosome pieces
     msList <- list()
-    for (chri in allChr) {
+    for (chri in chromosomes) {
         #currRows <- which(chrid == chri)
-        currChrSnps <- snpProbesetInfo$snpId[snpProbesetInfo$chrId == chri]
+        currChrSnps <- snpInfo$snpId[snpInfo$chrId == chri]
         currRows <- match(currChrSnps, aSnpIds)
         currRows <- currRows[!is.na(currRows)]
         

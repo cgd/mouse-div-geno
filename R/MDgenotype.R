@@ -118,11 +118,11 @@ mouseDivGenotype <- function(
         # normalization work unless it's necessary
         makeMsList <- function()
         {
-            .normalizeCelFileByChr(
+            normalizeCelFileByChr(
                 celfile,
-                verbose,
                 snpProbeInfo,
                 snpInfo,
+                verbose,
                 allChr,
                 referenceDistribution,
                 transformMethod)
@@ -199,7 +199,7 @@ mouseDivGenotype <- function(
         meanIntensityXPerArray <- meanIntensityXPerArray / sum(snpInfo$chrId == "X")
         meanIntensityYPerArray <- meanIntensityYPerArray / sum(snpInfo$chrId == "Y")
         
-        isMale <- .inferGender(
+        isMale <- inferGender(
             meanIntensityXPerArray,
             meanIntensityYPerArray,
             meanIntensityPerAutosome)
@@ -312,7 +312,7 @@ mouseDivGenotype <- function(
             }
             else
             {
-                chunkResult <- .genotypeAnyChrChunk(
+                chunkResult <- genotypeAnyChrChunk(
                     chr = chri,
                     ms = MM,
                     ss = SS,
@@ -419,7 +419,7 @@ mouseDivGenotype <- function(
 # advantage of the snow package's apply functions
 .applyGenotypeAnyChrChunk <- function(argList)
 {
-    .genotypeAnyChrChunk(
+    genotypeAnyChrChunk(
         argList$chr,
         argList$ms,
         argList$ss,
