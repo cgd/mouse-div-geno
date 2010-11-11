@@ -3,6 +3,7 @@ buildPennCNVInputFiles <- function(
     genotypes, snpProbeInfo, snpInfo, snpReferenceDistribution = NULL,
     invariantProbeInfo, invariantProbesetInfo, invariantReferenceDistribution = NULL,
     transformMethod = c("CCStrans", "MAtrans"), celFiles = expandCelFiles(getwd()),
+    isMale = NULL,
     chromosomes = c(1:19, "X", "Y", "M"),
     chromosomeRenameMap = list(X = 20, Y = 21, M = 22),
     cacheDir = tempdir(),
@@ -33,27 +34,15 @@ buildPennCNVInputFiles <- function(
     }
     snpInfo$snpId <- as.factor(snpInfo$snpId)
     
-    # if we have a list (or data frame) pull out the file names and gender info
-    # if it's in there
-    isMale <- NULL
-    if(is.list(celFiles))
-    {
-        if(!("fileName" %in% names(celFiles)))
-        {
-            stop("failed to find \"fileName\" component in the \"celFiles\" list")
-        }
-        
-        if("isMale" %in% names(celFiles))
-        {
-            isMale <- celFiles$isMale
-        }
-        celFiles <- celFiles$fileName
-    }
-    
     # if all are the same sex there is no need to separate
     if(!is.null(isMale) && (all(isMale) || !any(isMale)))
     {
         isMale <- NULL
+    }
+    
+    if(!is.null(isMale) && length(isMale) != length(celFiles))
+    {
+        stop("the length of isMale must match the length of celFiles")
     }
     
     # make the invariant data all lists for consistency

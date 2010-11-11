@@ -13,7 +13,14 @@
 }
 
 \usage{
-genotypeAnyChrChunk(chr, intensityConts, intensityAvgs, hint = NULL, parIndices = NULL, trans, isMale = NULL, confScoreThreshold = 1e-05)
+genotypeAnyChrChunk <- function(
+        chr,
+        intensityConts, intensityAvgs,
+        hint = NULL,
+        parIndices = NULL,
+        transformMethod = c("CCStrans", "MAtrans"),
+        isMale = NULL,
+        confScoreThreshold = 1e-05)
 }
 
 \arguments{
@@ -22,7 +29,7 @@ genotypeAnyChrChunk(chr, intensityConts, intensityAvgs, hint = NULL, parIndices 
     \item{intensityAvgs}{a matrix of (normalized) intensity averages. There must be a row per-SNP and a column per-sample. SNP ordering must be consistent with the ordering used for intensityConts but otherwise does not matter.}
     \item{hint}{an optional vector of hints for the (normalized) mean intensity of heterozygous SNPs}
     \item{parIndices}{this is only used in the case that chr == "X": a vector of indices indicating which SNPs fall into the pseudoautosomal region}
-    \item{trans}{indicates which transformation was used to generate intensityConts and intensityAvgs. Should be one of "CCStrans" or "MAtrans"}
+    \item{transformMethod}{indicates which transformation was used to generate intensityConts and intensityAvgs. Should be one of "CCStrans" or "MAtrans"}
     \item{isMale}{a vector of logicals indicating which samples are male. This is only used in the case that chr is "X" or "Y"}
     \item{confScoreThreshold}{the confidence threshold to use for genotyping. Any confidence scores below this threshold will be given a -1 rather than a valid genotype code}
 }

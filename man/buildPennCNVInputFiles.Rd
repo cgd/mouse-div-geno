@@ -11,6 +11,7 @@ buildPennCNVInputFiles(
     genotypes, snpProbeInfo, snpInfo, snpReferenceDistribution = NULL,
     invariantProbeInfo, invariantProbesetInfo, invariantReferenceDistribution = NULL,
     transformMethod = c("CCStrans", "MAtrans"), celFiles = expandCelFiles(getwd()),
+    isMale = NULL,
     chromosomes = c(1:19, "X", "Y", "M"),
     chromosomeRenameMap = list(X = 20, Y = 21, M = 22),
     cacheDir = tempdir(),
@@ -99,6 +100,7 @@ buildPennCNVInputFiles(
     }
   \item{transformMethod}{The MouseDivGenotype package genotype the array based on contrast and summation, and offers two transformations to obtain contrast; CCS and MA transformation. CCS (contrast centers stretch) transformation proposed by BRLMM-P algorithm obtains contrast via asinh(K*(A-B)/(A+B))/asinh(K), where A and B is intensity of A and B allele and K is a hyperparameter. MA transformation obtains contrast by log2(A) - log2(B). In both cases summation is defined by (log2(A) + log2(B))/2}
   \item{celFiles}{the vector of CEL files to process}
+  \item{isMale}{a logical vector the same length as celFiles that you can use if gender is known}
   \item{chromosomes}{character vector of chromosome IDs that you want to CNV. These should correspond to the values in \code{snpInfo$chrId}. Eg: \code{chromosomes=c(1 : 19, "X", "Y", "M")}.}
   \item{chromosomeRenameMap}{A list that allows you to rename chromosomes for the PennCNV files. This is needed because PennCNV uses all numeric chromosome values where this packages uses "X", "Y" and "M"}
   \item{cacheDir}{directory used to store intermediate results. By default a temporary directory is used. You can reuse a cache directory to save time in the normalization steps (this function will only perform CEL file normalization if it does not find the data that it needs in the cache)}
@@ -115,25 +117,13 @@ buildPennCNVInputFiles(
 \dontrun{
 baseDir <- "."
 celfiledir <- file.path(baseDir, "celFiles/")
-celfiles <- expandCelFiles(celfiledir)
-
-# create an output cache so that we only normalize CEL files once
-outcache <- file.path(baseDir, "outcache")
-if(!file.exists(outcache))
-{
-    dir.create(outcache)
-}
-
 outdir <- file.path(baseDir, "cnv-out")
-if(file.exists(outdir))
-{
-    unlink(outdir, recursive = TRUE)
-}
 dir.create(outdir)
 
-# load the genotypes that we saved from a previous call to mouseDivGeno
-load("genoVinoResult-2010-08-10_17.30.33.59530.RData")
+# load the genotypes that we saved from a previous call to mouseDivGenotype(...)
+load("parallelGenoVinoResult.RData")
 genos <- genoVinoResult$geno
+isMale <- genoVinoResult$isMale
 rm(genoVinoResult)
 
 
@@ -146,7 +136,6 @@ load("MouseDivData.RData")
 
 buildPennCNVInputFiles(
     outdir = outdir,
-    allowOverwrite = FALSE,
     genotypes = genos,
     snpProbeInfo = snpProbeInfo,
     snpInfo = snpInfo,
@@ -154,10 +143,9 @@ buildPennCNVInputFiles(
     invariantProbeInfo = invariantProbeInfo,
     invariantProbesetInfo = invariantProbesetInfo,
     invariantReferenceDistribution = invariantReferenceDistribution,
-    transformMethod = "CCStrans",
-    celFiles = celfiles,
+    celFiles = expandCelFiles(celfiledir),
+    isMale = isMale,
     chromosomes = c("19", "X", "Y"),
-    cacheDir = outcache,
     retainCache = retainCache,
     verbose = TRUE)
   }

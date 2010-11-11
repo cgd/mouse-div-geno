@@ -49,24 +49,33 @@ inferGender <- function(
     list(x = x, y = y)
 }
 
-genotypeAnyChrChunk <- function(chr, intensityConts, intensityAvgs, hint = NULL, parIndices = NULL, trans, isMale = NULL, confScoreThreshold = 1e-05)
+genotypeAnyChrChunk <- function(
+        chr,
+        intensityConts, intensityAvgs,
+        hint = NULL,
+        parIndices = NULL,
+        transformMethod = c("CCStrans", "MAtrans"),
+        isMale = NULL,
+        confScoreThreshold = 1e-05)
 {
+    transformMethod <- match.arg(transformMethod)
+    
     if(chr == "X")
     {
-        .genotypeXChromosomeChunk(intensityConts, intensityAvgs, hint, parIndices, trans, isMale, confScoreThreshold)
+        .genotypeXChromosomeChunk(intensityConts, intensityAvgs, hint, parIndices, transformMethod, isMale, confScoreThreshold)
     }
     else if(chr == "Y")
     {
-        .genotypeYChromosomeChunk(intensityConts, intensityAvgs, hint, trans, isMale, confScoreThreshold)
+        .genotypeYChromosomeChunk(intensityConts, intensityAvgs, hint, transformMethod, isMale, confScoreThreshold)
     }
     else if(chr == "M")
     {
-        .genotypeHomozygousChunk(intensityConts, intensityAvgs, trans, confScoreThreshold)
+        .genotypeHomozygousChunk(intensityConts, intensityAvgs, transformMethod, confScoreThreshold)
     }
     else
     {
         # chr is an autosome
-        .genotypeChunk(intensityConts, intensityAvgs, hint, trans, confScoreThreshold)
+        .genotypeChunk(intensityConts, intensityAvgs, hint, transformMethod, confScoreThreshold)
     }
 }
 

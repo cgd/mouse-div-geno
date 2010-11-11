@@ -11,10 +11,10 @@
 mouseDivGenotype <- function(
     snpProbeInfo, snpInfo, referenceDistribution = NULL,
     transformMethod = c("CCStrans", "MAtrans"),
-    celFiles = expandCelFiles(getwd()), confScoreThreshold = 1e-05,
+    celFiles = expandCelFiles(getwd()), isMale = NULL, confScoreThreshold = 1e-05,
     chromosomes = c(1:19, "X", "Y", "M"), cacheDir = tempdir(),
     retainCache = FALSE, verbose = FALSE, cluster = NULL,
-    probesetChunkSize = 1000, processResultsFunction = NULL)
+    probesetChunkSize = 1000, resultsOutputFile = NULL)
 {
     #library("time")
     
@@ -55,27 +55,24 @@ mouseDivGenotype <- function(
         stop("failed to load the snow library")
     }
     
-    # if we have a list (or data frame) pull out the file names and gender info
-    # if it's in there
-    isMale <- NULL
-    if(is.list(celFiles))
-    {
-        if(!("fileName" %in% names(celFiles)))
-        {
-            stop("failed to find \"fileName\" component in the \"celFiles\" list")
-        }
-        
-        if("isMale" %in% names(celFiles))
-        {
-            isMale <- celFiles$isMale
-        }
-        celFiles <- celFiles$fileName
-    }
-    
     nfile <- length(celFiles)
     if(nfile <= 1)
     {
         stop("Cannot successfully genotype with less than two CEL files")
+    }
+    
+    if(!is.null(isMale) && length(isMale) != nfile)
+    {
+        stop("the length of isMale must match the length of celFiles")
+    }
+    
+    if(!is.null(resultsOutputFile))
+    {
+        processResultsFunction <- .createAppendResultsToCSVFunction(resultsOutputFile)
+    }
+    else
+    {
+        processResultsFunction <- NULL
     }
     
     # make sure that the chromosome vector is not numeric
@@ -268,7 +265,7 @@ mouseDivGenotype <- function(
                     intensityAvgs = SS,
                     hint = chrHint[chunkRange],
                     parIndices = which(chrPAR[chunkRange]),
-                    trans = transformMethod,
+                    transformMethod = transformMethod,
                     isMale = isMale,
                     confScoreThreshold = confScoreThreshold)
                 if(length(argLists) >= length(cluster) || chunkIndex == length(chrChunks[[chri]]))
@@ -320,7 +317,7 @@ mouseDivGenotype <- function(
                     intensityAvgs = SS,
                     hint = chrHint[chunkRange],
                     parIndices = which(chrPAR[chunkRange]),
-                    trans = transformMethod,
+                    transformMethod = transformMethod,
                     isMale = isMale,
                     confScoreThreshold = confScoreThreshold)
                 if(is.null(processResultsFunction))
@@ -427,7 +424,7 @@ mouseDivGenotype <- function(
         argList$intensityAvgs,
         argList$hint,
         argList$parIndices,
-        argList$trans,
+        argList$transformMethod,
         argList$isMale,
         argList$confScoreThreshold)
 }

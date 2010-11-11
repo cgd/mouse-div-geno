@@ -66,7 +66,7 @@ mouseDivDensityPlot <- function(celFilenames, snpProbeInfo, type = c("Average", 
     }
 }
 
-createAppendResultsToCSVFunction <- function(fileName)
+.createAppendResultsToCSVFunction <- function(fileName)
 {
     # if the file already exists we should delete it (without this we would end
     # up appending to the exising file which we don't want)
