@@ -108,7 +108,11 @@ simpleCNV(
 
 \value{
     a list containing per-chromosome CNV results. Each list item will be a matrix
-    where the columns correspond to samples (CEL files) and the rows
+    where the columns correspond to samples (CEL files) and the rows correspond
+    to invariant probesets or SNPs. In the returned matrix list a value of
+    2 indicates no copy change, a value of 1 indicates a copy loss with respect
+    to the reference and a value of 3 indicates a copy gain with respect to the
+    reference
 }
 
 \examples{

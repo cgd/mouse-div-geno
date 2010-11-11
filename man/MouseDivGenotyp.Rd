@@ -67,7 +67,7 @@ mouseDivGenotype(
 \value{
     If \code{processResultsFunction} is non-NULL then this function returns a NULL value because it is assumed that the \code{processResultsFunction} is saving the results chunk-by-chunk allowing us to avoid the memory requirements imposed by accumulating all of the results into a return list. Assuming \code{processResultsFunction} is NULL this function returns an list object indexed by chromosome ID, containing another list indexed by "geno", "vino" or "conf", containing a matrix of values. So, for instance, \code{retVal[["X"]][["geno"]][3, 5]} will get you the genotype value for the third SNP on the X chromosome of the fifth CEL file (sample). It is probably simplest to use the \code{processResultsFunction} parameter so save your results to file unless you plan on further processing the genotype/vinotype data in R. The following describes the "geno", "vino" and "conf" list items
     \item{geno}{a matrix with a row per SNP and a column per CEL file. -1 = No call, 1 = AA, 2 = AB, and 3 = BB}
-    \item{vino}{a matrix with a row per SNP and a column per CEL file. 1 indicates VINO, any other value indicates no-VINO}
+    \item{vino}{a matrix with a row per SNP and a column per CEL file. 1 indicates VINO, 0 indicates no-VINO}
     \item{conf}{a matrix with a row per SNP and a column per CEL file. These values are confidence scores based on Mohalanobis distance with chi-squre distribution approximation. Smaller confidence score implies less reliable data.}
     \item{isMale}{A per-CEL-file vector of logicals indicating which were genotyped as male. If gender was supplied via the CEL files parameter then this value will match that otherwise it will be the inferred gender values.}
 }
