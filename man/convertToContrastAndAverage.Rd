@@ -1,6 +1,6 @@
 \author{Hyuna Yang and Keith Sheppard}
-\name{convertToContrastAndAverag}
-\alias{convertToContrastAndAverag}
+\name{convertToContrastAndAverage}
+\alias{convertToContrastAndAverage}
 \title{Convert A/B Intensities to Contrast and Average}
 
 \description{
@@ -9,7 +9,7 @@
 }
 
 \usage{
-convertToContrastAndAverag(
+convertToContrastAndAverage(
         aIntensities,
         bIntensities,
         transformMethod = c("CCStrans", "MAtrans"),
@@ -25,10 +25,9 @@ convertToContrastAndAverag(
     \item{k}{this is the dQuote{k} parameter used for CCS transform}
 }
 \value{
-    A list with "geno", "vino" and "conf" components
-    \item{geno}{a matrix with a row per SNP and a column per sample. -1 = No call, 1 = AA, 2 = AB, and 3 = BB}
-    \item{vino}{a matrix with a row per SNP and a column per sample. 1 indicates VINO, any other value indicates no-VINO}
-    \item{conf}{a matrix with a row per SNP and a column per sample. These values are confidence scores based on Mohalanobis distance with chi-squre distribution approximation. Smaller confidence score implies less reliable data.}
+    A list with dQuote{intensityConts} and dQuote{intensityAvgs} components.
+    These components will have the same shape as the A and B intensities which
+    were passed in.
 }
 
 \examples{

@@ -289,7 +289,7 @@ genotypeAnyChrChunk <- function(
 
 # this function will convert SNP A/B intensity pairs into M/S values which are
 # suitable as input to the genotypeAnyChrChunk function
-convertToContrastAndAverag <- function(
+convertToContrastAndAverage <- function(
         aIntensities,
         bIntensities,
         transformMethod = c("CCStrans", "MAtrans"),
@@ -302,11 +302,11 @@ convertToContrastAndAverag <- function(
     {
         if(intensitiesAreLog2)
         {
-            allAint <- 2 ^ allAint
-            allBint <- 2 ^ allBint
+            aIntensities <- 2 ^ aIntensities
+            bIntensities <- 2 ^ bIntensities
         }
         
-        res <- .ccstrans(allAint, allBint, k)
+        res <- .ccstrans(aIntensities, bIntensities, k)
         M <- res$x
         S <- res$y
     }
@@ -314,12 +314,12 @@ convertToContrastAndAverag <- function(
     {
         if(!intensitiesAreLog2)
         {
-            allAint <- log2(allAint)
-            allBint <- log2(allBint)
+            aIntensities <- log2(aIntensities)
+            bIntensities <- log2(bIntensities)
         }
         
-        M <- allAint - allBint
-        S <- (allAint + allBint) / 2
+        M <- aIntensities - bIntensities
+        S <- (aIntensities + bIntensities) / 2
     }
     else
     {
