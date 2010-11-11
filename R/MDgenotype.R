@@ -26,6 +26,7 @@ mouseDivGenotype <- function(
              "at a minimum the \"probeIndex\", \"isAAllele\" and \"snpId\" ",
              "components. Please see the help documentation for more details.")
     }
+    snpProbeInfo$snpId <- as.factor(snpProbeInfo$snpId)
     
     if(!inherits(snpInfo, "data.frame") ||
        !all(c("snpId", "chrId") %in% names(snpInfo)))
@@ -34,6 +35,7 @@ mouseDivGenotype <- function(
              "at a minimum the \"snpId\" and \"chrId\" ",
              "components. Please see the help documentation for more details.")
     }
+    snpInfo$snpId <- as.factor(snpInfo$snpId)
     
     # it is an error if isInPAR is set to TRUE in a non-X chromosome
     if(!is.null(snpInfo$isInPAR))

@@ -22,6 +22,7 @@ buildPennCNVInputFiles <- function(
             "at a minimum the \"probeIndex\", \"isAAllele\" and \"snpId\" ",
             "components. Please see the help documentation for more details.")
     }
+    snpProbeInfo$snpId <- as.factor(snpProbeInfo$snpId)
     
     if(!inherits(snpInfo, "data.frame") ||
        !all(c("snpId", "chrId", "positionBp") %in% names(snpInfo)))
@@ -30,6 +31,7 @@ buildPennCNVInputFiles <- function(
             "at a minimum the \"snpId\", \"chrId\" and \"positionBp\" ",
             "components. Please see the help documentation for more details.")
     }
+    snpInfo$snpId <- as.factor(snpInfo$snpId)
     
     # if we have a list (or data frame) pull out the file names and gender info
     # if it's in there
@@ -83,6 +85,7 @@ buildPennCNVInputFiles <- function(
                 "at a minimum the \"probeIndex\", and \"probesetId\" ",
                 "components. Please see the help documentation for more details.")
         }
+        invariantProbeInfo[[i]]$probesetId <- as.factor(invariantProbeInfo[[i]]$probesetId)
         
         if(!inherits(invariantProbesetInfo[[i]], "data.frame") ||
             !all(c("probesetId", "chrId", "positionBp") %in% names(invariantProbesetInfo[[i]])))
@@ -91,6 +94,7 @@ buildPennCNVInputFiles <- function(
                 "at a minimum the \"probesetId\", \"chrId\" and \"positionBp\" ",
                 "components. Please see the help documentation for more details.")
         }
+        invariantProbesetInfo[[i]]$probesetId <- as.factor(invariantProbesetInfo[[i]]$probesetId)
         
         if(!is.null(invariantReferenceDistribution[[i]]) &&
             !is.numeric(invariantReferenceDistribution[[i]]))
@@ -929,6 +933,7 @@ simpleCNV <- function(
             "at a minimum the \"probeIndex\", \"isAAllele\" and \"snpId\" ",
             "components. Please see the help documentation for more details.")
     }
+    snpProbeInfo$snpId <- as.factor(snpProbeInfo$snpId)
     
     if(!inherits(snpInfo, "data.frame") ||
         !all(c("snpId", "chrId", "positionBp") %in% names(snpInfo)))
@@ -937,6 +942,7 @@ simpleCNV <- function(
             "at a minimum the \"snpId\", \"chrId\" and \"positionBp\"",
             "components. Please see the help documentation for more details.")
     }
+    snpInfo$snpId <- as.factor(snpInfo$snpId)
     combinedInfo <- cbind(snpInfo[, c("snpId", "chrId", "positionBp")], 0)
     colnames(combinedInfo) <- c("ID", "chrId", "positionBp", "type")
     
@@ -997,6 +1003,7 @@ simpleCNV <- function(
                 "at a minimum the \"probeIndex\", and \"probesetId\" ",
                 "components. Please see the help documentation for more details.")
         }
+        invariantProbeInfo[[i]]$probesetId <- as.factor(invariantProbeInfo[[i]]$probesetId)
         
         if(!inherits(invariantProbesetInfo[[i]], "data.frame") ||
            !all(c("probesetId", "chrId", "positionBp") %in% names(invariantProbesetInfo[[i]])))
@@ -1005,6 +1012,7 @@ simpleCNV <- function(
                 "at a minimum the \"probesetId\", \"chrId\" and \"positionBp\" ",
                 "components. Please see the help documentation for more details.")
         }
+        invariantProbesetInfo[[i]]$probesetId <- as.factor(invariantProbesetInfo[[i]]$probesetId)
         newInfo <- cbind(invariantProbesetInfo[[i]][, c("probesetId", "chrId", "positionBp")], i)
         colnames(newInfo) <- c("ID", "chrId", "positionBp", "type")
         combinedInfo <- rbind(combinedInfo, newInfo)
