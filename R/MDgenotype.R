@@ -146,8 +146,8 @@ mouseDivGenotype <- function(
                     
                     chunk <- chrChunks[[currChr]][[chunkIndex]]
                     probesetIndices <- chunk$start : chunk$end
-                    mChunk <- msList[[currChr]]$M[probesetIndices]
-                    sChunk <- msList[[currChr]]$S[probesetIndices]
+                    mChunk <- msList[[currChr]]$intensityConts[probesetIndices]
+                    sChunk <- msList[[currChr]]$intensityAvgs[probesetIndices]
                     
                     save(mChunk, sChunk, file = chunkFile)
                 }
@@ -262,8 +262,8 @@ mouseDivGenotype <- function(
                 # ready to execute them in parallel
                 argLists[[length(argLists) + 1]] <- list(
                     chr = chri,
-                    ms = MM,
-                    ss = SS,
+                    intensityConts = MM,
+                    intensityAvgs = SS,
                     hint = chrHint[chunkRange],
                     parIndices = which(chrPAR[chunkRange]),
                     trans = transformMethod,
@@ -314,8 +314,8 @@ mouseDivGenotype <- function(
             {
                 chunkResult <- genotypeAnyChrChunk(
                     chr = chri,
-                    ms = MM,
-                    ss = SS,
+                    intensityConts = MM,
+                    intensityAvgs = SS,
                     hint = chrHint[chunkRange],
                     parIndices = which(chrPAR[chunkRange]),
                     trans = transformMethod,
@@ -421,8 +421,8 @@ mouseDivGenotype <- function(
 {
     genotypeAnyChrChunk(
         argList$chr,
-        argList$ms,
-        argList$ss,
+        argList$intensityConts,
+        argList$intensityAvgs,
         argList$hint,
         argList$parIndices,
         argList$trans,

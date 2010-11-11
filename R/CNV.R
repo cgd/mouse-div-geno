@@ -225,8 +225,8 @@ buildPennCNVInputFiles <- function(
                     
                     chunk <- chrChunks[[currChr]][[chunkIndex]]
                     probesetIndices <- chunk$start : chunk$end
-                    mChunk <- msList[[currChr]]$M[probesetIndices]
-                    sChunk <- msList[[currChr]]$S[probesetIndices]
+                    mChunk <- msList[[currChr]]$intensityConts[probesetIndices]
+                    sChunk <- msList[[currChr]]$intensityAvgs[probesetIndices]
                     
                     save(mChunk, sChunk, file = chunkFile)
                 }

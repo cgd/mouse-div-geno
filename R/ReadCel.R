@@ -49,24 +49,24 @@ inferGender <- function(
     list(x = x, y = y)
 }
 
-genotypeAnyChrChunk <- function(chr, ms, ss, hint = NULL, parIndices = NULL, trans, isMale = NULL, confScoreThreshold = 1e-05)
+genotypeAnyChrChunk <- function(chr, intensityConts, intensityAvgs, hint = NULL, parIndices = NULL, trans, isMale = NULL, confScoreThreshold = 1e-05)
 {
     if(chr == "X")
     {
-        .genotypeXChromosomeChunk(ms, ss, hint, parIndices, trans, isMale, confScoreThreshold)
+        .genotypeXChromosomeChunk(intensityConts, intensityAvgs, hint, parIndices, trans, isMale, confScoreThreshold)
     }
     else if(chr == "Y")
     {
-        .genotypeYChromosomeChunk(ms, ss, hint, trans, isMale, confScoreThreshold)
+        .genotypeYChromosomeChunk(intensityConts, intensityAvgs, hint, trans, isMale, confScoreThreshold)
     }
     else if(chr == "M")
     {
-        .genotypeHomozygousChunk(ms, ss, trans, confScoreThreshold)
+        .genotypeHomozygousChunk(intensityConts, intensityAvgs, trans, confScoreThreshold)
     }
     else
     {
         # chr is an autosome
-        .genotypeChunk(ms, ss, hint, trans, confScoreThreshold)
+        .genotypeChunk(intensityConts, intensityAvgs, hint, trans, confScoreThreshold)
     }
 }
 
@@ -278,6 +278,48 @@ genotypeAnyChrChunk <- function(chr, ms, ss, hint = NULL, parIndices = NULL, tra
     lapply(maleResult, fillInNAFemaleCols)
 }
 
+# this function will convert SNP A/B intensity pairs into M/S values which are
+# suitable as input to the genotypeAnyChrChunk function
+convertToContrastAndAverag <- function(
+        aIntensities,
+        bIntensities,
+        transformMethod = c("CCStrans", "MAtrans"),
+        intensitiesAreLog2 = FALSE,
+        k = 4)
+{
+    transformMethod <- match.arg(transformMethod)
+    
+    if (transformMethod == "CCStrans")
+    {
+        if(intensitiesAreLog2)
+        {
+            allAint <- 2 ^ allAint
+            allBint <- 2 ^ allBint
+        }
+        
+        res <- .ccstrans(allAint, allBint, k)
+        M <- res$x
+        S <- res$y
+    }
+    else if (transformMethod == "MAtrans")
+    {
+        if(!intensitiesAreLog2)
+        {
+            allAint <- log2(allAint)
+            allBint <- log2(allBint)
+        }
+        
+        M <- allAint - allBint
+        S <- (allAint + allBint) / 2
+    }
+    else
+    {
+        stop(paste("bad transformation argument:", transformMethod))
+    }
+    
+    list(intensityConts = M, intensityAvgs = S)
+}
+
 # reads in the given CEL file, partitions it into groups defined by groupLevels
 # then breaks up those groups into chunk sizes no bigger than maxChunkSize
 # groups should be factors where
@@ -350,8 +392,8 @@ normalizeCelFileByChr <- function(
             stop("Failed to find any probes on chromosome ", chri)
         }
         
-        msList[[chri]]$M <- M[currRows]
-        msList[[chri]]$S <- S[currRows]
+        msList[[chri]]$intensityConts <- M[currRows]
+        msList[[chri]]$intensityAvgs <- S[currRows]
     }
     
     msList
