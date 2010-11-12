@@ -6,35 +6,90 @@
 
 <<include = FALSE, echo = FALSE>>=
 options(keep.source = TRUE, width = 60)
+library("MouseDivGeno")
 @
 
-\title{MouseDivGeno Example (Version \Sexpr{packageDescription("MouseDivGeno")$Version})}
+\title{MouseDivGeno Vignette (Version \Sexpr{packageDescription("MouseDivGeno")$Version})}
 
 \author{Hyuna Yang and Keith Sheppard}
 \maketitle
 
 \section{Introduction}
 
-This package can be used to
+{\tt MouseDivGeno} is a R package specifically designed to genotype the Mouse
+Diversity Genotyping Array (Yang et al, 2008), an Affymetrix mouse genotyping
+array similar to the human SNP 6.0. {\tt MouseDivGeno} contains functions which
+allow you to perform genotyping, identify probe sets
+potentially harboring a new mutation (Variable INtensity Oligonucleotide or
+VINO, here we call it a vinotyping) and perform CNV analysis. The R package,
+annotations, and further information can be obtained from
+{\tt http://genomedynamics.org/tools/MouseDivGeno}.
 
-\begin{itemize}
-\item genotype Mouse Diversity Array CEL files
-\item generate LRR and BAF output from CEL files which is suitable as input for
-    the PennCNV program
-\item generate CNV calls using our simpleCNV function
-\end{itemize}
+Before we get started we will to load some data into scope which will give us probe and probeset
+level information about the Mouse Diversity Array platform which we will use in
+several examples throughout this vignette. You can obtain this data from
+{\tt http://genomedynamics.org/tools/MouseDivGeno}
 
-\section{Genotyping and Vinotyping}
-
-First we need to load some data into scope which will give us probe and probeset
-level information about the Mouse Diversity Array platform that we are going
-to use for genotyping. You can obtain this data from (TODO: add link here)
-
-%<<keep.source = TRUE, eval = FALSE>>=
-<<keep.source = TRUE>>=
+<<keep.source = TRUE, eval = TRUE>>=
 load("../../../MouseDivData.RData")
 ls()
 @
+
+\section{Quality Checks for the Mouse Diversity Genotyping Array}
+
+You will want to perform some quality checks on the arrays that you are
+genotyping. The quality checks in this section are specific to the Mouse
+Diversity Genotyping Array. First we can plot an image of an array to look
+for any obvious problems. This will create log2 intensity heatmap and will allow
+you to determine if the array has a spatial distribution:
+
+% we need to use PNG here. If we let Sweave use vector graphics the PDF
+% gets huge! (100s of megabites huge)
+<<include = FALSE, echo = FALSE, eval = TRUE>>=
+png(file = "array-image.png", width = 1200, height = 1200, pointsize = 24, bg = "white")
+@
+
+<<keep.source = TRUE, eval = TRUE>>=
+plotMouseDivArrayImage("../../../celFiles/SNP_mDIV_A8-8_081308.CEL")
+@
+
+<<include = FALSE, echo = FALSE, eval = TRUE>>=
+graphics.off()
+@
+
+\begin{figure}
+\begin{center}
+\includegraphics{array-image.png}
+\end{center}
+\caption{Array Image from plotMouseDivArrayImage(...)}
+\end{figure}
+
+Note that because we use four probes (two from the sense strand and two from the
+antisense strand) per probe set and those probes are randomly located across
+.CEL file, if there is a dim region, it does not affect the overall intensity
+due to the median summarization step. However if some .CEL files show an unusually
+big dark spot, or overall dark image, check the array processing steps including
+reagent, scanner, etc
+
+We can also compare the set of arrays that we plan to genotype against eachother
+by doing a density plot of thier SNP intensities (each plot line represents a
+different array). This can help you to determine whether your arrays should be
+quantile normalized or not:
+
+<<label = arraydesities, keep.source = TRUE, eval = TRUE>>=
+mouseDivDensityPlot(expandCelFiles("../../../celFiles"), snpProbeInfo)
+@
+
+\begin{figure}
+\begin{center}
+<<fig = TRUE, echo = FALSE, eval = TRUE>>=
+<<arraydesities>>
+@
+\end{center}
+\caption{Average SNP Intensities: (A + B) / 2}
+\end{figure}
+
+\section{Genotyping and Vinotyping for the Mouse Diversity Genotyping Array}
 
 For the purposes of genotyping we only care about the "snp" data so we will take
 a close look at these objects.
@@ -42,45 +97,77 @@ a close look at these objects.
 \begin{itemize}
 \item \verb#snpProbeInfo#: this data frame contains all of the probe-level information
 about snp probes in the mouse diversity platform:
-%<<keep.source = TRUE, eval = FALSE>>=
-<<keep.source = TRUE>>=
+
+<<keep.source = TRUE, eval = TRUE>>=
 snpProbeInfo[1 : 2, ]
-@ 
+@
+
+Column descriptions:
+\begin{itemize}
+    \item \verb#probeIndex#: the CEL file index for the probe (used to get intensity data)
+    
+    \item \verb#isAAllele#: \verb#TRUE# for A allele probes and \verb#FALSE# for B allele probes
+    
+    \item \verb#snpId#: the ID of the SNP that this probe belongs to. These IDs
+    should correspond to the same component in the \verb#snpInfo# argument
+    
+    \item \verb#correction# (optional): if present this correction will be
+    applied by adding it to probe mean intesity vales. In the MouseDivData object
+    that we have provided these values have been calculated to correct intensity
+    variation due to C G content in 25mers and restriction fragment size.
+    These coefficients were calculated using a spline regression model fitting
+\end{itemize}
+
 \item \verb#snpInfo#: this data frame contains SNP-level information:
-%<<keep.source = TRUE, eval = FALSE>>=
-<<keep.source = TRUE>>=
+
+<<keep.source = TRUE, eval = TRUE>>=
 snpInfo[1 : 2, ]
 @
+
+Column descriptions:
+\begin{itemize}
+    \item \verb#snpId#: the ID of this SNP
+    
+    \item \verb#chrId#: the chromosome that this SNP belongs to. Like "15" or "X"
+    
+    \item \verb#snpHetHint# (optional): provides an initial hint value for the
+    normalized mean intensity of heterozygous SNPs. In the MouseDivData object
+    that we have provided these hints were calculated based on 350 training
+    arrays.
+    
+    \item \verb#isPAR# (optional): if \verb#TRUE# this indicates that this SNP
+    is in the pseudoautosomal region (PAR). This should only be set to
+    \verb#TRUE# for SNPs where \verb#snpInfo$chrId == "X"#
+\end{itemize}
+
 \item \verb#snpReferenceDistribution#: a numeric vector which is the reference
 distribution used for the quantile normalization of SNP intensities
+In the MouseDivData object that we have provided these normalized coefficients
+were calculated based on 350 training arrays.
 \end{itemize}
 
 Now we're ready to genotype our CEL files. To do this we will use the
-\verb#mouseDivGenotype(...)# function. By default the \verb#mouseDivGenotype(...)# function will
-run in serial (ie. it will only use a single CPU core), however you can use the
-SNOW package in order to run in parallel. The following example will use
-the SNOW package to run the genotyping code on two cores, but you can of course
-remove all of the SNOW/cluster code and the example will produce the same
-result:
+\verb#mouseDivGenotype(...)# function. You will notice in this example that we
+use all of the SNP data objects described above. We also are only genotyping
+four chromosomes rather than the default which is to genotype all chromosomes.
+We set the \verb#celFiles# parameter using the \verb#expandCelFiles# convenience
+function which saves us the trouble of having to explicitly list all of the CEL
+files in the \verb#../../../celFiles# directory. As specified here gender
+will be inferred from the CEL files but you can also explicitly set gender
+if you have that information ahead of time. See the
+\verb#mouseDivGenotype(...)# function's documentation for details on how to do
+this.
 
-%<<keep.source = TRUE, eval = FALSE>>=
-<<keep.source = TRUE, results = hide>>=
-library("MouseDivGeno")
-library("snow")
-numCores <- 2
-cl <- makeSOCKcluster(rep("localhost", numCores))
-clusterEvalQ(cl, library("MouseDivGeno"))
+<<keep.source = TRUE, results = hide, eval = TRUE>>=
+# we use confScoreThreshold = 0 so that we get most likely genotypes even for
+# the low confidence SNPs. We will need these genotypes later for CNV analysis
 genoVinoResult <- mouseDivGenotype(
     snpProbeInfo            = snpProbeInfo,
     snpInfo                 = snpInfo,
     referenceDistribution   = snpReferenceDistribution,
-    transformMethod         = "CCStrans",
     chromosomes             = c(19, "X", "Y", "M"),
     celFiles                = expandCelFiles("../../../celFiles"),
-    confScoreThreshold      = 0,
-    cluster                 = cl,
-    probesetChunkSize       = 3000)
-stopCluster(cl)
+    confScoreThreshold      = 0)
 @
 
 The \verb#genoVinoResult# object contains the genotype calls, vinotype calls and
@@ -90,26 +177,204 @@ each CEL file whether the sample was inferred as male or female (the
 using the \verb#celFiles# argument if you know it a priori). Here is a small subset
 of the output to give you an idea of what it looks like:
 
-%<<keep.source = TRUE, eval = FALSE>>=
-<<keep.source = TRUE>>=
+<<keep.source = TRUE, eval = TRUE>>=
 genoVinoResult$geno[1 : 2, 10 : 12]
 genoVinoResult$vino[1 : 2, 10 : 12]
 genoVinoResult$conf[1 : 2, 10 : 12]
 genoVinoResult$isMale[10 : 12]
 @
 
-\section{Generating LRR and BAF for PennCNV}
+You can interpret the returned matrix values as follows:
 
-We will use the genotype data that we generated above along with the SNP and
+\begin{itemize}
+    \item \verb#genoVinoResult$geno#: -1 = No call, 1 = AA, 2 = AB, and 3 = BB
+    \item \verb#genoVinoResult$vino#: 1 indicates VINO, 0 indicates no VINO
+    \item \verb#genoVinoResult$conf#: These values are confidence scores ranging
+    from 0 to 1 based on Mohalanobis distance with chi-squre distribution
+    approximation. Smaller confidence score implies less reliable data.
+\end{itemize}
+
+\section{Genotyping and Vinotyping on Other Platforms}
+
+As described in the previous section you can directly genotype your CEL files
+if you are using the Mouse Diversity Genotyping Array with a single function
+call, but if you happen to be using a different genotyping platform you will need to
+first generate per-SNP A-allele/B-allele intensity values
+before you will be able to use this package. Here we assume those intensity
+matrices are named \verb#aIntensities# and \verb#bIntensities#:
+
+<<keep.source = FALSE, echo = FALSE, eval = TRUE>>=
+load("../../../abIntensities.RData")
+@
+<<keep.source = TRUE, eval = TRUE>>=
+dim(aIntensities)
+dim(bIntensities)
+@
+
+Now we can easily turn these intensities into the contrasts and average terms
+and genotype them:
+
+<<keep.source = TRUE, eval = TRUE>>=
+# for this example I will only genotype SNPs 15 and 1281
+intenCont <- convertToContrastAndAverage(
+        aIntensities[c(15, 1281), ],
+        bIntensities[c(15, 1281), ],
+        intensitiesAreLog2 = TRUE)
+genoVinoConfForChr19 <- genotypeAnyChrChunk(
+        "19",
+        intenCont$intensityConts,
+        intenCont$intensityAvgs)
+genoVinoConfForChr19
+@
+
+The function documentation for genotypeAnyChrChunk contains an explanation for
+all of the value codes shown.
+
+You may be interested in visually inspecting the distribution of intensity
+contrasts and averages for a particular SNP across samples. If this is the
+case you can use the \verb#plotSnp(...)# function to do this. Here we will
+plot the first SNP (which is SNP number 15 in the original matrix):
+
+<<label = snpplot, keep.source = TRUE, eval = TRUE>>=
+plotSNP(intenCont$intensityConts[1, ],
+        intenCont$intensityAvgs[1, ],
+        genoVinoConfForChr19$geno[1, ],
+        genoVinoConfForChr19$vino[1, ])
+@
+
+\begin{figure}
+\begin{center}
+<<fig = TRUE, echo = FALSE, eval = TRUE>>=
+<<snpplot>>
+@
+\end{center}
+\caption{Distribution of Contrast and Average Intensities for SNP \#15}
+\end{figure}
+
+\section{Further Discussion on Normalization and Genotyping Algorithms Used}
+
+This section provides more detailed information on the normalization methods
+and genotyping algorithms used in this package. This information is not essential
+to using the package but is very important in determining which parameters
+should be chosen and how to interpret results. 
+
+\subsection{Normalization}
+
+MouseDivGeno offers three normalization steps: intensity bias correction due to
+C G content in probe sequences and restriction fragment length correction,
+quantile normalization based on a reference distribution, and median
+summarization. Each probe set of Mouse Diversity Array has different restriction
+fragment length and C G content, and it affects the intensity. To adjust those
+difference, we initally chose 350 .CEL files, fit a spline regression, and
+obtained the coefficients for each probe. These coefficitents were saved in the
+annotation files and is used to normalize a new array. 
+
+Quantile normalization is commonly used in microarray data to remove array
+specific noise, and the reference distribution is often derived from each batch
+of arrays. However obtaining a reference distribution each time introduces
+an unnecessary batch effect , so we derived one reference distribution using
+350 training arrays, and saved this reference distribution. Note that the
+quantile normalization can only be applied to samples having the same underlying
+distribution to classical inbred strains (such as C57BL/6J). If there is sample
+whose intensity distribution is different from that of classical inbred strains
+then you should not use the quantile normalization option.
+{\tt mouseDivDensityPlot(...)} can be a useful tool to check the intensity
+distribution. 
+
+After these normalization steps, we take a median from four probes intensities
+(two from sense and two from antisense strand) to make one probe set value. In
+some cases, probes on one strand perform much worse than probes on the other
+strand. We compared intensities from sense and antisense, and removed
+57,066 probes from sense strand and 61,196 probes from antisense strand. As a
+result for most probe sets we summarize four probe values, but for 118,262
+probe sets we only summarize two probes.
+
+\subsection{Genotyping Algorithms}
+
+{\bf Genotyping} is based on a method combining EM based clustering and single linkage
+hierachical clustering. Detail algorithm follows. Suppose you genotype $n$
+samples.
+\begin{enumerate}
+\item[1.] test two groups (N = 2)
+  \begin{enumerate}
+  \item Find center via EM based clustering using contrast intensities.
+    \begin{enumerate}
+    \item Initialization : $\mu_1$ = maximum of contrast, $\mu_2$ =  minimum of contrast, $\sigma^2_1$ = $\sigma^2_2$ = 0.1 
+    \item E step : calculate $P(j|i) = exp(-(x_i-\mu_j)^2/(2*\sigma^2_j)$, where $j = 1, 2$ and $i = 1, \cdots, n$
+    \item M step : $\mu_j = \frac{\sum w_jy_i}{ \sum w_j}$, $\sigma_j = \frac{\sum w_j*(y_i-\mu_j)^2}{ \sum w_j}$, and $w_j = 1/N  \sum p(j|i)$
+    \end{enumerate}
+  \item Assign inital genotype. This step assigns genotype only for the samples having high probability $P(j|i)$. When the $w_j$ is severely unbalanced the maximum $P(j|i)$ in a group could be quite small, and this initial genotype step tries to assign at least one sample to each genotype. 
+     \begin{enumerate}
+     \item For the group having a higher $w_j$ (let's call this group $j_1$, and the other group $j_2$), let threshold = median of $P(j_1|i)$ only using sample $i$ whose $P(j_2|i) < 0.5$. Assign genotype $j_1$ to samples $i$ if $P(j_1|i)$ is bigger than the threshold. 
+     \item Assign genotype for group $j_2$ : Threshold = find biggest mode of $P(j_2|i)$ only using unassigned $i$ from the previous step. Also find median of $P(j_2|i)$ only using $i$ whose $P(j_1|i) < 0.5$. Threshold is maximum of two values. Assign genotype $j_2$ to $i$ if $P(j_2|i)$ is bigger than the threshold. 
+     \end{enumerate}
+  \item Genotype remaining samples using single linkage hierarchical clustering.
+    \begin{enumerate}
+    \item Find one unassigned sample having the smallest distance to any assignment sample. 
+    \item Assign the unassigned sample to the same genotype which the closest assigned sample belongs to. 
+    \item Repeat this procedure till every sample gets genotyped. 
+     \end{enumerate}
+  \end{enumerate}
+\item[2] test N = 3 : same as N = 2 except now the initialization : $\mu_1$ = maximum of contrast, $\mu_2$ =  obtain from hint file or 0, and $\mu_3$ =  minimum of contrast.
+\item[3] Finalize the genotype. Compare N = 3 vs. N = 2 using silhouette score and distance between each group. If N = 3 fails, it compares N = 2 vs. N = 1.
+\end{enumerate}
+
+{\bf VINOtyping} Mouse Diversity Genotyping Array is based on C57BL6/J sequence
+and when a strain contains unknown SNPs (or a new mutation) somewhere in the
+probe sequence other than target SNP, hybridazation fails and it reduces the
+average intensity. Depending on the nature of the new mutation and the genotype
+of target SNP, identifying some VINOs is easier than identifying others. For
+instance when an inbred mouse has a new mutation right next to the target SNP,
+the hybridization failure is easy to detect. One the other hand, if the new
+mutation occurs at the  end of the probe sequence, the hybridization failure
+may not be noticeable. When a strain has a AB genotype at the target SNP and has
+a new mutation, the intensity looks like homozygosity genotype with some
+reduction in intensity. Thus it is quite difficult to distinguish a homozygous
+genotype from heterozygosity with a new mutation in the probe sequence.
+Genotyping the parental strains helps to distinguish these cases.
+
+Details on the approach we use for VINOtyping follows.
+To find VINO (variant intensity oligonecleotide), MouseDivGeno calculates the
+product of two probabilities.
+P(data is not a member of AA, AB, and BB) = 1 - P(data is a member of AA, AB or BB),
+and P(the intensity is low). P(data is a member of AA, AB or BB) is calculated
+by mohalanobis distance, and also returned as a confidence score. Note that when
+there are many VINOs they affect the mean and variance of each group, and to
+avoid this, we remove outliers and secondary cluster at the average intensity
+dimension if it exists. P(the intensity is low) is based on the average
+intensity. Again we removed the outliers and secondary cluster based on each
+genotype, then merge data from all genotypes to obtain the mean and variance of
+the average intensity, and calculate the probability based on the normal
+distribution. P(data is a VINO) is a product of those two probabilities, and
+using stringent threshold first it identifies samples having extremely low
+intensities. Then using single linkage based hierachical clustering, it
+identifies samples clustered with the one having extremely low intensities, and
+finishes vinotyping. Note that when there is a VINO, the genotype of the
+original target SNPs should be considered as no call. It is because the observed
+intensities reflect the dynamic between a new mutation and the original
+genotype, and it is not obvious to predict the original SNP genotype. Also note
+that if VINOs are called in consecutive probes, it indicates a deletion. Thus
+vinotyping along with simple HMM can be used to detect deletion.
+
+\section{Generating LRR and BAF for PennCNV (Wang et al, 2007)}
+
+We will use the genotype data that we generated in the section titled
+"Genotyping and Vinotyping for the Mouse Diversity Genotyping Array" along with the SNP and
 invariant data that we have already loaded in order to calculate LRR and BAF
 values. Before we start let's take a look at what is in the invariant data. One
 thing that you'll notice right away is that the invariant data types are lists
 of data frames rather than simple data frames. The reason for doing this is so
 that we could segregate the exons into two groups based on quality metrics and
-normalize them separately rather than normalizing them as a single group:
+normalize them separately rather than normalizing them as a single group.
+More specifically the Mouse Diversity Genotyping Array contains 25mer sequences
+from exons which were carefully chosen for not containing any known SNP and
+thus can be used to study CNV. To get a better PCR amplification it was
+recommended that the restriction fragment length should be less than 1Kb, and
+when an exon probe set satisfies this condition we conventionally call this
+probe set exon1 and otherwise exon2 (Yang et al., 2008). This is why the
+invariant data structures are lists of length two.
 
-%<<keep.source = TRUE, eval = FALSE>>=
-<<keep.source = TRUE>>=
+<<keep.source = TRUE, eval = TRUE>>=
 lapply(invariantProbeInfo, dim)
 lapply(invariantProbeInfo, function(x) x[1 : 2, ])
 lapply(invariantProbesetInfo, dim)
@@ -120,17 +385,10 @@ lapply(invariantReferenceDistribution, length)
 See the documentation for \verb#buildPennCNVInputFiles(...)# for a more detailed
 explaination of these input parameters.
 
-In order to generate the LRR and BAF files we can construct a command like:
+In order to generate the LRR and BAF files we can enter a command like:
 
-%<<keep.source = TRUE, eval = FALSE>>=
-<<keep.source = TRUE, results = hide>>=
-library("MouseDivGeno")
+<<keep.source = TRUE, results = hide, eval = TRUE>>=
 dir.create("../../../lrr-baf-output")
-
-celfiles <- data.frame(
-    fileName = expandCelFiles("../../../celFiles"),
-    isMale = genoVinoResult$isMale,
-    stringsAsFactors = FALSE)
 buildPennCNVInputFiles(
     outdir                          = "../../../lrr-baf-output",
     allowOverwrite                  = TRUE,
@@ -141,10 +399,9 @@ buildPennCNVInputFiles(
     invariantProbeInfo              = invariantProbeInfo,
     invariantProbesetInfo           = invariantProbesetInfo,
     invariantReferenceDistribution  = invariantReferenceDistribution,
-    transformMethod                 = "CCStrans",
-    celFiles                        = celfiles,
-    chromosomes                     = c("19", "X", "Y", "M"),
-    probesetChunkSize               = 3000)
+    celFiles                        = expandCelFiles("../../../celFiles"),
+    isMale                          = genoVinoResult$isMale,
+    chromosomes                     = c("19", "X", "Y", "M"))
 @
 
 When this command completes successfully the \verb#lrr-baf-output# directory should
@@ -152,12 +409,17 @@ contain the resulting LRR/BAF files along with a single \verb#pfbdata.txt# file.
 
 \section{Simple CNV}
 
-The \verb#simpleCNV(...)# function provides a simplified and fully self-contained way to
-call CNVs. In order to do this you must choose one CEL file to represent the
-"reference" that CNV calls will be made against:
+The \verb#simpleCNV(...)# function provides a simplified way to
+call CNVs which does not require using an external program such as PennCNV.
+Note that you must have the \verb#HiddenMarkov# package installed in order to
+use this function. This function requires you to choose one CEL file to
+represent the "reference" that CNV calls will be made against. All "gains" and
+"losses" are relative to this reference. Also note that there is an optional
+\verb#summaryOutputFile# parameter. If you set this parameter to a file name
+then a summary report will be generated and written to that file, otherwise
+no summary report will be generated.
 
-%<<keep.source = TRUE, eval = FALSE>>=
-<<keep.source = TRUE>>=
+<<keep.source = TRUE, eval = TRUE>>=
 library("MouseDivGeno")
 simpleCNVResult <- simpleCNV(
     snpProbeInfo                    = snpProbeInfo,
@@ -168,48 +430,55 @@ simpleCNVResult <- simpleCNV(
     invariantReferenceDistribution  = invariantReferenceDistribution,
     celFiles                        = expandCelFiles("../../../celFiles"),
     referenceCelFile                = "../../../celFiles/SNP_mDIV_A7-7_081308.CEL",
-    chromosomes                     = c("19"))
+    chromosomes                     = c("19"),
+    summaryOutputFile               = "../../../vignetteCNVSummaryOut.txt")
 @
 
-Now that we have calculated the CNVs for chromosome 19 we can ask questions
-like:
+In the returned matrix list a value of
+2 indicates no copy change, a value of 1 indicates a copy loss with respect
+to the reference and a value of 3 indicates a copy gain with respect to the
+reference. Now that we have calculated the CNVs for chromosome 19 we can ask
+questions like:
 
 "Over all samples what percent of SNPs and invariants did we call as a CNV?"
 
-%<<keep.source = TRUE, eval = FALSE>>=
-<<keep.source = TRUE>>=
+<<keep.source = TRUE, eval = TRUE>>=
 sum(simpleCNVResult$`19` != 2) / length(simpleCNVResult$`19`)
 @
 
 and, "Which probesets did we call as CNVs for sample \verb#SNP_mDIV_B4-15_081308#?"
 
-%<<keep.source = TRUE, eval = FALSE>>=
-<<keep.source = TRUE>>=
+<<keep.source = TRUE, eval = TRUE>>=
 which(simpleCNVResult$`19`[, "SNP_mDIV_B4-15_081308"] != 2)
 @
 
-% TODO: include a real bibliography. The following is just an example
-%       bibliography
+\subsection{Further Details on CNV}
 
-%\begin{thebibliography}{}
-%
-%\bibitem[Gelman et al.(1996)Gelman, Roberts, and Gilks]{grg}
-%Gelman, A., G.~O. Roberts, and W.~R. Gilks (1996).
-%\newblock Efficient Metropolis jumping rules.
-%\newblock In \emph{Bayesian Statistics, 5 (Alicante, 1994)}, pp.~599--607.
-%  Oxford University Press.
-%
-%\bibitem[Geyer(1992)]{practical}
-%Geyer, C.~J. (1992).
-%\newblock Practical Markov chain Monte Carlo (with discussion).
-%\newblock \emph{Statistical Science}, 7, 473--511.
-%
-%\bibitem[Geyer and Thompson(1995)]{geyer-temp}
-%Geyer, C.~J. and E.~A. Thompson (1995).
-%\newblock Annealing Markov chain Monte Carlo with applications to
-%    ancestral inference.
-%\newblock \emph{Journal of the American Statistical Association}, 90, 909--920.
-%
-%\end{thebibliography}
+{\tt simpleCNV(...)} integrates normalized intensities from SNPs and exons. For
+SNP probe sets, the mean of average intensities of AB genotype group tends to be
+higher than that of AA or BB group, and to avoid intensity difference due to
+genotype group, {\tt simpleCNV(...)} calculates intensities using
+max(A allele intensity, B allele intensity). We use {\tt HiddenMarkov} an
+existing HMM R package to infer the most likely state from three possible states
+(1 = loss, 2 = normal, 3 = gain compared to the reference strain). Finally it
+saves the status and a summary table containing only copy number variance region.
+Compared to the first approach which obtains LRR and BAF from the canonical
+genotype grouping, this option is more useful to identify common CNV regions.
+On the other hand, this method relies on the reference strain, thus it is
+sensitive to the quality of the reference strain. For either approach users may
+ignore small size copy number variance region. 
+
+\section{Acknowlegements}
+
+This work is funded by TODO ADD FUNDING SOURCE
+ 
+\section{References}
+
+Wang, K.\textit{et~al} (2007) PennCNV: an integrated hidden Markov model
+designed for high-resolution copy number variation detection in whole-genome
+SNP genotyping data {\it Genome Research}, {\bf 17}, 1665-1674.
+
+Yang, H.\textit{et~al} (2009) A customized and versatile high-density genotyping
+array for the mouse, {\it Nature Method}, {\bf 6}, 663-666.
 
 \end{document}
