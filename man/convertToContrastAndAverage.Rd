@@ -20,7 +20,7 @@ convertToContrastAndAverage(
 \arguments{
     \item{aIntensities}{intensities for the A alleles. This argument can be a vector or a matrix but its shape must match up with bIntensities}
     \item{bIntensities}{intensities for the B alleles. This argument can be a vector or a matrix but its shape must match up with aIntensities}
-    \item{transformMethod}{determines which transformation method should be used}
+    \item{transformMethod}{This package genotypes SNPs based on intensity contrasts and averages, and offers two transformations to obtain contrast; CCS and MA transformation. CCS (contrast centers stretch) transformation proposed by BRLMM-P algorithm obtains contrast via asinh(K*(A-B)/(A+B))/asinh(K), where A and B is intensity of A and B allele and K is a hyperparameter. MA transformation obtains contrast by log2(A) - log2(B). In both cases summation is defined by (log2(A) + log2(B))/2}
     \item{intensitiesAreLog2}{should be set to TRUE if the given intensities are log2 normalized}
     \item{k}{this is the dQuote{k} parameter used for CCS transform}
 }
