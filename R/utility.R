@@ -20,6 +20,8 @@ plotMouseDivArrayImage <- function(celFilename)
 
 mouseDivDensityPlot <- function(celFilenames, snpProbeInfo, type = c("Average", "MatchedSet"))
 {
+    snpProbeInfo$snpId <- as.factor(snpProbeInfo$snpId)
+    
     type <- match.arg(type)
     isMatchedSet <- type == "MatchedSet"
     
