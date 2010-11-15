@@ -19,9 +19,4 @@ inferGender(meanIntensityXPerArray, meanIntensityYPerArray, meanIntensityPerAuto
   a logical vector set to true for samples that were inferred as male and false for samples that were inferred as female
 }
 
-\examples{
-\dontrun{
-#TODO add usage example
-}}
-
 %\keyword{}

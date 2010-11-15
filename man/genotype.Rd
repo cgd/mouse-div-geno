@@ -5,7 +5,14 @@
 
 \title{Genotype a SNP.}
 
-\description{This function genotype the array. This function is used inside \code{MouseDivGeno} and \code{genotypethis}, and also can be used to genotype one SNP. genotypeSexchr is a function to genotype a SNP having AA and BB clusters only, such as SNPs from male Y and X chromosomes, and Mitochondria.  }
+\description{
+If you want to directly genotype intensity contrasts and averages it is
+recommended that you use the \code{genotypeAnyChrChunk(...)} function
+rather than either of these, since it will call these functions for you.
+These functions genotype several arrays at a single SNP. genotypeHomozygous
+can be used when you know ahead of time that your samples can only have
+homozygous genotypes such as SNPs from male Y and X chromosomes, and Mitochondria
+}
 
 \usage{
   genotype(nm, ns, hint1, trans)
@@ -20,11 +27,6 @@
 }
 \value{
   It returns genotype (1 = AA, 2 = AB, 3 = BB), VINOtype (1 = VINO, 0 = not), and confidence score
-}
-\examples{
-\dontrun{
-    # TODO add examples
-}
 }
 
 \keyword{genotype}

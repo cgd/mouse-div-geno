@@ -32,7 +32,18 @@ convertToContrastAndAverage(
 
 \examples{
 \dontrun{
-#TODO add usage example
+# to see this example in context please read the vignette
+
+# loads aIntensities and bIntensities objects which contain log2 normalized
+# A/B SNP allele intensities. Matrix rows are SNPs and matrix columns are
+# are samples
+load("../../../abIntensities.RData")
+
+# for this example I will only genotype SNPs 15 and 1281
+intenCont <- convertToContrastAndAverage(
+        aIntensities[c(15, 1281), ],
+        bIntensities[c(15, 1281), ],
+        intensitiesAreLog2 = TRUE)
 }}
 
 %\keyword{}

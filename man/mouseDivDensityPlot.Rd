@@ -30,9 +30,10 @@ mouseDivDensityPlot(celFilenames, snpProbeInfo, type = c("Average", "MatchedSet"
 
 \examples{
 \dontrun{
-load("MouseDivData.RData") # loads MouseDivData into scope
-celFilenames <- c("~/projects/cel/SNPex1.CEL", "~/projects/cel/SNPex1.CEL")
-mouseDivDensityPlot(celFilenames, MouseDivData)
+# load snpProbeInfo into scope
+load("../../../MouseDivData.RData")
+
+mouseDivDensityPlot(expandCelFiles("../../../celFiles"), snpProbeInfo)
 }}
 
 \keyword{plot}

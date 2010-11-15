@@ -62,9 +62,4 @@ normalizeCelFileByChr(
     vinotype the SNPs
 }
 
-\examples{
-\dontrun{
-#TODO add usage example
-}}
-
 %\keyword{}

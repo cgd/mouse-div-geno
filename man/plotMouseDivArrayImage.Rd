@@ -19,7 +19,7 @@ plotMouseDivArrayImage(celFilename)
 
 \examples{
 \dontrun{
-plotMouseDivArrayImage("~/projects/cel/SNPex1.CEL")
+plotMouseDivArrayImage("../../../celFiles/SNP_mDIV_A8-8_081308.CEL")
 }}
 
 

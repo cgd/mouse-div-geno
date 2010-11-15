@@ -112,8 +112,7 @@ cat("Running MouseDivGenotype in parallel and saving to parallelGenoVinoResult.R
 genoVinoResult <- mouseDivGenotype(
     snpProbeInfo = snpProbeInfo, snpInfo = snpInfo, referenceDistribution=reference,
     chromosomes=c("19", "X", "Y"), celFiles=expandCelFiles(celfiledir),
-    cacheDir = outcache, verbose=T, cluster=cl,
-    processResultsFunction = NULL)
+    cacheDir = outcache, verbose=T, cluster=cl)
 save(genoVinoResult, file = "parallelGenoVinoResult.RData")
 
 stopCluster(cl)

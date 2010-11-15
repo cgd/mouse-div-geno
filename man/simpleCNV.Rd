@@ -129,14 +129,36 @@ celfiles <- expandCelFiles(celfiledir)
 ################################################################################
 load("MouseDivData.RData")
 
+# so that we can print timing information
+library("time")
+
+# First so simple CNV analysis without any clustering
+startTime <- getTime()
+simpleCNVResultNotClustered <- simpleCNV(
+    snpProbeInfo = snpProbeInfo,
+    snpInfo = snpInfo,
+    snpReferenceDistribution = snpReferenceDistribution,
+    invariantProbeInfo = invariantProbeInfo,
+    invariantProbesetInfo = invariantProbesetInfo,
+    invariantReferenceDistribution = invariantReferenceDistribution,
+    celFiles = celfiles,
+    referenceCelFile = file.path(celfiledir, "SNP_mDIV_A1-1_081308.CEL"),
+    chromosomes = c("19", "X", "Y"),
+    verbose = TRUE)
+cat("time it took us to do non-clustered CNV\n")
+timeReport(startTime)
+
+timeStampFileName <- file.path(
+    baseDir,
+    format(Sys.time(), "simpleCNVResultNotClustered-%Y-%m-%d_%H.%M.%OS5.RData"))
+save(simpleCNVResultNotClustered, file = timeStampFileName)
+
 # Do simple CNV analysis using a "local" SNOW cluster
 library("snow")
 setDefaultClusterOptions(outfile = "/dev/tty")
 numCores <- 2
 cl <- makeSOCKcluster(rep("localhost", numCores))
 clusterEvalQ(cl, library("MouseDivGeno"))
-
-library("time")
 
 startTime <- getTime()
 simpleCNVResultClustered <- simpleCNV(
@@ -161,29 +183,6 @@ save(simpleCNVResultClustered, file = timeStampFileName)
 rm(simpleCNVResultClustered)
 
 stopCluster(cl)
-
-# Do simple CNV analysis without a cluster
-startTime <- getTime()
-simpleCNVResultNotClustered <- simpleCNV(
-    snpProbeInfo = snpProbeInfo,
-    snpInfo = snpInfo,
-    snpReferenceDistribution = snpReferenceDistribution,
-    invariantProbeInfo = invariantProbeInfo,
-    invariantProbesetInfo = invariantProbesetInfo,
-    invariantReferenceDistribution = invariantReferenceDistribution,
-    celFiles = celfiles,
-    referenceCelFile = file.path(celfiledir, "SNP_mDIV_A1-1_081308.CEL"),
-    chromosomes = c("19", "X", "Y"),
-    verbose = TRUE,
-    cluster = NULL)
-cat("time it took us to do non-clustered CNV\n")
-timeReport(startTime)
-
-timeStampFileName <- file.path(
-    baseDir,
-    format(Sys.time(), "simpleCNVResultNotClustered-%Y-%m-%d_%H.%M.%OS5.RData"))
-save(simpleCNVResultNotClustered, file = timeStampFileName)
-rm(simpleCNVResultNotClustered)
   }
 }
 

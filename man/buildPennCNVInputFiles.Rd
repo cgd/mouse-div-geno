@@ -115,39 +115,30 @@ buildPennCNVInputFiles(
 
 \examples{
 \dontrun{
-baseDir <- "."
-celfiledir <- file.path(baseDir, "celFiles/")
-outdir <- file.path(baseDir, "cnv-out")
-dir.create(outdir)
+# to see this example in context please read the vignette
 
-# load the genotypes that we saved from a previous call to mouseDivGenotype(...)
-load("parallelGenoVinoResult.RData")
-genos <- genoVinoResult$geno
-isMale <- genoVinoResult$isMale
-rm(genoVinoResult)
-
-
-################################################################################
-# This command loads the snpProbeInfo, snpInfo and reference objects
-# you should download this from the CGD website in order to be able to run
-# through this example
-################################################################################
-load("MouseDivData.RData")
-
+load("../../../MouseDivData.RData")
+dir.create("../../../lrr-baf-output")
+genoVinoResult <- mouseDivGenotype(
+    snpProbeInfo            = snpProbeInfo,
+    snpInfo                 = snpInfo,
+    referenceDistribution   = snpReferenceDistribution,
+    chromosomes             = c(19, "X", "Y", "M"),
+    celFiles                = expandCelFiles("../../../celFiles"),
+    confScoreThreshold      = 0)
 buildPennCNVInputFiles(
-    outdir = outdir,
-    genotypes = genos,
-    snpProbeInfo = snpProbeInfo,
-    snpInfo = snpInfo,
-    snpReferenceDistribution = snpReferenceDistribution,
-    invariantProbeInfo = invariantProbeInfo,
-    invariantProbesetInfo = invariantProbesetInfo,
-    invariantReferenceDistribution = invariantReferenceDistribution,
-    celFiles = expandCelFiles(celfiledir),
-    isMale = isMale,
-    chromosomes = c("19", "X", "Y"),
-    retainCache = retainCache,
-    verbose = TRUE)
+    outdir                          = "../../../lrr-baf-output",
+    allowOverwrite                  = TRUE,
+    genotypes                       = genoVinoResult$geno,
+    snpProbeInfo                    = snpProbeInfo,
+    snpInfo                         = snpInfo,
+    snpReferenceDistribution        = snpReferenceDistribution,
+    invariantProbeInfo              = invariantProbeInfo,
+    invariantProbesetInfo           = invariantProbesetInfo,
+    invariantReferenceDistribution  = invariantReferenceDistribution,
+    celFiles                        = expandCelFiles("../../../celFiles"),
+    isMale                          = genoVinoResult$isMale,
+    chromosomes                     = c("19", "X", "Y", "M"))
   }
 }
 

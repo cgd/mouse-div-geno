@@ -28,41 +28,26 @@ plotSNP(nm, ns, geno, vino, main = "", xlab = "Contrast", ylab = "Average Intens
 
 \examples{
 \dontrun{
-  #== there are two ways to get genotype and vinotype
-  #=== option 1 : get genotype using genotype function
-  load('allid'); load('ABid'); load('chrid'); load('CGFLcorrection'); load('reference');
-  celfiledir = '~/projects/cel'
-  outfiledir = '~/projects/outfile'
-  isMale = ReadCel(celfiledir=celfiledir, outfiledir=outfiledir, allid, ABid, chrid, 
-     CGFLcorrection=CGFLcorrection, reference=reference, trans="CCStrans")
-  chr = 19
-  xname = paste(outfiledir, '/rawdataMMchr' chr, sep='', collapse='')
-  load(xname) # this will read chr19 contrast intensity, the output of ReadCel, MM 
-  xname = paste(outfiledir, '/rawdataSSchr' chr, sep='', collapse='')
-  load(xname) # this will read chr19 average intensity, the output of ReadCel, SS
-  load('hint') # this is list
-  genom = genotype(MM[1,], SS[1,], hint[[chr]][1], 'CCStrans')
-  geno = genom$geno; vino = genom$vino;
-  plotSNP(MM[1,], SS[1,], geno, vino)
+# to see this example in context please read the vignette
 
-  #=== option 2 : get genotype using MouseDivGenotype function
-  load('allid'); load('ABid'); load('chrid'); load('CGFLcorrection'); load('reference'); load('hint')
-  celfiledir = '~/projects/cel'
-  outfiledir = '~/projects/outfile'
-  celnamefile = '~/celname.txt'
-  chr = 19
-  MouseDivGenotype = function(allid, ABid, chrid, CGFLcorrection=CGFLcorrection, reference=reference,
-    hint=hint, trans='CCStrans', celnamefile=celnamefile, mchr=chr, celfiledir=celfiledir, 
-    outfiledir=outfiledir, subset=TRUE, confscore = 0.00001)
-  xname = paste(outfiledir, '/rawdataMMchr' chr, sep='', collapse='')
-  load(xname) # this will read chr19 contrast intensity, the output of ReadCel, MM 
-  xname = paste(outfiledir, '/rawdataSSchr' chr, sep='', collapse='')
-  load(xname) # this will read chr19 average intensity, the output of ReadCel, SS
-  xname = paste(outfiledir, '/genodata' chr, sep='', collapse='')
-  load(xname) # this will read chr19 genotype data
-  xname = paste(outfiledir, '/vinodata' chr, sep='', collapse='')
-  load(xname) # this will read chr19 vinotype data
-  plotSNP(MM[1,], SS[1,], geno[1,], vino[1,])
+# loads aIntensities and bIntensities objects which contain log2 normalized
+# A/B SNP allele intensities. Matrix rows are SNPs and matrix columns are
+# are samples
+load("../../../abIntensities.RData")
+
+# for this example I will only genotype SNPs 15 and 1281
+intenCont <- convertToContrastAndAverage(
+        aIntensities[c(15, 1281), ],
+        bIntensities[c(15, 1281), ],
+        intensitiesAreLog2 = TRUE)
+genoVinoConfForChr19 <- genotypeAnyChrChunk(
+        "19",
+        intenCont$intensityConts,
+        intenCont$intensityAvgs)
+plotSNP(intenCont$intensityConts[1, ],
+        intenCont$intensityAvgs[1, ],
+        genoVinoConfForChr19$geno[1, ],
+        genoVinoConfForChr19$vino[1, ])
   }
 }
 
