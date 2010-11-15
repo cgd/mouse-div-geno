@@ -112,7 +112,7 @@ Column descriptions:
     should correspond to the same component in the \verb#snpInfo# argument
     
     \item \verb#correction# (optional): if present this correction will be
-    applied by adding it to probe mean intesity vales. In the MouseDivData object
+    applied by adding it to probe mean intensity vales. In the MouseDivData object
     that we have provided these values have been calculated to correct intensity
     variation due to C G content in 25mers and restriction fragment size.
     These coefficients were calculated using a spline regression model fitting
@@ -265,7 +265,7 @@ C G content in probe sequences and restriction fragment length correction,
 quantile normalization based on a reference distribution, and median
 summarization. Each probe set of Mouse Diversity Array has different restriction
 fragment length and C G content, and it affects the intensity. To adjust those
-difference, we initally chose 350 .CEL files, fit a spline regression, and
+difference, we initially chose 350 .CEL files, fit a spline regression, and
 obtained the coefficients for each probe. These coefficitents were saved in the
 annotation files and is used to normalize a new array. 
 
@@ -292,7 +292,7 @@ probe sets we only summarize two probes.
 \subsection{Genotyping Algorithms}
 
 {\bf Genotyping} is based on a method combining EM based clustering and single linkage
-hierachical clustering. Detail algorithm follows. Suppose you genotype $n$
+hierarchical clustering. Detail algorithm follows. Suppose you genotype $n$
 samples.
 \begin{enumerate}
 \item[1.] test two groups (N = 2)
@@ -303,7 +303,7 @@ samples.
     \item E step : calculate $P(j|i) = exp(-(x_i-\mu_j)^2/(2*\sigma^2_j)$, where $j = 1, 2$ and $i = 1, \cdots, n$
     \item M step : $\mu_j = \frac{\sum w_jy_i}{ \sum w_j}$, $\sigma_j = \frac{\sum w_j*(y_i-\mu_j)^2}{ \sum w_j}$, and $w_j = 1/N  \sum p(j|i)$
     \end{enumerate}
-  \item Assign inital genotype. This step assigns genotype only for the samples having high probability $P(j|i)$. When the $w_j$ is severely unbalanced the maximum $P(j|i)$ in a group could be quite small, and this initial genotype step tries to assign at least one sample to each genotype. 
+  \item Assign initial genotype. This step assigns genotype only for the samples having high probability $P(j|i)$. When the $w_j$ is severely unbalanced the maximum $P(j|i)$ in a group could be quite small, and this initial genotype step tries to assign at least one sample to each genotype. 
      \begin{enumerate}
      \item For the group having a higher $w_j$ (let's call this group $j_1$, and the other group $j_2$), let threshold = median of $P(j_1|i)$ only using sample $i$ whose $P(j_2|i) < 0.5$. Assign genotype $j_1$ to samples $i$ if $P(j_1|i)$ is bigger than the threshold. 
      \item Assign genotype for group $j_2$ : Threshold = find biggest mode of $P(j_2|i)$ only using unassigned $i$ from the previous step. Also find median of $P(j_2|i)$ only using $i$ whose $P(j_1|i) < 0.5$. Threshold is maximum of two values. Assign genotype $j_2$ to $i$ if $P(j_2|i)$ is bigger than the threshold. 
@@ -347,7 +347,7 @@ genotype, then merge data from all genotypes to obtain the mean and variance of
 the average intensity, and calculate the probability based on the normal
 distribution. P(data is a VINO) is a product of those two probabilities, and
 using stringent threshold first it identifies samples having extremely low
-intensities. Then using single linkage based hierachical clustering, it
+intensities. Then using single linkage based hierarchical clustering, it
 identifies samples clustered with the one having extremely low intensities, and
 finishes vinotyping. Note that when there is a VINO, the genotype of the
 original target SNPs should be considered as no call. It is because the observed
@@ -468,7 +468,7 @@ On the other hand, this method relies on the reference strain, thus it is
 sensitive to the quality of the reference strain. For either approach users may
 ignore small size copy number variance region. 
 
-\section{Acknowlegements}
+\section{Acknowledgements}
 
 This work is funded by TODO ADD FUNDING SOURCE
  
