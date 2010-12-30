@@ -339,7 +339,8 @@ normalizeCelFileByChr <- function(
     verbose = FALSE,
     chromosomes = c(as.character(1 : 19), "X", "Y", "M"),
     referenceDistribution = NULL,
-    transformMethod = c("CCStrans", "MAtrans"))
+    transformMethod = c("CCStrans", "MAtrans", "None"),
+    keepSNPIds = FALSE)
 {
     if(verbose) cat("Reading and normalizing CEL file: ", celFileName, "\n", sep="")
     
@@ -383,9 +384,6 @@ normalizeCelFileByChr <- function(
         M <- allAint - allBint
         S <- (allAint + allBint)/2
     }
-    else {
-        stop(paste("bad transformation argument:", transformMethod))
-    }
     
     # divide CEL file up into chromosome pieces
     msList <- list()
@@ -401,8 +399,22 @@ normalizeCelFileByChr <- function(
             stop("Failed to find any probes on chromosome ", chri)
         }
         
-        msList[[chri]]$intensityConts <- M[currRows]
-        msList[[chri]]$intensityAvgs <- S[currRows]
+        if (transformMethod == "None")
+        {
+            msList[[chri]]$a <- allAint[currRows]
+            msList[[chri]]$b <- allBint[currRows]
+        }
+        else
+        {
+            msList[[chri]]$intensityConts <- M[currRows]
+            msList[[chri]]$intensityAvgs <- S[currRows]
+        }
+        
+        if(keepSNPIds)
+        {
+            names(msList[[chri]][[1]]) <- aSnpIds[currRows]
+            names(msList[[chri]][[2]]) <- names(msList[[chri]][[1]])
+        }
     }
     
     msList
