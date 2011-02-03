@@ -630,6 +630,6 @@ normalizeCelFileByChr <- function(
     }
     else
     {
-        list(head = f(xs$head), tail = function() .lazyApply(xs$tail()))
+        list(head = f(xs$head), tail = function() .lazyApply(f, xs$tail()))
     }
 }
