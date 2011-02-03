@@ -57,7 +57,7 @@ mouseDivGenotypeTab <- function(
     transformMethod <- match.arg(transformMethod)
     
     snpIntensities <- .readSnpIntensitiesFromTab(
-            snpIntensityFile    = tabFile,
+            tabFile             = snpIntensityFile,
             verbose             = verbose)
     .mouseDivGenotypeInternal(
             snpIntensities      = snpIntensities,
