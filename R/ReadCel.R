@@ -605,7 +605,7 @@ normalizeCelFileByChr <- function(
 {
     result <- .ccstrans(2 ^ sample$sampleData[ , 1], 2 ^ sample$sampleData[ , 2])
     sampleData <- matrix(c(result$x, result$y), ncol = 2)
-    rownames(sampleData) <- rownames(sample)
+    rownames(sampleData) <- rownames(sample$sampleData)
     colnames(sampleData) <- c("intensityConts", "intensityAvgs")
     
     list(sampleName = sample$sampleName, sampleData = sampleData)
@@ -616,7 +616,7 @@ normalizeCelFileByChr <- function(
     m <- sample$sampleData[ , 1] - sample$sampleData[ , 2]
     s <- (sample$sampleData[ , 1] + sample$sampleData[ , 2]) / 2
     sampleData <- matrix(c(m, s), ncol = 2)
-    rownames(sampleData) <- rownames(sample)
+    rownames(sampleData) <- rownames(sample$sampleData)
     colnames(sampleData) <- c("intensityConts", "intensityAvgs")
     
     list(sampleName = sample$sampleName, sampleData = sampleData)
