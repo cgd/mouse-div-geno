@@ -9,24 +9,92 @@
 #########################################################################
 
 mouseDivGenotype <- function(
-    snpProbeInfo, snpInfo, referenceDistribution = NULL,
-    transformMethod = c("CCStrans", "MAtrans"),
-    celFiles = expandCelFiles(getwd()), isMale = NULL, confScoreThreshold = 1e-05,
-    chromosomes = c(1:19, "X", "Y", "M"), cacheDir = tempdir(),
-    retainCache = FALSE, verbose = FALSE, cluster = NULL,
-    probesetChunkSize = 1000, resultsOutputFile = NULL)
+        snpProbeInfo, snpInfo, referenceDistribution = NULL,
+        transformMethod = c("CCStrans", "MAtrans"),
+        celFiles = expandCelFiles(getwd()), isMale = NULL, confScoreThreshold = 1e-05,
+        chromosomes = c(1:19, "X", "Y", "M"), cacheDir = tempdir(),
+        retainCache = FALSE, verbose = FALSE, cluster = NULL,
+        probesetChunkSize = 1000, resultsOutputFile = NULL)
 {
-    #library("time")
-    
     transformMethod <- match.arg(transformMethod)
     if(!inherits(snpProbeInfo, "data.frame") ||
        !all(c("probeIndex", "isAAllele", "snpId") %in% names(snpProbeInfo)))
     {
         stop("You must supply a \"snpProbeInfo\" data frame parameter which has ",
-             "at a minimum the \"probeIndex\", \"isAAllele\" and \"snpId\" ",
-             "components. Please see the help documentation for more details.")
+                "at a minimum the \"probeIndex\", \"isAAllele\" and \"snpId\" ",
+                "components. Please see the help documentation for more details.")
     }
     snpProbeInfo$snpId <- as.factor(snpProbeInfo$snpId)
+    
+    snpIntensities <- .readSnpIntensitiesFromCEL(
+            celFiles                = celFiles,
+            snpProbeInfo            = snpProbeInfo,
+            referenceDistribution   = referenceDistribution,
+            verbose                 = verbose)
+    .mouseDivGenotypeInternal(
+            snpIntensities      = snpIntensities,
+            snpInfo             = snpInfo,
+            transformMethod     = transformMethod,
+            isMale              = isMale,
+            confScoreThreshold  = confScoreThreshold,
+            chromosomes         = chromosomes,
+            cacheDir            = cacheDir,
+            retainCache         = retainCache,
+            verbose             = verbose,
+            cluster             = cluster,
+            probesetChunkSize   = probesetChunkSize,
+            resultsOutputFile   = resultsOutputFile)
+}
+
+mouseDivGenotypeTab <- function(
+        snpIntensityFile, snpInfo,
+        transformMethod = c("CCStrans", "MAtrans"),
+        isMale = NULL, confScoreThreshold = 1e-05,
+        chromosomes = c(1:19, "X", "Y", "M"), cacheDir = tempdir(),
+        retainCache = FALSE, verbose = FALSE, cluster = NULL,
+        probesetChunkSize = 1000, resultsOutputFile = NULL)
+{
+    transformMethod <- match.arg(transformMethod)
+    
+    snpIntensities <- .readSnpIntensitiesFromTab(
+            snpIntensityFile    = tabFile,
+            verbose             = verbose)
+    .mouseDivGenotypeInternal(
+            snpIntensities      = snpIntensities,
+            snpInfo             = snpInfo,
+            transformMethod     = transformMethod,
+            isMale              = isMale,
+            confScoreThreshold  = confScoreThreshold,
+            chromosomes         = chromosomes,
+            cacheDir            = cacheDir,
+            retainCache         = retainCache,
+            verbose             = verbose,
+            cluster             = cluster,
+            probesetChunkSize   = probesetChunkSize,
+            resultsOutputFile   = resultsOutputFile)
+}
+
+.mouseDivGenotypeInternal <- function(
+    snpIntensities, snpInfo,
+    transformMethod = c("CCStrans", "MAtrans"),
+    isMale = NULL, confScoreThreshold = 1e-05,
+    chromosomes = c(1:19, "X", "Y", "M"), cacheDir = tempdir(),
+    retainCache = FALSE, verbose = FALSE, cluster = NULL,
+    probesetChunkSize = 1000, resultsOutputFile = NULL)
+{
+    transformMethod <- match.arg(transformMethod)
+    if(transformMethod == "CCStrans")
+    {
+        snpIntensities <- .lazyApply(.ccsTransformSample, snpIntensities)
+    }
+    else if(transformMethod == "MAtrans")
+    {
+        snpIntensities <- .lazyApply(.maTransformSample, snpIntensities)
+    }
+    else
+    {
+        stop("transformMethod parameter is not valid")
+    }
     
     if(!inherits(snpInfo, "data.frame") ||
        !all(c("snpId", "chrId") %in% names(snpInfo)))
@@ -55,17 +123,6 @@ mouseDivGenotype <- function(
         stop("failed to load the snow library")
     }
     
-    nfile <- length(celFiles)
-    if(nfile <= 1)
-    {
-        stop("Cannot successfully genotype with less than two CEL files")
-    }
-    
-    if(!is.null(isMale) && length(isMale) != nfile)
-    {
-        stop("the length of isMale must match the length of celFiles")
-    }
-    
     if(!is.null(resultsOutputFile))
     {
         processResultsFunction <- .createAppendResultsToCSVFunction(resultsOutputFile)
@@ -87,13 +144,8 @@ mouseDivGenotype <- function(
     genderInferenceRequired <- is.null(isMale)
     if(genderInferenceRequired)
     {
-        # in order to be able to infer gender we'll need per-array
-        # mean intensity values for the X and Y chromosomes. We'll initialize
-        # them as all 0's
-        meanIntensityXPerArray <- rep(0, length(celFiles))
-        meanIntensityYPerArray <- rep(0, length(celFiles))
-        names(meanIntensityXPerArray) <- celFiles
-        names(meanIntensityYPerArray) <- celFiles
+        meanIntensityXPerArray <- NULL
+        meanIntensityYPerArray <- NULL
         
         meanIntensityPerAutosome <- rep(0, length(allAutosomes))
         names(meanIntensityPerAutosome) <- allAutosomes
@@ -111,57 +163,33 @@ mouseDivGenotype <- function(
     
     # loop through all the CELL files. We need to read and normalize the CEL
     # file data and save it to file in chunks no bigger than probesetChunkSize
-    for(celfile in celFiles)
+    sampleNames <- character()
+    while(!is.null(snpIntensities))
     {
-        # wrapping this up as a local function def allows us to avoid doing the
-        # normalization work unless it's necessary
-        makeMsList <- function()
+        head <- snpIntensities$head
+        sampleNames <- c(sampleNames, head$sampleName)
+        
+        if(genderInferenceRequired)
         {
-            normalizeCelFileByChr(
-                celfile,
-                snpProbeInfo,
-                snpInfo,
-                verbose,
-                allChr,
-                referenceDistribution,
-                transformMethod)
+            meanIntensityXPerArray[head$sampleName] <- 0
+            meanIntensityYPerArray[head$sampleName] <- 0
         }
-        msList <- NULL
         
         for(currChr in allChr)
         {
+            chrSnpInfo <- snpInfo[snpInfo$chrId == currChr, ]
+            chrMatch <- match(chrSnpInfo$snpId, rownames(head$sampleData))
+            chrMatch <- chrMatch[!is.na(chrMatch)]
+            chrData <- head$sampleData[chrMatch, ]
             for(chunkIndex in 1 : length(chrChunks[[currChr]]))
             {
-                chunkFile <- .chunkFileName(cacheDir, "snp", celfile, currChr, probesetChunkSize, chunkIndex)
-                chunkFileAlreadyExists <- file.exists(chunkFile)
-                if(!chunkFileAlreadyExists)
-                {
-                    # if we haven't yet normalized the CEL file we'll have to
-                    # do that now
-                    if(is.null(msList))
-                    {
-                        msList <- makeMsList()
-                    }
-                    
-                    chunk <- chrChunks[[currChr]][[chunkIndex]]
-                    probesetIndices <- chunk$start : chunk$end
-                    mChunk <- msList[[currChr]]$intensityConts[probesetIndices]
-                    sChunk <- msList[[currChr]]$intensityAvgs[probesetIndices]
-                    
-                    save(mChunk, sChunk, file = chunkFile)
-                }
+                chunk <- chrChunks[[currChr]][[chunkIndex]]
+                probesetIndices <- chunk$start : chunk$end
+                mChunk <- chrData[ , "intensityConts"][probesetIndices]
+                sChunk <- chrData[ , "intensityAvgs"][probesetIndices]
                 
                 if(genderInferenceRequired)
                 {
-                    if(chunkFileAlreadyExists)
-                    {
-                        # we need to bring sChunk into scope
-                        # TODO this is loading mChunk too which is unnecessary
-                        #      if we save m and s to different files we can
-                        #      avoid this
-                        load(file = chunkFile)
-                    }
-                    
                     if(currChr %in% allAutosomes)
                     {
                         meanIntensityPerAutosome[currChr] <-
@@ -169,19 +197,34 @@ mouseDivGenotype <- function(
                     }
                     else if(currChr == "X")
                     {
-                    	meanIntensityXPerArray[celfile] <-
-                            meanIntensityXPerArray[celfile] + sum(as.double(sChunk))
+                    	meanIntensityXPerArray[head$sampleName] <-
+                            meanIntensityXPerArray[head$sampleName] + sum(as.double(sChunk))
                     }
                     else if(currChr == "Y")
                     {
-                        meanIntensityYPerArray[celfile] <-
-                            meanIntensityYPerArray[celfile] + sum(as.double(sChunk))
+                        meanIntensityYPerArray[head$sampleName] <-
+                            meanIntensityYPerArray[head$sampleName] + sum(as.double(sChunk))
                     }
                 }
+                
+                # cache the data
+                chunkFile <- .chunkFileName(cacheDir, "snp", head$sampleName, currChr, probesetChunkSize, chunkIndex)
+                save(mChunk, sChunk, file = chunkFile)
             }
         }
         
-        rm(msList)
+        snpIntensities <- snpIntensities$tail()
+    }
+    
+    nfile <- length(sampleNames)
+    if(nfile <= 1)
+    {
+        stop("Cannot successfully genotype with less than two samples")
+    }
+    
+    if(!is.null(isMale) && length(isMale) != nfile)
+    {
+        stop("the length of isMale must match the sample count")
     }
     
     # determines which arrays are male and which are female if we need to
@@ -240,15 +283,15 @@ mouseDivGenotype <- function(
             SS <- NULL
             for (i in 1:nfile)
             {
-                chunkFile <- .chunkFileName(cacheDir, "snp", celFiles[i], chri, probesetChunkSize, chunkIndex)
+                chunkFile <- .chunkFileName(cacheDir, "snp", sampleNames[i], chri, probesetChunkSize, chunkIndex)
                 load(chunkFile)
                 MM <- cbind(MM, mChunk)
                 SS <- cbind(SS, sChunk)
                 rm(mChunk, sChunk)
             }
             
-            colnames(MM) <- celFiles
-            colnames(SS) <- celFiles
+            colnames(MM) <- sampleNames
+            colnames(SS) <- sampleNames
             
             #cat("time it took us to get to genotypethis\n")
             #timeReport(startTime)
@@ -298,7 +341,7 @@ mouseDivGenotype <- function(
                             
                             for(k in 1 : length(chunkResult))
                             {
-                                colnames(chunkResult[[k]]) <- .fileBaseWithoutExtension(celFiles)
+                                colnames(chunkResult[[k]]) <- sampleNames
                             }
                             processResultsFunction(chunkProbesetInfo, chunkResult)
                         }
@@ -338,7 +381,7 @@ mouseDivGenotype <- function(
                     
                     for(k in 1 : length(chunkResult))
                     {
-                        colnames(chunkResult[[k]]) <- .fileBaseWithoutExtension(celFiles)
+                        colnames(chunkResult[[k]]) <- sampleNames
                     }
                     processResultsFunction(chunkProbesetInfo, chunkResult)
                 }
@@ -382,7 +425,7 @@ mouseDivGenotype <- function(
         {
             results[[i]] <- results[[i]][snpOrdering, ]
             rownames(results[[i]]) <- snpIdsInOrder
-            colnames(results[[i]]) <- .fileBaseWithoutExtension(celFiles)
+            colnames(results[[i]]) <- sampleNames
         }
     }
     
@@ -394,13 +437,13 @@ mouseDivGenotype <- function(
             cat("cleaning up cache files before returning geno/vinotype results")
         }
         
-        for(celfile in celFiles)
+        for(sampleName in sampleNames)
         {
             for(currChr in allChr)
             {
                 for(chunkIndex in 1 : length(chrChunks[[currChr]]))
                 {
-                    chunkFile <- .chunkFileName(cacheDir, "snp", celfile, currChr, probesetChunkSize, chunkIndex)
+                    chunkFile <- .chunkFileName(cacheDir, "snp", sampleName, currChr, probesetChunkSize, chunkIndex)
                     if(file.exists(chunkFile))
                     {
                         file.remove(chunkFile)

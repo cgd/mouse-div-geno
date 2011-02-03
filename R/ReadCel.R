@@ -439,10 +439,9 @@ normalizeCelFileByChr <- function(
 }
 
 # TODO we need more parameters to make sure this is really meaningfully unique
-.chunkFileName <- function(baseDir, kind, celFileName, chrName, chunkSize, chunkIndex)
+.chunkFileName <- function(baseDir, kind, sampleName, chrName, chunkSize, chunkIndex)
 {
-    fileBase <- .fileBaseWithoutExtension(celFileName)
-    chunkFile <- paste(fileBase, "-", kind, "-", chrName, "-", chunkSize, "-", chunkIndex, ".RData", sep="")
+    chunkFile <- paste(sampleName, "-", kind, "-", chrName, "-", chunkSize, "-", chunkIndex, ".RData", sep="")
     
     file.path(baseDir, chunkFile)
 }
@@ -450,4 +449,185 @@ normalizeCelFileByChr <- function(
 .fileBaseWithoutExtension <- function(celFileName)
 {
     sub("\\.[^\\.]*$", "", basename(celFileName))
+}
+
+.readSnpIntensitiesFromCEL <- function(
+        celFiles,
+        snpProbeInfo,
+        referenceDistribution = NULL,
+        verbose = FALSE)
+{
+    readNext <- function(index)
+    {
+        if(index > length(celFiles))
+        {
+            NULL
+        }
+        else
+        {
+            if(verbose) cat("Reading and normalizing CEL file: ", celFiles[index], "\n", sep="")
+            
+            celData <- read.celfile(celFiles[index], intensity.means.only = TRUE)
+            y <- log2(as.matrix(celData[["INTENSITY"]][["MEAN"]][snpProbeInfo$probeIndex]))
+            if (length(snpProbeInfo$correction) > 0)
+                # C+G and fragment length correction y
+                y <- y + snpProbeInfo$correction
+            if (length(referenceDistribution) > 0)
+                y <- normalize.quantiles.use.target(y, target = referenceDistribution)
+            
+            # separate A alleles from B alleles and summarize to the probeset level
+            allAint <- y[snpProbeInfo$isAAllele, 1, drop = FALSE]
+            allBint <- y[!snpProbeInfo$isAAllele, 1, drop = FALSE]
+            allAint <- subColSummarizeMedian(
+                    matrix(allAint, ncol = 1),
+                    snpProbeInfo$snpId[snpProbeInfo$isAAllele])
+            allBint <- subColSummarizeMedian(
+                    matrix(allBint, ncol = 1),
+                    snpProbeInfo$snpId[!snpProbeInfo$isAAllele])
+            
+            aSnpIds <- rownames(allAint)
+            bSnpIds <- rownames(allBint)
+            if(!all(aSnpIds == bSnpIds))
+            {
+                stop("The SNP IDs for the A alleles should match up with the SNP IDs ",
+                     "for the B alleles but they do not.")
+            }
+            
+            currDataMatrix <- matrix(c(allAint, allBint), ncol = 2)
+            rownames(currDataMatrix) <- aSnpIds
+            colnames(currDataMatrix) <- c("A", "B")
+            
+            sampleName <- .fileBaseWithoutExtension(celFiles[index])
+            list(
+                head = list(sampleName = sampleName, sampleData = currDataMatrix),
+                tail = function() readNext(index + 1))
+        }
+    }
+}
+
+.readSnpIntensitiesFromTab <- function(tabFile, verbose = FALSE)
+{
+    mustCloseConnection <- FALSE
+    if(!inherits(tabFile, "connection"))
+    {
+        tabFile <- file(tabFile, "rt")
+        mustCloseConnection <- TRUE
+    }
+    
+    # wrap read.table function for convenience
+    readSnpIntenTable <- function(file, ...)
+    {
+        read.table(
+                file,
+                header = FALSE,
+                sep = "\t",
+                row.names = NULL,
+                stringsAsFactors = FALSE,
+                col.names = c("sampleID", "snpId", "A", "B"),
+                colClasses = c("character", "character", "numeric", "numeric"),
+                ...)
+    }
+    
+    # for our initial read we need to determine a SNP count
+    currSampleData <- NULL
+    repeat
+    {
+        currBlock <- readSnpIntenTable(tabFile, nrows = 10000)
+        if(nrow(currBlock) == 0)
+        {
+            break
+        }
+        
+        currSampleData <- rbind(currSampleData, currBlock)
+        
+        if(currSampleData[[1]][1] != currSampleData[[1]][nrow(currSampleData)])
+        {
+            break
+        }
+    }
+    snpCount <- sum(currSampleData[[1]] == currSampleData[[1]][1])
+    
+    readNext <- function(leftovers)
+    {
+        numLeftovers <- if(is.null(leftovers)) 0 else nrow(leftovers)
+        numLeftoversToTake <- min(snpCount, numLeftovers)
+        if(numLeftoversToTake >= 1)
+        {
+            leftoversToTake <- 1 : numLeftoversToTake
+            taken <- leftovers[leftoversToTake, ]
+            leftovers <- leftovers[-leftoversToTake, ]
+        }
+        else
+        {
+            taken <- NULL
+        }
+        
+        numNewToTake <- snpCount - numLeftoversToTake
+        if(numNewToTake >= 1)
+        {
+            newData <- readSnpIntenTable(tabFile, nrows = numNewToTake)
+            currData <- rbind(taken, newData)
+        }
+        else
+        {
+            currData <- taken
+        }
+        
+        if(is.null(currData) || nrow(currData) == 0)
+        {
+            if(mustCloseConnection)
+            {
+                close(tabFile)
+            }
+            
+            NULL
+        }
+        else
+        {
+            if(verbose) cat("Finished reading data for sample: ", currData[[1]][1], "\n", sep="")
+            
+            currDataMatrix <- matrix(c(currData[[3]], currData[[4]]), ncol = 2)
+            rownames(currDataMatrix) <- currData[[2]]
+            colnames(currDataMatrix) <- c("A", "B")
+            
+            list(
+                head = list(sampleName = currData[[1]][1], sampleData = currDataMatrix),
+                tail = function() readNext(leftovers))
+        }
+    }
+    
+    readNext(currSampleData)
+}
+
+.ccsTransformSample <- function(sample)
+{
+    result <- .ccstrans(2 ^ sample$sampleData[ , 1], 2 ^ sample$sampleData[ , 2])
+    sampleData <- matrix(c(result$x, result$y), ncol = 2)
+    rownames(sampleData) <- rownames(sample)
+    colnames(sampleData) <- c("intensityConts", "intensityAvgs")
+    
+    list(sampleName = sample$sampleName, sampleData = sampleData)
+}
+
+.maTransformSample <- function(sample)
+{
+    m <- sample$sampleData[ , 1] - sample$sampleData[ , 2]
+    s <- (sample$sampleData[ , 1] + sample$sampleData[ , 2]) / 2
+    sampleData <- matrix(c(m, s), ncol = 2)
+    rownames(sampleData) <- rownames(sample)
+    colnames(sampleData) <- c("intensityConts", "intensityAvgs")
+    
+    list(sampleName = sample$sampleName, sampleData = sampleData)
+}
+
+.lazyApply <- function(f, xs)
+{
+    if(is.null(xs))
+    {
+        NULL
+    }
+    else
+    {
+        list(head = f(xs$head), tail = function() .lazyApply(xs$tail()))
+    }
 }
