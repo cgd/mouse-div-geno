@@ -503,6 +503,8 @@ normalizeCelFileByChr <- function(
                 tail = function() readNext(index + 1))
         }
     }
+    
+    readNext(1)
 }
 
 .readSnpIntensitiesFromTab <- function(tabFile, verbose = FALSE)
