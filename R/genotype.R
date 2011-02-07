@@ -17,6 +17,14 @@
 # geno = genotype(nm, ns, hint = NULL)
 #======================================================================
 genotype <- function(nm, ns, hint1, trans) {
+    onError <- function(e) {
+        nsize <- length(nm)
+        list(geno = rep(-1, nsize), vino = rep(0, nsize), conf = rep(0, nsize))
+    }
+    tryCatch(.genotype(nm, ns, hint1, trans), error = onError)
+}
+
+.genotype <- function(nm, ns, hint1, trans) {
     hint <- rep(0, 3)
     hint[1] <- max(nm)
     hint[3] <- min(nm)
@@ -379,6 +387,14 @@ genotype <- function(nm, ns, hint1, trans) {
 
 # genotyping for probesets that we know are homozygous a priori
 genotypeHomozygous <- function(nm, ns, trans) {
+    onError <- function(e) {
+        nsize <- length(nm)
+        list(geno = rep(-1, nsize), vino = rep(0, nsize), conf = rep(0, nsize))
+    }
+    tryCatch(.genotypeHomozygous(nm, ns, trans), error = onError)
+}
+
+.genotypeHomozygous <- function(nm, ns, trans) {
     nsize <- length(nm)
     hint <- c(max(nm), min(nm))
     
