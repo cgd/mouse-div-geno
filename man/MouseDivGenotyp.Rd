@@ -1,6 +1,7 @@
 \author{Hyuna Yang}
 \name{mouseDivGenotype}
 \alias{mouseDivGenotype}
+\alias{mouseDivGenotypeTab}
 \title{Genotype the Mouse Diversity Array}
 \description{
   This function reads the .CEL files, normalizes the intensities, genotypes and vinotypes the Mouse Diversity Array. It also provides the input files used for the pennCNV (Wang, et al, 2007, a software to detect the copy number variance. Refer to CNV.R for detail information for detecting CNV.).  
@@ -10,15 +11,23 @@
 }
 \usage{
 mouseDivGenotype(
-    snpProbeInfo, snpInfo, referenceDistribution = NULL,
-    transformMethod = c("CCStrans", "MAtrans"),
-    celFiles = expandCelFiles(getwd()), isMale = NULL, confScoreThreshold = 1e-05,
-    chromosomes = c(1:19, "X", "Y", "M"), cacheDir = tempdir(),
-    retainCache = FALSE, verbose = FALSE, cluster = NULL,
-    probesetChunkSize = 1000, resultsOutputFile = NULL)
+        snpProbeInfo, snpInfo, referenceDistribution = NULL,
+        transformMethod = c("CCStrans", "MAtrans"),
+        celFiles = expandCelFiles(getwd()), isMale = NULL, confScoreThreshold = 1e-05,
+        chromosomes = c(1:19, "X", "Y", "M"),
+        verbose = FALSE, cluster = NULL,
+        probesetChunkSize = 1000, outputDir = NULL, outputFilePrefix = "mouseDivResults_")
+mouseDivGenotypeTab(
+        snpIntensityFile, snpInfo,
+        transformMethod = c("CCStrans", "MAtrans"),
+        isMale = NULL, confScoreThreshold = 1e-05,
+        chromosomes = c(1:19, "X", "Y", "M"),
+        verbose = FALSE, cluster = NULL,
+        probesetChunkSize = 1000, outputDir = NULL, outputFilePrefix = "mouseDivResults_")
 }
 
 \arguments{
+    \item{snpIntensityFile}{a tab delimited file with columns for "sampleID", "snpId", "A", "B" where the A and B columns contain log-normalized summarized per-SNP intensities}
     \item{snpProbeInfo}{
         A data-frame containing probe-level data for the SNPs we are genotyping.
         The data-frame should contain the following components:
@@ -52,19 +61,18 @@ mouseDivGenotype(
   \item{isMale}{a logical vector the same length as celFiles or NULL if gender should be inferred from the CEL file intensities}
   \item{confScoreThreshold}{if confidence scores fall below this threshold we assign a genotype value of -1}
   \item{chromosomes}{character vector of chromosome IDs that you want to genotype. These should correspond to the values in \code{snpInfo$chrId}. Eg: \code{chromosomes=c(1 : 19, "X", "Y", "M")}.}
-  \item{cacheDir}{directory used to store intermediate results. By default a temporary directory is used. You can reuse a cache directory to save time in the normalization steps (this function will only perform CEL file normalization if it does not find the data that it needs in the cache)}
-  \item{retainCache}{defaults to \code{FALSE}. If \code{FALSE} the data cache is deleted before returning. Setting this value to \code{TRUE} could save processing time on subsequent calls}
   \item{verbose}{if set to \code{TRUE} status information will be printed while the function executes}
   \item{cluster}{a cluster object as created by the \pkg{SNOW} package. If this value is non-NULL then this function will run genotyping computations in parallel on the given cluster}
   \item{probesetChunkSize}{determines how many SNPs will be processed at a time (in a single chunk). Keeping this number low reduces memory utilization and makes paralellism more fine-grained at the cost of managing more chunk objects. The default value provides a reasonable tradeoff}
-  \item{resultsOutputFile}{an optional file name argument which can will cause genotyping results to be saved to a comma separated file rather than being returned as an R object. This parameter will provide a convenient way to save results to a CSV file, but it can also be an important way to save memory if you are processing many CEL files in a single run (because results are processed chunk-by-chunk there is no longer a need to accumulate results for a single return value)}
+  \item{outputDir}{an optional directory name argument which will cause genotype, vinotype and confidence results to be saved to a comma separated file rather than being returned as an R object. This parameter will provide a convenient way to save results to a CSV file, but it can also be an important way to save memory if you are processing many CEL files in a single run (because results are processed chunk-by-chunk there is no longer a need to accumulate results for a single return value.)}
+  \item{outputFilePrefix}{this parameter is only used where outputDir is non-NULL. Three files will be saved in outputDir (for genotypes, vinotypes and confidence scores). This parameter determines the prefix used in those three file names.}
 }
 
 \value{
-    If \code{resultsOutputFile} is non-NULL then this function returns a
+    If (and only if) the \code{outputDir} parameter is non-NULL then this function returns a
     list containing only \code{isMale} value because
-    \code{resultsOutputFile} will contain data for \code{geno}, \code{vino} and
-    \code{conf}. If \code{resultsOutputFile} is NULL however the return list
+    \code{outputDir} will contain data for \code{geno}, \code{vino} and
+    \code{conf}. If \code{outputDir} is NULL however the return list
     will contain all of the following components:
     
     \item{geno}{a matrix with a row per SNP and a column per CEL file. -1 = No call, 1 = AA, 2 = AB, and 3 = BB}
@@ -80,10 +88,6 @@ baseDir <- "."
 # the directory that contains all of our CEL files
 celfiledir <- file.path(baseDir, "celFiles/")
 
-# create an output cache so that we only normalize CEL files once
-outcache <- file.path(baseDir, "outcache")
-dir.create(outcache)
-
 ################################################################################
 # This command loads the snpProbeInfo, snpInfo and reference objects
 # you should download this from the CGD website in order to be able to run
@@ -91,15 +95,12 @@ dir.create(outcache)
 ################################################################################
 load("MouseDivData.RData")
 
-# genotype in serial and save the results to "serialGenoVinoResults.csv", note
-# that setting retainCache = T allows the following mouseDivGenotype call to
-# save some time by reusing the normalized CEL file data
+# genotype in serial and save the results to "." (the current directory)
 cat("Running mouseDivGenotype in serial and saving to serialGenoVinoResults.csv\n")
 mouseDivGenotype(
     snpProbeInfo = snpProbeInfo, snpInfo = snpInfo, referenceDistribution=reference,
     chromosomes=c("19", "X", "Y"), celFiles=expandCelFiles(celfiledir),
-    cacheDir = outcache, retainCache = T, verbose = T,
-    resultsOutputFile = "serialGenoVinoResults.csv")
+    verbose = T, resultsOutputFile = ".")
 
 # Run in parallel and this time save the resulting raw R object to file rather
 # than using the processResultsFunction argument to create a CSV file
@@ -112,7 +113,7 @@ cat("Running MouseDivGenotype in parallel and saving to parallelGenoVinoResult.R
 genoVinoResult <- mouseDivGenotype(
     snpProbeInfo = snpProbeInfo, snpInfo = snpInfo, referenceDistribution=reference,
     chromosomes=c("19", "X", "Y"), celFiles=expandCelFiles(celfiledir),
-    cacheDir = outcache, verbose=T, cluster=cl)
+    verbose=T, cluster=cl)
 save(genoVinoResult, file = "parallelGenoVinoResult.RData")
 
 stopCluster(cl)

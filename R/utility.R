@@ -68,47 +68,188 @@ mouseDivDensityPlot <- function(celFilenames, snpProbeInfo, type = c("Average", 
     }
 }
 
-.createAppendResultsToCSVFunction <- function(fileName)
+.initFlatFileConnections <- function(
+        dir,
+        matrices,
+        sep = "\t",
+        prefix = "mouseDivResults_",
+        suffix = ".txt")
 {
-    # if the file already exists we should delete it (without this we would end
-    # up appending to the exising file which we don't want)
-    if(file.exists(fileName))
+    connections <- list()
+    for(name in names(matrices))
     {
-        file.remove(fileName)
+        outFileName <- file.path(dir, paste(prefix, name, suffix, sep = ""))
+        con <- file(description = outFileName, open = "wt")
+        connections[[name]] <- con
+        
+        # write the header
+        write.table(
+                matrix(c("ID", colnames(matrices[[name]])), nrow = 1),
+                file = con,
+                sep = sep,
+                row.names = FALSE,
+                col.names = FALSE,
+                qmethod = "double")
     }
     
-    function(snpProbesetInfoChunk, genotypingResultsChunk)
+    connections
+}
+
+.writeResultsToFlatFile <- function(connections, matrices, sep = "\t")
+{
+    n <- length(connections)
+    if(length(matrices) != n)
     {
-        # the genotyping results are a list of matrices right now. We need
-        # to bind everything together into a single matrix.
-        fileExists <- file.exists(fileName)
-        if(!fileExists)
-        {
-            # start by ensuring that column names are unique and meaningful if
-            # we're working on a new file
-            for(currName in names(genotypingResultsChunk))
-            {
-                colnames(genotypingResultsChunk[[currName]]) <-
-                    paste(currName, colnames(genotypingResultsChunk[[currName]]), sep = "_")
-            }
-        }
-        
-        uberMatrix <- snpProbesetInfoChunk
-        for(currMat in genotypingResultsChunk)
-        {
-        	uberMatrix <- cbind(uberMatrix, currMat)
-        }
-        
+        stop("number of file connections must match number of matrices")
+    }
+    
+    for(i in 1 : n)
+    {
         write.table(
-            uberMatrix,
-            file = fileName,
-            append = fileExists,
-            sep = ",",
-            row.names = FALSE,
-            col.names = !fileExists,
-            qmethod = "double")
+                matrices[[i]],
+                file = connections[[i]],
+                sep = sep,
+                row.names = TRUE,
+                col.names = FALSE,
+                qmethod = "double")
     }
 }
+
+#.writeResultsListHeader <- function(
+#        outCon,
+#        outSep = c("\t", ","))
+#{
+#    outSep <- match.arg(outSep)
+#    write.table(
+#            matrix(c("probeset_id", "sample", "call", "score"), nrow = 1),
+#            file = outCon,
+#            sep = outSep,
+#            row.names = FALSE,
+#            col.names = FALSE,
+#            qmethod = "double")
+#}
+#
+#.writeResultsList <- function(
+#        outCon,
+#        snpProbesetInfoChunk,
+#        genotypingResultsChunk,
+#        outSep = c("\t", ","))
+#{
+#    outSep <- match.arg(outSep)
+#    
+#    # fill in the out calls
+#    outCalls <- matrix(
+#            "",
+#            nrow = nrow(genotypingResultsChunk$geno),
+#            ncol = ncol(genotypingResultsChunk$geno))
+#    outCalls[genotypingResultsChunk$geno == 1] <- "A"
+#    outCalls[genotypingResultsChunk$geno == 2] <- "H"
+#    outCalls[genotypingResultsChunk$geno == 3] <- "B"
+#    outCalls[genotypingResultsChunk$geno == -1] <- "N"
+#    outCalls[genotypingResultsChunk$vino == 1] <- "V"
+#    
+#    # now write the output snp by snp
+#    for(i in 1 : nrow(outCalls))
+#    {
+#        currMatrix <- cbind(
+#                snpProbesetInfoChunk$snpId[i],
+#                colnames(genotypingResultsChunk$geno),
+#                outCalls[i, ],
+#                genotypingResultsChunk$conf[i, ])
+#    }
+#}
+#
+#.writeResultsMatrixHeader <- function(
+#        outCon,
+#        snpProbesetInfoChunk,
+#        genotypingResultsChunk,
+#        outSep = c("\t", ","))
+#{
+#    outSep <- match.arg(outSep)
+#    
+#    header <- colnames(snpProbesetInfoChunk)
+#    for(currName in names(genotypingResultsChunk))
+#    {
+#        header <- c(
+#                header,
+#                paste(currName, colnames(genotypingResultsChunk[[currName]]), sep = "_"))
+#    }
+#    
+#    write.table(
+#            matrix(header, nrow = 1),
+#            file = outCon,
+#            sep = outSep,
+#            row.names = FALSE,
+#            col.names = FALSE,
+#            qmethod = "double")
+#}
+#
+#.writeResultsMatricies <- function(
+#    outCon,
+#    snpProbesetInfoChunk,
+#    genotypingResultsChunk,
+#    outSep = c("\t", ","))
+#{
+#    outSep <- match.arg(outSep)
+#    
+#    # the genotyping results are a list of matrices right now. We need
+#    # to bind everything together into a single matrix.
+#    uberMatrix <- snpProbesetInfoChunk
+#    for(currMat in genotypingResultsChunk)
+#    {
+#       uberMatrix <- cbind(uberMatrix, currMat)
+#    }
+#    
+#    write.table(
+#        uberMatrix,
+#        file = fileName,
+#        sep = outSep,
+#        row.names = FALSE,
+#        col.names = FALSE,
+#        qmethod = "double")
+#}
+#
+#.createAppendResultsToCSVFunction <- function(fileName)
+#{
+#    # if the file already exists we should delete it (without this we would end
+#    # up appending to the exising file which we don't want)
+#    if(file.exists(fileName))
+#    {
+#        file.remove(fileName)
+#    }
+#    
+#    function(snpProbesetInfoChunk, genotypingResultsChunk)
+#    {
+#        # the genotyping results are a list of matrices right now. We need
+#        # to bind everything together into a single matrix.
+#        fileExists <- file.exists(fileName)
+#        if(!fileExists)
+#        {
+#            # start by ensuring that column names are unique and meaningful if
+#            # we're working on a new file
+#            for(currName in names(genotypingResultsChunk))
+#            {
+#                colnames(genotypingResultsChunk[[currName]]) <-
+#                    paste(currName, colnames(genotypingResultsChunk[[currName]]), sep = "_")
+#            }
+#        }
+#        
+#        uberMatrix <- snpProbesetInfoChunk
+#        for(currMat in genotypingResultsChunk)
+#        {
+#        	uberMatrix <- cbind(uberMatrix, currMat)
+#        }
+#        
+#        write.table(
+#            uberMatrix,
+#            file = fileName,
+#            append = fileExists,
+#            sep = ",",
+#            row.names = FALSE,
+#            col.names = !fileExists,
+#            qmethod = "double")
+#    }
+#}
 
 #### biweight midcovariance from Wilcox(1997)
 #### code from Dr.RichHerrington at

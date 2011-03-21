@@ -98,9 +98,10 @@ genotypeAnyChrChunk <- function(
         hint <- rep(0, numProbesets)
     }
     
-    # geno/vinotype each of the probesets in this chunk and
-    # append the results to our list of matrices
-    chunkResult <- list(geno = NULL, vino = NULL, conf = NULL)
+    # geno/vinotype each of the probesets in this chunk
+    geno <- matrix(0, nrow = numProbesets, ncol = numArrays)
+    vino <- matrix(0, nrow = numProbesets, ncol = numArrays)
+    conf <- matrix(0, nrow = numProbesets, ncol = numArrays)
     for(probesetIndex in 1 : numProbesets)
     {
         # TODO genotype sometimes returns results with colnames and sometimes not.
@@ -109,8 +110,11 @@ genotypeAnyChrChunk <- function(
             ss[probesetIndex, ],
             hint[probesetIndex],
             trans)
-        chunkResult <- mapply(rbind, chunkResult, currVals, SIMPLIFY = FALSE)
+        geno[probesetIndex, ] <- currVals$geno
+        vino[probesetIndex, ] <- currVals$vino
+        conf[probesetIndex, ] <- currVals$conf
     }
+    chunkResult <- list(geno = geno, vino = vino, conf = conf)
     
     if(confScoreThreshold > 0)
     {
@@ -135,17 +139,21 @@ genotypeAnyChrChunk <- function(
         stop("Internal error: ms matrix dimensions should match ss matrix dimensions")
     }
     
-    # geno/vinotype each of the probesets in this chunk and
-    # append the results to our list of matrices
-    chunkResult <- list(geno = NULL, vino = NULL, conf = NULL)
+    # geno/vinotype each of the probesets in this chunk
+    geno <- matrix(0, nrow = numProbesets, ncol = numArrays)
+    vino <- matrix(0, nrow = numProbesets, ncol = numArrays)
+    conf <- matrix(0, nrow = numProbesets, ncol = numArrays)
     for(probesetIndex in 1 : numProbesets)
     {
         currVals <- genotypeHomozygous(
             ms[probesetIndex, ],
             ss[probesetIndex, ],
             trans)
-        chunkResult <- mapply(rbind, chunkResult, currVals, SIMPLIFY = FALSE)
+        geno[probesetIndex, ] <- currVals$geno
+        vino[probesetIndex, ] <- currVals$vino
+        conf[probesetIndex, ] <- currVals$conf
     }
+    chunkResult <- list(geno = geno, vino = vino, conf = conf)
     
     if(confScoreThreshold > 0)
     {

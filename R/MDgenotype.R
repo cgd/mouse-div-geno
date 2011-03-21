@@ -12,9 +12,9 @@ mouseDivGenotype <- function(
         snpProbeInfo, snpInfo, referenceDistribution = NULL,
         transformMethod = c("CCStrans", "MAtrans"),
         celFiles = expandCelFiles(getwd()), isMale = NULL, confScoreThreshold = 1e-05,
-        chromosomes = c(1:19, "X", "Y", "M"), cacheDir = tempdir(),
-        retainCache = FALSE, verbose = FALSE, cluster = NULL,
-        probesetChunkSize = 1000, resultsOutputFile = NULL)
+        chromosomes = c(1:19, "X", "Y", "M"),
+        verbose = FALSE, cluster = NULL,
+        probesetChunkSize = 1000, outputDir = NULL, outputFilePrefix = "mouseDivResults_")
 {
     transformMethod <- match.arg(transformMethod)
     if(!inherits(snpProbeInfo, "data.frame") ||
@@ -38,21 +38,20 @@ mouseDivGenotype <- function(
             isMale              = isMale,
             confScoreThreshold  = confScoreThreshold,
             chromosomes         = chromosomes,
-            cacheDir            = cacheDir,
-            retainCache         = retainCache,
             verbose             = verbose,
             cluster             = cluster,
             probesetChunkSize   = probesetChunkSize,
-            resultsOutputFile   = resultsOutputFile)
+            outputDir           = outputDir,
+            outputFilePrefix    = outputFilePrefix)
 }
 
 mouseDivGenotypeTab <- function(
         snpIntensityFile, snpInfo,
         transformMethod = c("CCStrans", "MAtrans"),
         isMale = NULL, confScoreThreshold = 1e-05,
-        chromosomes = c(1:19, "X", "Y", "M"), cacheDir = tempdir(),
-        retainCache = FALSE, verbose = FALSE, cluster = NULL,
-        probesetChunkSize = 1000, resultsOutputFile = NULL)
+        chromosomes = c(1:19, "X", "Y", "M"),
+        verbose = FALSE, cluster = NULL,
+        probesetChunkSize = 1000, outputDir = NULL, outputFilePrefix = "mouseDivResults_")
 {
     transformMethod <- match.arg(transformMethod)
     
@@ -66,12 +65,11 @@ mouseDivGenotypeTab <- function(
             isMale              = isMale,
             confScoreThreshold  = confScoreThreshold,
             chromosomes         = chromosomes,
-            cacheDir            = cacheDir,
-            retainCache         = retainCache,
             verbose             = verbose,
             cluster             = cluster,
             probesetChunkSize   = probesetChunkSize,
-            resultsOutputFile   = resultsOutputFile)
+            outputDir           = outputDir,
+            outputFilePrefix    = outputFilePrefix)
 }
 
 .mouseDivGenotypeInternal <- function(
@@ -80,7 +78,7 @@ mouseDivGenotypeTab <- function(
     isMale = NULL, confScoreThreshold = 1e-05,
     chromosomes = c(1:19, "X", "Y", "M"), cacheDir = tempdir(),
     retainCache = FALSE, verbose = FALSE, cluster = NULL,
-    probesetChunkSize = 1000, resultsOutputFile = NULL)
+    probesetChunkSize = 1000, outputDir = NULL, outputFilePrefix = "mouseDivResults_")
 {
     transformMethod <- match.arg(transformMethod)
     if(transformMethod == "CCStrans")
@@ -121,15 +119,6 @@ mouseDivGenotypeTab <- function(
     if(!is.null(cluster) && !require("snow"))
     {
         stop("failed to load the snow library")
-    }
-    
-    if(!is.null(resultsOutputFile))
-    {
-        processResultsFunction <- .createAppendResultsToCSVFunction(resultsOutputFile)
-    }
-    else
-    {
-        processResultsFunction <- NULL
     }
     
     # make sure that the chromosome vector is not numeric
@@ -248,6 +237,7 @@ mouseDivGenotypeTab <- function(
     }
     
     results <- list()
+    outFileConnections <- NULL
     for (chri in chromosomes)
     {
         chrIndices <- which(snpInfo$chrId == chri)
@@ -318,7 +308,7 @@ mouseDivGenotypeTab <- function(
                     for(i in 1 : length(chunkResultsList))
                     {
                         chunkResult <- chunkResultsList[[i]]
-                        if(is.null(processResultsFunction))
+                        if(is.null(outputDir))
                         {
                             # we only accumulate results if there is no function
                             if(length(results) == 0)
@@ -342,8 +332,17 @@ mouseDivGenotypeTab <- function(
                             for(k in 1 : length(chunkResult))
                             {
                                 colnames(chunkResult[[k]]) <- sampleNames
+                                rownames(chunkResult[[k]]) <- chunkProbesetInfo$snpId
                             }
-                            processResultsFunction(chunkProbesetInfo, chunkResult)
+                            
+                            if(is.null(outFileConnections))
+                            {
+                                outFileConnections <- .initFlatFileConnections(
+                                        outputDir,
+                                        chunkResult,
+                                        prefix = outputFilePrefix)
+                            }
+                            .writeResultsToFlatFile(outFileConnections, chunkResult)
                         }
                     }
                     rm(chunkResult)
@@ -363,7 +362,7 @@ mouseDivGenotypeTab <- function(
                     transformMethod = transformMethod,
                     isMale = isMale,
                     confScoreThreshold = confScoreThreshold)
-                if(is.null(processResultsFunction))
+                if(is.null(outputDir))
                 {
                     # we only accumulate results if there is no function
                     if(length(results) == 0)
@@ -382,8 +381,17 @@ mouseDivGenotypeTab <- function(
                     for(k in 1 : length(chunkResult))
                     {
                         colnames(chunkResult[[k]]) <- sampleNames
+                        rownames(chunkResult[[k]]) <- chunkProbesetInfo$snpId
                     }
-                    processResultsFunction(chunkProbesetInfo, chunkResult)
+                    
+                    if(is.null(outFileConnections))
+                    {
+                        outFileConnections <- .initFlatFileConnections(
+                                outputDir,
+                                chunkResult,
+                                prefix = outputFilePrefix)
+                    }
+                    .writeResultsToFlatFile(outFileConnections, chunkResult)
                 }
                 rm(chunkResult)
             }
@@ -398,9 +406,14 @@ mouseDivGenotypeTab <- function(
     # we have not accumulated any results to return, otherwise we have a bit
     # of post-processing to do to make sure that the matrices that we return
     # to the user match up nicely with what they passed in
-    if(!is.null(processResultsFunction))
+    if(!is.null(outputDir))
     {
         results <- NULL
+        for(con in outFileConnections)
+        {
+            flush(con)
+            close(con)
+        }
     }
     else
     {

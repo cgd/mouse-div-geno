@@ -18,7 +18,9 @@ normalizeCelFileByChr(
     verbose = FALSE,
     chromosomes = c(as.character(1 : 19), "X", "Y", "M"),
     referenceDistribution = NULL,
-    transformMethod = c("CCStrans", "MAtrans"))}
+    transformMethod = c("CCStrans", "MAtrans", "None"),
+    keepSNPIds = FALSE)
+}
 
 \arguments{
     \item{celFileName}{the file path to the CEL file that will be read and normalized}
@@ -51,6 +53,7 @@ normalizeCelFileByChr(
     \item{chromosomes}{the vector of chromosomes that should be normalized. Data from other chromosomes will be discarded}
     \item{referenceDistribution}{Reference distribution used for the quantile normalization. If there is an evidence that the density distribution of samples follows more than one distribution or different from that of classical laboratory strain, this normalization should not be used and leave as a default i.e. \code{referenceDistribution = NULL}.}
     \item{transformMethod}{The MouseDivGenotype package genotype the array based on contrast and summation, and offers two transformations to obtain contrast; CCS and MA transformation. CCS (contrast centers stretch) transformation proposed by BRLMM-P algorithm obtains contrast via asinh(K*(A-B)/(A+B))/asinh(K), where A and B is intensity of A and B allele and K is a hyperparameter. MA transformation obtains contrast by log2(A) - log2(B). In both cases summation is defined by (log2(A) + log2(B))/2}
+    \item{keepSNPIds}{determines if the return value should preserve the SNP IDs or not}
 }
 \value{
     A list object where chromosome names can be used to index. Each list item
