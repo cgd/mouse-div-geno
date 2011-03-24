@@ -204,7 +204,13 @@ buildPennCNVInputFiles <- function(
         {
             for(chunkIndex in 1 : length(chrChunks[[currChr]]))
             {
-                chunkFile <- .chunkFileName(cacheDir, "snp", celfile, currChr, probesetChunkSize, chunkIndex)
+                chunkFile <- .chunkFileName(
+                        cacheDir,
+                        "snp",
+                        .fileBaseWithoutExtension(celfile),
+                        currChr,
+                        probesetChunkSize,
+                        chunkIndex)
                 chunkFileAlreadyExists <- file.exists(chunkFile)
                 
                 if(!chunkFileAlreadyExists)
@@ -311,7 +317,13 @@ buildPennCNVInputFiles <- function(
                 celfile <- celFiles[fileIndex]
                 
                 # loads mChunk and sChunk into scope
-                chunkFile <- .chunkFileName(cacheDir, "snp", celfile, currChr, probesetChunkSize, chunkIndex)
+                chunkFile <- .chunkFileName(
+                        cacheDir,
+                        "snp",
+                        .fileBaseWithoutExtension(celfile),
+                        currChr,
+                        probesetChunkSize,
+                        chunkIndex)
                 load(chunkFile)
                 
                 mMatrix[, fileIndex] <- mChunk
@@ -365,7 +377,7 @@ buildPennCNVInputFiles <- function(
                     chunkFile <- .chunkFileName(
                         cacheDir,
                         paste("invariant", i, sep = ""),
-                        celfile,
+                        .fileBaseWithoutExtension(celfile),
                         currChr,
                         probesetChunkSize,
                         chunkIndex)
@@ -425,7 +437,7 @@ buildPennCNVInputFiles <- function(
                     chunkFile <- .chunkFileName(
                         cacheDir,
                         paste("invariant", i, sep = ""),
-                        celfile,
+                        .fileBaseWithoutExtension(celfile),
                         currChr,
                         probesetChunkSize,
                         chunkIndex)

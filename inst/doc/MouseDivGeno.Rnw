@@ -470,8 +470,9 @@ ignore small size copy number variance region.
 
 \section{Acknowledgements}
 
-This work is funded by TODO ADD FUNDING SOURCE
- 
+This work was funded by the NIGMS National Centers of Excellence in Systems
+Biology Program, grant P50 GM076468.
+
 \section{References}
 
 Wang, K.\textit{et~al} (2007) PennCNV: an integrated hidden Markov model
