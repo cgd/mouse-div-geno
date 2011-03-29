@@ -23,12 +23,12 @@ allow you to perform genotyping, identify probe sets
 potentially harboring a new mutation (Variable INtensity Oligonucleotide or
 VINO, here we call it a vinotyping) and perform CNV analysis. The R package,
 annotations, and further information can be obtained from
-{\tt http://genomedynamics.org/tools/MouseDivGeno}.
+{\tt http://genomedynamics.org/tools/mousedivgeno}.
 
 Before we get started we will to load some data into scope which will give us probe and probeset
 level information about the Mouse Diversity Array platform which we will use in
 several examples throughout this vignette. You can obtain this data from
-{\tt http://genomedynamics.org/tools/MouseDivGeno}
+{\tt http://genomedynamics.org/tools/mousedivgeno}
 
 <<keep.source = TRUE, eval = TRUE>>=
 load("../../../MouseDivData.RData")
