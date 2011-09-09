@@ -15,13 +15,36 @@
 # vino = vinotype(nm, ns, geno)
 #======================================================================
 
-vinotype <- function(nm, ns, geno) {
+vinotype <- function(nm, ns, geno, logfn=NULL) {
+    doLog <- !is.null(logfn)
+    
+    # logging code expects nm vector elements to be named
+    if(doLog && is.null(names(nm))) {
+        names(nm) <- paste("Sample", seq_along(nm), sep="")
+    }
+    sampleNames <- names(nm)
+    
+    if(doLog) {
+        logfn("performing SNP VInOtyping")
+    }
+    
     #=========== find centers
     iig <- sort(unique(geno))
     ngeno <- length(iig)
+    if(doLog) {
+        logfn("vinotyping using observed genotype(s): %s", paste(iig, collapse=", "))
+    }
     
     # identifies likely H's
     rmid <- nm >= -0.3 & nm <= 0.3 & ns < quantile(ns, 0.2)
+    if(doLog && any(rmid)) {
+        logfn(
+            "the following %i sample(s) are excluded for the purposes of calculating a VInO threshold:",
+            sum(rmid))
+        for(n in sampleNames[rmid]) {
+            logfn("    %s", n)
+        }
+    }
     
     # key ideas:
     #   * get some kind of threshold which is mms to decide if there
@@ -45,11 +68,26 @@ vinotype <- function(nm, ns, geno) {
     vino <- rep(-1, nsize)
     
     # 2 indicates it's definitely not a vino
-    vino[(ns > mms)] <- 2
+    aboveThresh <- ns > mms
+    vino[aboveThresh] <- 2
     vino1 <- vino
     ss <- list()
     m <- matrix(0, 2, 2)
     lm <- 0
+    
+    if(doLog) {
+        if(any(aboveThresh)) {
+            logfn(
+                "the following %i samples are above the VInO threshold of %f and therefore are not VInOs:",
+                sum(aboveThresh),
+                mms)
+            for(n in sampleNames[aboveThresh]) {
+                logfn("    %s", n)
+            }
+        } else {
+            logfn("all samples are below the VInO threshold of %f and will be tested as vinos", mms)
+        }
+    }
     
     # iterate through the genotypes
     for (ik in iig) {
@@ -83,6 +121,14 @@ vinotype <- function(nm, ns, geno) {
                   if (length(k) > 0) {
                     # find them and mark them as vino here
                     vino[geno == 2 & ns <= onns[max(k)]] <- 1
+                    if(doLog && any(geno == 2 & ns <= onns[max(k)])) {
+                        logfn(
+                            "the following hets will be set to vino since we detected an intensity gap and AB averaged intensity <= %f:",
+                            onns[max(k)])
+                        for(n in sampleNames[geno == 2 & ns <= onns[max(k)]]) {
+                            logfn("    %s", n)
+                        }
+                    }
                   }
                 }
             }
@@ -140,18 +186,44 @@ vinotype <- function(nm, ns, geno) {
             
             # vino1 only for aa group, (=2 means not a vino for sure)
             vino1[geno == 1][dd1 < th[1]] <- 2
+            if(doLog && any(dd1 < th[1])) {
+                logfn(
+                    "excluding the following as candidate VInOs since geno==1 and dd1 < %f:",
+                    th[1])
+                for(n in sampleNames[geno == 1][dd1 < th[1]]) {
+                    logfn("    %s", n)
+                }
+            }
         }
         if (l2 > 1 & det(ss[[2]]) > 10^(-10)) {
             tmp <- mahalanobis(adata[geno == 2, ], c(mm[2], ms[2]), ss[[2]])
             dd2 <- pchisq(tmp, df = 2)
             mdd[geno == 2] <- dd2
             vino1[geno == 2][dd2 < th[2]] <- 2
+            
+            if(doLog && any(dd2 < th[2])) {
+                logfn(
+                    "excluding the following as candidate VInOs since geno==2 and dd2 < %f:",
+                    th[2])
+                for(n in sampleNames[geno == 2][dd2 < th[2]]) {
+                    logfn("    %s", n)
+                }
+            }
         }
         if (l3 > 1 & det(ss[[3]]) > 10^(-10)) {
             tmp <- mahalanobis(adata[geno == 3, ], c(mm[3], ms[3]), ss[[3]])
             dd3 <- pchisq(tmp, df = 2)
             mdd[geno == 3] <- dd3
             vino1[geno == 3][dd3 < th[3]] <- 2
+            
+            if(doLog && any(dd3 < th[3])) {
+                logfn(
+                    "excluding the following as candidate VInOs since geno==3 and dd3 < %f:",
+                    th[3])
+                for(n in sampleNames[geno == 3][dd3 < th[3]]) {
+                    logfn("    %s", n)
+                }
+            }
         }
     }
     else if (ngeno == 2) {
@@ -166,6 +238,16 @@ vinotype <- function(nm, ns, geno) {
             dd1 <- pchisq(tmp, df = 2)
             mdd[geno == iig[1]] <- dd1
             vino1[geno == iig[1]][dd1 < th[1]] <- 2
+            
+            if(doLog && any(dd1 < th[1])) {
+                logfn(
+                    "excluding the following as candidate VInOs since geno==%i and dd1 < %f:",
+                    iig[1],
+                    th[1])
+                for(n in sampleNames[geno == iig[1]][dd1 < th[1]]) {
+                    logfn("    %s", n)
+                }
+            }
         }
         if (l2 > 1 & det(ss[[iig[2]]]) > 10^(-10)) {
             tmp <- mahalanobis(adata[geno == iig[2], ], c(mm[iig[2]], ms[iig[2]]), 
@@ -173,12 +255,31 @@ vinotype <- function(nm, ns, geno) {
             dd2 <- pchisq(tmp, df = 2)
             mdd[geno == iig[2]] <- dd2
             vino1[geno == iig[2]][dd2 < th[2]] <- 2
+            
+            if(doLog && any(dd2 < th[2])) {
+                logfn(
+                    "excluding the following as candidate VInOs since geno==%i and dd2 < %f:",
+                    iig[2],
+                    th[2])
+                for(n in sampleNames[geno == iig[2]][dd2 < th[2]]) {
+                    logfn("    %s", n)
+                }
+            }
         }
     }
     else if (ngeno == 1) {
         tmp <- mahalanobis(adata, c(mm[iig[1]], ms[iig[1]]), ss[[iig[1]]])
         mdd <- pchisq(tmp, df = 2)
         vino1[mdd < 0.99] <- 2
+        
+        if(doLog && any(mdd < 0.99)) {
+            logfn(
+                "excluding the following as candidate VInOs since %f < 0.99:",
+                mdd)
+            for(n in sampleNames[mdd < 0.99]) {
+                logfn("    %s", n)
+            }
+        }
     }
     
     # vino is product of 2 probs. IE: assuming our 2D intensity plot, how far
@@ -192,6 +293,13 @@ vinotype <- function(nm, ns, geno) {
     # vino = outlier with in each group & low intensity
     k <- alld * mdd
     vino[(vino1 != 2 & k > 0.9999)] <- 1
+    if(doLog && any(vino1 != 2 & k > 0.9999)) {
+        logfn("the following are called as VInO since they haven't yet been excluded and k > 0.9999:")
+        for(n in sampleNames[vino1 != 2 & k > 0.9999]) {
+            logfn("    %s", n)
+        }
+    }
+    
     ons <- order(ns)
     sn <- ns[ons]
     dsn <- diff(sn)
@@ -202,13 +310,36 @@ vinotype <- function(nm, ns, geno) {
         g <- match(bdsn, dsn)
         th <- sum(ns < median(ns))
         g <- g[g < th]
-        if (length(g) > 0) 
+        if (length(g) > 0) {
             vino[ns <= sn[max(g)]] <- 1
+            if(doLog && any(ns <= sn[max(g)])) {
+                logfn("the following are set to VInO because of a large gap in intensity (despite any previous exclusions):")
+                for(n in sampleNames[ns <= sn[max(g)]]) {
+                    logfn("    %s", n)
+                }
+            }
+        }
     }
     
-    if (any(vino == 1) & any(vino == -1)) {
+    if (any(vino == 1) && any(vino == -1)) {
+        if(doLog) {
+            naVinos <- which(vino == -1)
+        }
+        
         # pick up remaining vinos using vdist clustering
         vino <- .vdist(nm/5, ns/(2 * (max(ns) - min(ns))), vino)
+        
+        if(doLog) {
+            newVinos <- c()
+            for(i in naVinos) {
+                newVinos[length(newVinos) + 1] <- sprintf("%s=%i", sampleNames[i], vino[i])
+            }
+            
+            logfn("the following VInO values were determined using .vdist clustering:")
+            for(n in newVinos) {
+                logfn("    %s", n)
+            }
+        }
     }
     
     vino[vino != 1] <- 0

@@ -15,15 +15,17 @@ mouseDivGenotype(
         transformMethod = c("CCStrans", "MAtrans"),
         celFiles = expandCelFiles(getwd()), isMale = NULL, confScoreThreshold = 1e-05,
         chromosomes = c(1:19, "X", "Y", "M"),
-        verbose = FALSE, cluster = NULL,
-        probesetChunkSize = 1000, outputDir = NULL, outputFilePrefix = "mouseDivResults_")
+        cluster = NULL,
+        probesetChunkSize = 1000, outputDir = NULL, outputFilePrefix = "mouseDivResults_",
+        logFile)
 mouseDivGenotypeTab(
         snpIntensityFile, snpInfo,
         transformMethod = c("CCStrans", "MAtrans"),
         isMale = NULL, confScoreThreshold = 1e-05,
         chromosomes = c(1:19, "X", "Y", "M"),
-        verbose = FALSE, cluster = NULL,
-        probesetChunkSize = 1000, outputDir = NULL, outputFilePrefix = "mouseDivResults_")
+        cluster = NULL,
+        probesetChunkSize = 1000, outputDir = NULL, outputFilePrefix = "mouseDivResults_",
+        logFile)
 }
 
 \arguments{
@@ -61,11 +63,11 @@ mouseDivGenotypeTab(
   \item{isMale}{a logical vector the same length as celFiles or NULL if gender should be inferred from the CEL file intensities}
   \item{confScoreThreshold}{if confidence scores fall below this threshold we assign a genotype value of -1}
   \item{chromosomes}{character vector of chromosome IDs that you want to genotype. These should correspond to the values in \code{snpInfo$chrId}. Eg: \code{chromosomes=c(1 : 19, "X", "Y", "M")}.}
-  \item{verbose}{if set to \code{TRUE} status information will be printed while the function executes}
   \item{cluster}{a cluster object as created by the \pkg{SNOW} package. If this value is non-NULL then this function will run genotyping computations in parallel on the given cluster}
   \item{probesetChunkSize}{determines how many SNPs will be processed at a time (in a single chunk). Keeping this number low reduces memory utilization and makes paralellism more fine-grained at the cost of managing more chunk objects. The default value provides a reasonable tradeoff}
   \item{outputDir}{an optional directory name argument which will cause genotype, vinotype and confidence results to be saved to a comma separated file rather than being returned as an R object. This parameter will provide a convenient way to save results to a CSV file, but it can also be an important way to save memory if you are processing many CEL files in a single run (because results are processed chunk-by-chunk there is no longer a need to accumulate results for a single return value.)}
   \item{outputFilePrefix}{this parameter is only used where outputDir is non-NULL. Three files will be saved in outputDir (for genotypes, vinotypes and confidence scores). This parameter determines the prefix used in those three file names.}
+  \item{logFile}{the file name or connection that log messages should be written to. Use stdout() to print to standard-out}
 }
 
 \value{
@@ -100,7 +102,7 @@ cat("Running mouseDivGenotype in serial and saving to serialGenoVinoResults.csv\
 mouseDivGenotype(
     snpProbeInfo = snpProbeInfo, snpInfo = snpInfo, referenceDistribution=reference,
     chromosomes=c("19", "X", "Y"), celFiles=expandCelFiles(celfiledir),
-    verbose = T, resultsOutputFile = ".")
+    logFile = stdout(), resultsOutputFile = ".")
 
 # Run in parallel and this time save the resulting raw R object to file rather
 # than using the processResultsFunction argument to create a CSV file
@@ -113,7 +115,7 @@ cat("Running MouseDivGenotype in parallel and saving to parallelGenoVinoResult.R
 genoVinoResult <- mouseDivGenotype(
     snpProbeInfo = snpProbeInfo, snpInfo = snpInfo, referenceDistribution=reference,
     chromosomes=c("19", "X", "Y"), celFiles=expandCelFiles(celfiledir),
-    verbose=T, cluster=cl)
+    logFile=stdout(), cluster=cl)
 save(genoVinoResult, file = "parallelGenoVinoResult.RData")
 
 stopCluster(cl)

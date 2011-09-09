@@ -53,29 +53,31 @@ genotypeAnyChrChunk <- function(
         chr,
         intensityConts, intensityAvgs,
         hint = NULL,
-        parIndices = NULL,
+        isInPAR = NULL,
         transformMethod = c("CCStrans", "MAtrans"),
         isMale = NULL,
-        confScoreThreshold = 1e-05)
+        confScoreThreshold = 1e-05,
+        logSnp = NULL,
+        logfn = NULL)
 {
     transformMethod <- match.arg(transformMethod)
     
     if(chr == "X")
     {
-        .genotypeXChromosomeChunk(intensityConts, intensityAvgs, hint, parIndices, transformMethod, isMale, confScoreThreshold)
+        .genotypeXChromosomeChunk(intensityConts, intensityAvgs, hint, isInPAR, transformMethod, isMale, confScoreThreshold, logSnp, logfn)
     }
     else if(chr == "Y")
     {
-        .genotypeYChromosomeChunk(intensityConts, intensityAvgs, hint, transformMethod, isMale, confScoreThreshold)
+        .genotypeYChromosomeChunk(intensityConts, intensityAvgs, hint, transformMethod, isMale, confScoreThreshold, logSnp, logfn)
     }
     else if(chr == "M")
     {
-        .genotypeHomozygousChunk(intensityConts, intensityAvgs, transformMethod, confScoreThreshold)
+        .genotypeHomozygousChunk(intensityConts, intensityAvgs, transformMethod, confScoreThreshold, logSnp, logfn, "M")
     }
     else
     {
         # chr is an autosome
-        .genotypeChunk(intensityConts, intensityAvgs, hint, transformMethod, confScoreThreshold)
+        .genotypeChunk(intensityConts, intensityAvgs, hint, transformMethod, confScoreThreshold, logSnp, logfn, "autosome")
     }
 }
 
@@ -83,8 +85,18 @@ genotypeAnyChrChunk <- function(
 # columns map to arrays (CEL files). This function is useful for genotyping
 # autosomes and other sections of the genome where it is possible to have 3
 # genotyping outcomes. Otherwise use genotypeHomozygousChunk
-.genotypeChunk <- function(ms, ss, hint, trans, confScoreThreshold)
+.genotypeChunk <- function(ms, ss, hint, trans, confScoreThreshold, logSnp=NULL, logfn=NULL, kind = c("autosome", "PAR", "femaleX"))
 {
+    kind <- match.arg(kind)
+    if(!is.null(logfn)) {
+        kindDescrip <- switch(kind, autosome="autosome", PAR="pseudoautosomal", "female X chromosome")
+        logfn(
+            "performing standard genotyping for %i %s SNPs and %i samples",
+            nrow(ms),
+            kindDescrip,
+            ncol(ms))
+    }
+    
     numArrays <- ncol(ms)
     numProbesets <- nrow(ms)
     
@@ -98,21 +110,43 @@ genotypeAnyChrChunk <- function(
         hint <- rep(0, numProbesets)
     }
     
+    if(is.null(logfn)) {
+        logSnp <- NULL
+    }
+    
+    snpNames <- rownames(ms)
+    
     # geno/vinotype each of the probesets in this chunk
     geno <- matrix(0, nrow = numProbesets, ncol = numArrays)
     vino <- matrix(0, nrow = numProbesets, ncol = numArrays)
     conf <- matrix(0, nrow = numProbesets, ncol = numArrays)
     for(probesetIndex in 1 : numProbesets)
     {
-        # TODO genotype sometimes returns results with colnames and sometimes not.
+        if(!is.null(logSnp) && logSnp[probesetIndex]) {
+            if(is.null(snpNames)) {
+                logfn("==== GENOTYPING AND VINOTYPING SNP ====")
+            } else {
+                logfn("==== GENOTYPING AND VINOTYPING %s ====", snpNames[probesetIndex])
+            }
+        }
+        
         currVals <- genotype(
             ms[probesetIndex, ],
             ss[probesetIndex, ],
             hint[probesetIndex],
-            trans)
+            trans,
+            if(!is.null(logSnp) && logSnp[probesetIndex]) logfn else NULL)
         geno[probesetIndex, ] <- currVals$geno
         vino[probesetIndex, ] <- currVals$vino
         conf[probesetIndex, ] <- currVals$conf
+
+        if(!is.null(logSnp) && logSnp[probesetIndex]) {
+            if(is.null(snpNames)) {
+                logfn("==== FINISHED GENOTYPING AND VINOTYPING SNP ====")
+            } else {
+                logfn("==== FINISHED GENOTYPING AND VINOTYPING %s ====", snpNames[probesetIndex])
+            }
+        }
     }
     chunkResult <- list(geno = geno, vino = vino, conf = conf)
     
@@ -129,8 +163,18 @@ genotypeAnyChrChunk <- function(
 # columns map to arrays (CEL files). This function is useful for genotyping
 # the parts of the genome where you do not expect to observe heterozygous
 # alleles
-.genotypeHomozygousChunk <- function(ms, ss, trans, confScoreThreshold)
+.genotypeHomozygousChunk <- function(ms, ss, trans, confScoreThreshold, logSnp=NULL, logfn=NULL, kind = c("M", "maleX", "Y"))
 {
+    kind <- match.arg(kind)
+    if(!is.null(logfn)) {
+        kindDescrip <- switch(kind, M="mitochondrial", maleX="male X chromosome", Y="Y chromosome")
+        logfn(
+            "performing homozygous genotyping for %i %s SNPs and %i samples",
+            nrow(ms),
+            kindDescrip,
+            ncol(ms))
+    }
+    
     numArrays <- ncol(ms)
     numProbesets <- nrow(ms)
     
@@ -148,7 +192,8 @@ genotypeAnyChrChunk <- function(
         currVals <- genotypeHomozygous(
             ms[probesetIndex, ],
             ss[probesetIndex, ],
-            trans)
+            trans,
+            if(!is.null(logSnp) && logSnp[probesetIndex]) logfn else NULL)
         geno[probesetIndex, ] <- currVals$geno
         vino[probesetIndex, ] <- currVals$vino
         conf[probesetIndex, ] <- currVals$conf
@@ -164,8 +209,9 @@ genotypeAnyChrChunk <- function(
     chunkResult
 }
 
-.genotypeXChromosomeChunk <- function(ms, ss, hint, parIndices, trans, isMale, confScoreThreshold)
+.genotypeXChromosomeChunk <- function(ms, ss, hint, isInPAR, trans, isMale, confScoreThreshold, logSnp=NULL, logfn=NULL)
 {
+    parIndices <- which(as.logical(isInPAR))
     numArrays <- ncol(ms)
     numProbesets <- nrow(ms)
     
@@ -203,12 +249,14 @@ genotypeAnyChrChunk <- function(
     }
     results <- list()
     
+    normalHint <- hint[normalIndices]
+    normalLogSnp <- logSnp[normalIndices]
+    
     # we can treat the females like autosomes for the purposes of genotyping
     if(length(femaleColumns) >= 2) # TODO is this OK if it is equal to 1?
     {
         normalFemaleMs <- ms[normalIndices, femaleColumns, drop = FALSE]
         normalFemaleSs <- ss[normalIndices, femaleColumns, drop = FALSE]
-        normalHint <- hint[normalIndices]
         
         # we are going to treat the female probesets just like autosomes for
         # the purposes of geno/vinotyping
@@ -217,7 +265,10 @@ genotypeAnyChrChunk <- function(
             normalFemaleSs,
             normalHint,
             trans,
-            confScoreThreshold)
+            confScoreThreshold,
+            normalLogSnp,
+            logfn,
+            "femaleX")
         results <- initializeNamesIfMissing(results, names(normalFemaleResult))
         for(itemName in names(normalFemaleResult))
         {
@@ -236,7 +287,10 @@ genotypeAnyChrChunk <- function(
             normalMaleMs,
             normalMaleSs,
             trans,
-            confScoreThreshold)
+            confScoreThreshold,
+            normalLogSnp,
+            logfn,
+            "maleX")
         results <- initializeNamesIfMissing(results, names(normalMaleResult))
         for(itemName in names(normalMaleResult))
         {
@@ -251,13 +305,17 @@ genotypeAnyChrChunk <- function(
         parMs <- ms[parIndices, , drop = FALSE]
         parSs <- ss[parIndices, , drop = FALSE]
         parHint <- hint[parIndices]
+        parLogSnp <- logSnp[parIndices]
         
         parResult <- .genotypeChunk(
             parMs,
             parSs,
             parHint,
             trans,
-            confScoreThreshold)
+            confScoreThreshold,
+            parLogSnp,
+            logfn,
+            "PAR")
         results <- initializeNamesIfMissing(results, names(parResult))
         for(itemName in names(parResult))
         {
@@ -268,7 +326,7 @@ genotypeAnyChrChunk <- function(
     results
 }
 
-.genotypeYChromosomeChunk <- function(ms, ss, hint, trans, isMale, confScoreThreshold)
+.genotypeYChromosomeChunk <- function(ms, ss, hint, trans, isMale, confScoreThreshold, logSnp=NULL, logfn=NULL)
 {
     numArrays <- ncol(ms)
     numProbesets <- nrow(ms)
@@ -282,7 +340,7 @@ genotypeAnyChrChunk <- function(
     
     maleMs <- ms[, maleColumns, drop = FALSE]
     maleSs <- ss[, maleColumns, drop = FALSE]
-    maleResult <- .genotypeHomozygousChunk(maleMs, maleSs, trans, confScoreThreshold)
+    maleResult <- .genotypeHomozygousChunk(maleMs, maleSs, trans, confScoreThreshold, logSnp, logfn, "Y")
     
     # fill in the female columns using NA so that the dimensions of the
     # input data match the dimensions of the output data
@@ -337,20 +395,26 @@ convertToContrastAndAverage <- function(
     list(intensityConts = M, intensityAvgs = S)
 }
 
-# reads in the given CEL file, partitions it into groups defined by groupLevels
-# then breaks up those groups into chunk sizes no bigger than maxChunkSize
-# groups should be factors where
 normalizeCelFileByChr <- function(
     celFileName,
     snpProbeInfo,
     snpInfo,
-    verbose = FALSE,
+    logFile = NULL,
     chromosomes = c(as.character(1 : 19), "X", "Y", "M"),
     referenceDistribution = NULL,
     transformMethod = c("CCStrans", "MAtrans", "None"),
     keepSNPIds = FALSE)
 {
-    if(verbose) cat("Reading and normalizing CEL file: ", celFileName, "\n", sep="")
+    if(inherits(logFile, "character")) {
+        logFile <- file(logFile, "wt")
+    } else if(!is.null(logFile) && !inherits(logFile, "connection")) {
+        stop("the logFile parameter should be either NULL, a file name, ",
+            "or a connection")
+    }
+    
+    if(!is.null(logFile)) {
+        cat("Reading and normalizing CEL file: ", celFileName, "\n", file=logFile, sep="")
+    }
     
     transformMethod <- match.arg(transformMethod)
     
@@ -463,8 +527,25 @@ normalizeCelFileByChr <- function(
         celFiles,
         snpProbeInfo,
         referenceDistribution = NULL,
-        verbose = FALSE)
+        logFile = NULL)
 {
+    if(!is.null(logFile) && !inherits(logFile, "connection")) {
+        stop("the logFile parameter should be a connection")
+    }
+    
+    logOn <- !is.null(logFile)
+    logf <- function(fmt, ...) {
+        if(logOn) {
+            cat(sprintf(fmt, ...), file=logFile)
+        }
+    }
+    logfn <- function(fmt, ...) {
+        if(logOn) {
+            logf(fmt, ...)
+            cat("\n", file=logFile)
+        }
+    }
+    
     readNext <- function(index)
     {
         if(index > length(celFiles))
@@ -473,7 +554,7 @@ normalizeCelFileByChr <- function(
         }
         else
         {
-            if(verbose) cat("Reading and normalizing CEL file: ", celFiles[index], "\n", sep="")
+            logfn("Reading and normalizing CEL file: %s", celFiles[index])
             
             celData <- read.celfile(celFiles[index], intensity.means.only = TRUE)
             y <- log2(as.matrix(celData[["INTENSITY"]][["MEAN"]][snpProbeInfo$probeIndex]))
@@ -515,8 +596,25 @@ normalizeCelFileByChr <- function(
     readNext(1)
 }
 
-.readSnpIntensitiesFromTab <- function(tabFile, verbose = FALSE)
+.readSnpIntensitiesFromTab <- function(tabFile, logFile = NULL)
 {
+    if(!is.null(logFile) && !inherits(logFile, "connection")) {
+        stop("the logFile parameter should be a connection")
+    }
+    
+    logOn <- !is.null(logFile)
+    logf <- function(fmt, ...) {
+        if(logOn) {
+            cat(sprintf(fmt, ...), file=logFile)
+        }
+    }
+    logfn <- function(fmt, ...) {
+        if(logOn) {
+            logf(fmt, ...)
+            cat("\n", file=logFile)
+        }
+    }
+    
     mustCloseConnection <- FALSE
     if(!inherits(tabFile, "connection"))
     {
@@ -594,7 +692,7 @@ normalizeCelFileByChr <- function(
         }
         else
         {
-            if(verbose) cat("Finished reading data for sample: ", currData[[1]][1], "\n", sep="")
+            logfn("Finished reading data for sample: %s", currData[[1]][1])
             
             currDataMatrix <- matrix(c(currData[[3]], currData[[4]]), ncol = 2)
             rownames(currDataMatrix) <- currData[[2]]

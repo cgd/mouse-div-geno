@@ -15,8 +15,8 @@ homozygous genotypes such as SNPs from male Y and X chromosomes, and Mitochondri
 }
 
 \usage{
-  genotype(nm, ns, hint1, trans)
-  genotypeHomozygous(nm, ns, trans) 
+  genotype(nm, ns, hint1, trans, logfn=NULL)
+  genotypeHomozygous(nm, ns, trans, logfn=NULL)
 }
 
 \arguments{
@@ -24,6 +24,7 @@ homozygous genotypes such as SNPs from male Y and X chromosomes, and Mitochondri
   \item{ns}{A vector of intensity averages for a single SNP.}
   \item{hint1}{A mean of AB group contrast intensities.}
   \item{trans}{CCStrans or MAtrans.}
+  \item{logfn}{A function used to write a line to our debug log. If non-NULL, the arguments accepted by this function must work the same way as the sprintf(...) function}
 }
 \value{
   It returns genotype (1 = AA, 2 = AB, 3 = BB), VINOtype (1 = VINO, 0 = not), and confidence score

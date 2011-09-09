@@ -13,10 +13,19 @@ mouseDivGenotype <- function(
         transformMethod = c("CCStrans", "MAtrans"),
         celFiles = expandCelFiles(getwd()), isMale = NULL, confScoreThreshold = 1e-05,
         chromosomes = c(1:19, "X", "Y", "M"),
-        verbose = FALSE, cluster = NULL,
-        probesetChunkSize = 1000, outputDir = NULL, outputFilePrefix = "mouseDivResults_")
+        cluster = NULL,
+        probesetChunkSize = 1000, outputDir = NULL, outputFilePrefix = "mouseDivResults_",
+        logFile = NULL)
 {
     transformMethod <- match.arg(transformMethod)
+    
+    if(inherits(logFile, "character")) {
+        logFile <- file(logFile, "wt")
+    } else if(!is.null(logFile) && !inherits(logFile, "connection")) {
+        stop("the logFile parameter should be either NULL, a file name, ",
+             "or a connection")
+    }
+    
     if(!inherits(snpProbeInfo, "data.frame") ||
        !all(c("probeIndex", "isAAllele", "snpId") %in% names(snpProbeInfo)))
     {
@@ -30,7 +39,7 @@ mouseDivGenotype <- function(
             celFiles                = celFiles,
             snpProbeInfo            = snpProbeInfo,
             referenceDistribution   = referenceDistribution,
-            verbose                 = verbose)
+            logFile                 = logFile)
     .mouseDivGenotypeInternal(
             snpIntensities      = snpIntensities,
             snpInfo             = snpInfo,
@@ -38,11 +47,11 @@ mouseDivGenotype <- function(
             isMale              = isMale,
             confScoreThreshold  = confScoreThreshold,
             chromosomes         = chromosomes,
-            verbose             = verbose,
             cluster             = cluster,
             probesetChunkSize   = probesetChunkSize,
             outputDir           = outputDir,
-            outputFilePrefix    = outputFilePrefix)
+            outputFilePrefix    = outputFilePrefix,
+            logFile             = logFile)
 }
 
 mouseDivGenotypeTab <- function(
@@ -50,14 +59,22 @@ mouseDivGenotypeTab <- function(
         transformMethod = c("CCStrans", "MAtrans"),
         isMale = NULL, confScoreThreshold = 1e-05,
         chromosomes = c(1:19, "X", "Y", "M"),
-        verbose = FALSE, cluster = NULL,
-        probesetChunkSize = 1000, outputDir = NULL, outputFilePrefix = "mouseDivResults_")
+        cluster = NULL,
+        probesetChunkSize = 1000, outputDir = NULL, outputFilePrefix = "mouseDivResults_",
+        logFile = NULL)
 {
     transformMethod <- match.arg(transformMethod)
     
+    if(inherits(logFile, "character")) {
+        logFile <- file(logFile, "wt")
+    } else if(!is.null(logFile) && !inherits(logFile, "connection")) {
+        stop("the logFile parameter should be either NULL, a file name, ",
+             "or a connection")
+    }
+    
     snpIntensities <- .readSnpIntensitiesFromTab(
             tabFile             = snpIntensityFile,
-            verbose             = verbose)
+            logFile             = logFile)
     .mouseDivGenotypeInternal(
             snpIntensities      = snpIntensities,
             snpInfo             = snpInfo,
@@ -65,11 +82,11 @@ mouseDivGenotypeTab <- function(
             isMale              = isMale,
             confScoreThreshold  = confScoreThreshold,
             chromosomes         = chromosomes,
-            verbose             = verbose,
             cluster             = cluster,
             probesetChunkSize   = probesetChunkSize,
             outputDir           = outputDir,
-            outputFilePrefix    = outputFilePrefix)
+            outputFilePrefix    = outputFilePrefix,
+            logFile             = logFile)
 }
 
 .mouseDivGenotypeInternal <- function(
@@ -77,8 +94,9 @@ mouseDivGenotypeTab <- function(
     transformMethod = c("CCStrans", "MAtrans"),
     isMale = NULL, confScoreThreshold = 1e-05,
     chromosomes = c(1:19, "X", "Y", "M"), cacheDir = tempdir(),
-    retainCache = FALSE, verbose = FALSE, cluster = NULL,
-    probesetChunkSize = 1000, outputDir = NULL, outputFilePrefix = "mouseDivResults_")
+    retainCache = FALSE, cluster = NULL,
+    probesetChunkSize = 1000, outputDir = NULL, outputFilePrefix = "mouseDivResults_",
+    logFile = NULL)
 {
     transformMethod <- match.arg(transformMethod)
     if(transformMethod == "CCStrans")
@@ -103,14 +121,35 @@ mouseDivGenotypeTab <- function(
     }
     snpInfo$snpId <- as.factor(snpInfo$snpId)
     
+    if(inherits(logFile, "character")) {
+        logFile <- file(logFile, "wt")
+    } else if(!is.null(logFile) && !inherits(logFile, "connection")) {
+        stop("the logFile parameter should be either NULL, a file name, ",
+             "or a connection")
+    }
+    
+    logOn <- !is.null(logFile)
+    logfn <- function(fmt, ...) {
+        if(logOn) {
+            logfnTry <- function() {
+                cat(sprintf(fmt, ...), file=logFile)
+                cat("\n", file=logFile)
+            }
+            onError <- function(e) {
+                warning("failed to log message")
+            }
+            tryCatch(logfnTry(), error=onError)
+        }
+    }
+    
     # it is an error if isInPAR is set to TRUE in a non-X chromosome
     if(!is.null(snpInfo$isInPAR))
     {
-        parChrs <- unique(snpInfo$chrId[snpInfo$isInPar])
+        parChrs <- unique(snpInfo$chrId[snpInfo$isInPAR])
         if(!all(parChrs == "X"))
         {
-            stop("snpInfo$isInPar should only ever be TRUE on the \"X\" ",
-                 "chromosome, but TRUE isInPar values were found on chromosomes: ",
+            stop("snpInfo$isInPAR should only ever be TRUE on the \"X\" ",
+                 "chromosome, but TRUE isInPAR values were found on chromosomes: ",
                  paste(parChrs, collapse=", "))
         }
     }
@@ -127,6 +166,7 @@ mouseDivGenotypeTab <- function(
     
     allChr <- as.character(unique(snpInfo$chrId))
     allAutosomes <- setdiff(allChr, c("X", "Y", "M"))
+    logfn("genotyping the following chromosomes: %s", paste(chromosomes, collapse = ", "))
     
     # we must infer gender if we don't yet have it and we need to
     # genotype either sex chromosome
@@ -156,6 +196,7 @@ mouseDivGenotypeTab <- function(
     while(!is.null(snpIntensities))
     {
         head <- snpIntensities$head
+        logfn("preprocessing intensities from %s ", head$sampleName)
         sampleNames <- c(sampleNames, head$sampleName)
         
         if(genderInferenceRequired)
@@ -210,6 +251,7 @@ mouseDivGenotypeTab <- function(
     {
         stop("Cannot successfully genotype with less than two samples")
     }
+    logfn("finished preprocessing %i samples", nfile)
     
     if(!is.null(isMale) && length(isMale) != nfile)
     {
@@ -219,6 +261,8 @@ mouseDivGenotypeTab <- function(
     # determines which arrays are male and which are female if we need to
     if(genderInferenceRequired)
     {
+        logfn("inferring gender for each sample based on probe intensities")
+        
         # up to this point we've just been summing up intensity values. Now
         # we want to take the mean
         probesetCountPerAutosome <- sapply(
@@ -234,6 +278,15 @@ mouseDivGenotypeTab <- function(
             meanIntensityXPerArray,
             meanIntensityYPerArray,
             meanIntensityPerAutosome)
+        
+        logfn("%i samples inferred as male:", sum(isMale))
+        for(n in sampleNames[isMale]) {
+            logfn("    %s", n)
+        }
+        logfn("%i samples inferred as female:", sum(!isMale))
+        for(n in sampleNames[!isMale]) {
+            logfn("    %s", n)
+        }
     }
     
     results <- list()
@@ -250,25 +303,30 @@ mouseDivGenotypeTab <- function(
             chrHint <- snpInfo$snpHetHint[chrIndices]
         }
         
-        chrPAR <- logical(0)
+        chrPAR <- NULL
         if(!is.null(snpInfo$isInPAR))
         {
             chrPAR <- snpInfo$isInPAR[chrIndices]
         }
         
+        chrLogSNP <- NULL
+        if(!is.null(snpInfo$logSNP)) {
+            chrLogSNP <- snpInfo$logSNP[chrIndices]
+            names(chrLogSNP) <- snpInfo$snpId[chrIndices]
+        }
+        
         for(chunkIndex in 1 : length(chrChunks[[chri]]))
         {
             chunk <- chrChunks[[chri]][[chunkIndex]]
-            if(verbose)
-            {
-                cat("geno/vinotyping chromosome ", chri,
-                    " from probeset #", chunk$start,
-                    " to probeset #", chunk$end, "\n", sep="")
-            }
+            logfn(
+                "geno/vinotyping chromosome %s from probeset #%i to probeset #%i",
+                chri,
+                chunk$start,
+                chunk$end)
             
             #startTime <- getTime()
         
-            # paste the chromosomes together for genotyping
+            # paste the samples together for genotyping
             MM <- NULL
             SS <- NULL
             for (i in 1:nfile)
@@ -297,17 +355,24 @@ mouseDivGenotypeTab <- function(
                     intensityConts = MM,
                     intensityAvgs = SS,
                     hint = chrHint[chunkRange],
-                    parIndices = which(chrPAR[chunkRange]),
+                    isInPAR = chrPAR[chunkRange],
                     transformMethod = transformMethod,
                     isMale = isMale,
-                    confScoreThreshold = confScoreThreshold)
+                    confScoreThreshold = confScoreThreshold,
+                    logOn = logOn,
+                    logSnp = chrLogSNP[chunkRange])
                 if(length(argLists) >= length(cluster) || chunkIndex == length(chrChunks[[chri]]))
                 {
                     # parallel apply using snow then reset the arg list
                     chunkResultsList <- parLapply(cluster, argLists, .applyGenotypeAnyChrChunk)
+
                     for(i in 1 : length(chunkResultsList))
                     {
-                        chunkResult <- chunkResultsList[[i]]
+                        for(logLine in chunkResultsList[[i]]$logLines) {
+                            logfn(logLine)
+                        }
+                        
+                        chunkResult <- chunkResultsList[[i]]$genoResult
                         if(is.null(outputDir))
                         {
                             # we only accumulate results if there is no function
@@ -358,10 +423,12 @@ mouseDivGenotypeTab <- function(
                     intensityConts = MM,
                     intensityAvgs = SS,
                     hint = chrHint[chunkRange],
-                    parIndices = which(chrPAR[chunkRange]),
+                    isInPAR = chrPAR[chunkRange],
                     transformMethod = transformMethod,
                     isMale = isMale,
-                    confScoreThreshold = confScoreThreshold)
+                    confScoreThreshold = confScoreThreshold,
+                    logSnp = chrLogSNP[chunkRange],
+                    logfn = logfn)
                 if(is.null(outputDir))
                 {
                     # we only accumulate results if there is no function
@@ -445,9 +512,9 @@ mouseDivGenotypeTab <- function(
     # clean-up unless we were asked to retain the cache
     if(!retainCache)
     {
-        if(verbose)
+        if(logOn)
         {
-            cat("cleaning up cache files before returning geno/vinotype results")
+            logfn("cleaning up cache files before returning geno/vinotype results")
         }
         
         for(sampleName in sampleNames)
@@ -474,13 +541,40 @@ mouseDivGenotypeTab <- function(
 # advantage of the snow package's apply functions
 .applyGenotypeAnyChrChunk <- function(argList)
 {
-    genotypeAnyChrChunk(
+    # To explain the strange logging code below, its purpose is to define a
+    # logging function which appends to a list rather than printing to a
+    # connection. The reason that we can't just directly print to a connection
+    # is that this code could be running on a different machine than the main
+    # process (the snow package is used for this), so rather than write
+    # to a file we will return the log results along with the genotyping results
+    logEnv <- new.env(parent=emptyenv())
+    logEnv[["logLines"]] <- list()
+    if(argList$logOn) {
+        logfn <- function(fmt, ...) {
+            logfnTry <- function() {
+                currLineCount <- length(logEnv[["logLines"]])
+                logEnv[["logLines"]][[currLineCount + 1]] <- sprintf(fmt, ...)
+            }
+            onError <- function(e) {
+                warning("failed to log message")
+            }
+            tryCatch(logfnTry(), error=onError)
+        }
+    } else {
+        logfn <- NULL
+    }
+
+    genoResult <- genotypeAnyChrChunk(
         argList$chr,
         argList$intensityConts,
         argList$intensityAvgs,
         argList$hint,
-        argList$parIndices,
+        argList$isInPAR,
         argList$transformMethod,
         argList$isMale,
-        argList$confScoreThreshold)
+        argList$confScoreThreshold,
+        argList$logSnp,
+        logfn)
+
+    list(genoResult=genoResult, logLines=logEnv[["logLines"]])
 }

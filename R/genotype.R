@@ -16,15 +16,25 @@
 # nm = MM[1,]; ns = SS[1,]
 # geno = genotype(nm, ns, hint = NULL)
 #======================================================================
-genotype <- function(nm, ns, hint1, trans) {
+genotype <- function(nm, ns, hint1, trans, logfn=NULL) {
+    # logging code expects nm vector elements to be named
+    if(!is.null(logfn) && is.null(names(nm))) {
+        names(nm) <- paste("Sample", seq_along(nm), sep="")
+    }
+    
     onError <- function(e) {
+        if(!is.null(logfn)) {
+            logfn("caught an error in \"genotype\" function. setting all genotypes to -1")
+        }
         nsize <- length(nm)
         list(geno = rep(-1, nsize), vino = rep(0, nsize), conf = rep(0, nsize))
     }
-    tryCatch(.genotype(nm, ns, hint1, trans), error = onError)
+    tryCatch(.genotype(nm, ns, hint1, trans, logfn), error = onError)
 }
 
-.genotype <- function(nm, ns, hint1, trans) {
+.genotype <- function(nm, ns, hint1, trans, logfn=NULL) {
+    doLog <- !is.null(logfn)
+    
     hint <- rep(0, 3)
     hint[1] <- max(nm)
     hint[3] <- min(nm)
@@ -32,49 +42,90 @@ genotype <- function(nm, ns, hint1, trans) {
         hint[2] <- hint1
     
     nsize <- length(nm)
+    sampleNames <- names(nm)
     
-    # thres is for CCStrans. The thresholds are used to determine how many and
+    # The thresholds are used to determine how many and
     # what kind of genotypes we should consider for our tests.
     # (Eg: if all smaller than .3 BB or H so 2 only)
-    #         <--B          H-----H         A-->
-    thres <- c(-0.4, -0.3, -0.15, 0.15, 0.3, 0.4)
-    MAtransthres <- c(-0.8, -0.6, -0.3, 0.3, 0.6, 0.8)
-    if (is.element(trans, "MAtrans")) 
-        thres <- MAtransthres
+    #              <--B          H-----H         A-->
+    ccsThresh <- c(-0.4, -0.3, -0.15, 0.15, 0.3, 0.4)
+    maThresh  <- c(-0.8, -0.6, -0.3,  0.3,  0.6, 0.8)
+    if (is.element(trans, "MAtrans")) {
+        thresh <- maThresh
+    } else {
+        thresh <- ccsThresh
+    }
     
     # rmid is used to remove the values that fall outside of our chosen
     # threshold. Calculated because vinos tend to be low intensity (if you only
     # use contrast dimension you get a bad clustering) note that 1st part is for
     # testing "in H range" and quantile part is testing for low intensity
-    rmid <- nm >= thres[2] & nm <= thres[5] & ns < quantile(ns, 0.2)
+    rmid <- nm >= thresh[2] & nm <= thresh[5] & ns < quantile(ns, 0.2)
     lnrmid <- sum(!rmid)
+    if(doLog) {
+        logfn("Performing genotyping. Intensity contrast/average values per sample:")
+        for(i in seq_len(nsize)) {
+            logfn("    %s: %f/%f", sampleNames[i], nm[i], ns[i])
+        }
+        
+        if(any(rmid)) {
+            logfn(paste(
+                "the following samples are low-intensity and low-contrast so they",
+                "will be excluded from genotype thresholding and genotype",
+                "clustering:"))
+            for(n in sampleNames[rmid]) {
+                logfn("    %s", n)
+            }
+        }
+    }
+    
     istwo <- FALSE
     isone <- FALSE
     iig <- NULL
     #================================================ obvious one group SNPs
-    if (all(nm[!rmid] < thres[1])) {
+    if (all(nm[!rmid] < thresh[1])) {
+        if(doLog) {
+            logfn("sample contrasts fall below %f so all genotypes are being set to 3 (BB)", thresh[1])
+        }
+        
         geno <- rep(3, nsize)
-        v1 <- vinotype(nm, ns, geno)
+        v1 <- vinotype(nm, ns, geno, logfn)
         vino <- v1$vino
         conf <- v1$conf
     }
-    else if (all(nm[!rmid] > thres[6])) {
+    else if (all(nm[!rmid] > thresh[6])) {
+        if(doLog) {
+            logfn("sample contrasts are above %f so all genotypes are being set to 1 (AA)", thresh[6])
+        }
+        
         geno <- rep(1, nsize)
-        v1 <- vinotype(nm, ns, geno)
+        v1 <- vinotype(nm, ns, geno, logfn)
         vino <- v1$vino
         conf <- v1$conf
     }
-    else if (all(nm[!rmid] >= thres[3] & nm[!rmid] <= thres[4])) {
+    else if (all(nm[!rmid] >= thresh[3] & nm[!rmid] <= thresh[4])) {
+        if(doLog) {
+            logfn("sample contrasts fall between %f and %f so all genotypes are being set to 2 (AB)", thresh[3], thresh[4])
+        }
+        
         geno <- rep(2, nsize)
-        v1 <- vinotype(nm, ns, geno)
+        v1 <- vinotype(nm, ns, geno, logfn)
         vino <- v1$vino
         conf <- v1$conf
     }
-    else if (all(nm[!rmid] <= thres[2] | nm[!rmid] >= thres[5])) {
+    else if (all(nm[!rmid] <= thresh[2] | nm[!rmid] >= thresh[5])) {
+        if(doLog) {
+            fmtMsg <- paste(
+                "sample contrasts fall outside of the range %f to %f. Negative ",
+                "contrasts are set to 3 (BB) and positive contrasts are set to 1 (AA)",
+                sep="")
+            logfn(fmtMsg, thresh[2], thresh[5])
+        }
+        
         # 1,3
         geno <- rep(1, nsize)
         geno[nm < 0] <- 3
-        v1 <- vinotype(nm, ns, geno)
+        v1 <- vinotype(nm, ns, geno, logfn)
         vino <- v1$vino
         conf <- v1$conf
     }
@@ -83,12 +134,26 @@ genotype <- function(nm, ns, hint1, trans) {
         #startTime <- proc.time()[3]
         
         ##============================================ obvious two groups SNPs
-        if (all(nm <= thres[5])) {
+        if (all(nm <= thresh[5])) {
+            if(doLog) {
+                fmtMsg <- paste(
+                    "all sample contrasts are less than or equal to %f ",
+                    "so all genotypes will be set to 2 (AB) or 3 (BB)",
+                    sep="")
+                logfn(fmtMsg, thresh[5])
+            }
             # 2,3
             istwo <- TRUE
             iig <- c(2, 3)
         }
-        if (all(nm >= thres[2])) {
+        if (all(nm >= thresh[2])) {
+            if(doLog) {
+                fmtMsg <- paste(
+                    "all sample contrasts are greater than or equal to %f ",
+                    "so all genotypes will be set to 1 (AA) or 2 (AB)",
+                    sep="")
+                logfn(fmtMsg, thresh[2])
+            }
             # 1,2
             istwo <- TRUE
             iig <- c(1, 2)
@@ -135,32 +200,52 @@ genotype <- function(nm, ns, hint1, trans) {
         geno2[geno2 == -1 & T[, ii] >= min(max(T[, ii]), max(median(T[T[, ig[1]] < 0.5, ii]), th))] <- ii
         tgeno2[!rmid] <- geno2
         if (length(unique(tgeno2[tgeno2 != -1])) == 1) {
+            
             # test for 3 group case
             isone <- TRUE
             mm <- median(nm)
-            if (mm > thres[5]) 
+            if (mm > thresh[5]) {
                 geno <- rep(1, nsize)
-            else if (mm < thres[2]) 
+            } else if (mm < thresh[2]) {
                 geno <- rep(3, nsize)
-            else geno <- rep(2, nsize)
+            } else {
+                geno <- rep(2, nsize)
+            }
+            
+            if(doLog) {
+                fmtMsg <- paste(
+                    "the two state EM was only able to assign a single genotype group. ",
+                    "The contrast average is %f so genotypes have been set to %i",
+                    sep="")
+                logfn(fmtMsg, mm, geno[1])
+            }
+            
             if (istwo) {
-                v1 <- vinotype(nm, ns, geno)
+                v1 <- vinotype(nm, ns, geno, logfn)
                 vino <- v1$vino
                 conf <- v1$conf
             }
         }
         else {
-            if (any(tgeno2 == -1))
+            noCalls <- tgeno2 == -1
+            if (any(noCalls)) {
                 # use vdist to give membership
                 tgeno2 <- .vdist(adata[, 1], adata[, 2] / 5, tgeno2)
+                if(doLog) {
+                    logfn("used vdist function to assign missing genotypes as follows:")
+                    for(i in which(noCalls)) {
+                        logfn("    %s: %i", sampleNames[i], tgeno2[i])
+                    }
+                }
+            }
             
             tscore2 <- silhouette(match(tgeno2[!rmid], unique(tgeno2[!rmid])), dist(nm[!rmid]))
             if(any(is.na(tscore2))) stop("Internal Error: silhouette score is NA")
             
             if (istwo) {
                 # test if it's one group or two group
-                geno <- .test12(tscore2, nm, tgeno2, rmid, thres, iig, nsize)
-                v1 <- vinotype(nm, ns, geno)
+                geno <- .test12(tscore2, nm, tgeno2, rmid, thresh, iig, nsize, logfn)
+                v1 <- vinotype(nm, ns, geno, logfn)
                 vino <- v1$vino
                 conf <- v1$conf
             }
@@ -196,10 +281,13 @@ genotype <- function(nm, ns, hint1, trans) {
             # out contains the threshold in this section which is used later
             out[mm[3, 3]] <- max(median(T[T[, mm[3, 1]] <= min(out[mm[3, 1]], 0.5) & T[, mm[3, 2]] <= min(out[mm[3, 2]], 0.5), mm[3, 3]]), th)
             if (any(is.na(out))) {
+                if(doLog) {
+                    logfn("failed to calculate thresholds for three genotype case. Falling back on two genotype test.")
+                }
                 # we need to fall back on the 2 vs 1 group test
                 if (!isone) 
-                  geno <- .test12(tscore2, nm, tgeno2, rmid, thres, iig, nsize)
-                v1 <- vinotype(nm, ns, geno)
+                  geno <- .test12(tscore2, nm, tgeno2, rmid, thresh, iig, nsize, logfn)
+                v1 <- vinotype(nm, ns, geno, logfn)
                 vino <- v1$vino
                 conf <- v1$conf
             }
@@ -210,30 +298,44 @@ genotype <- function(nm, ns, hint1, trans) {
                 geno3[T[, mm[3, 3]] >= out[mm[3, 3]]] <- mm[3, 3]
                 tgeno3[!rmid] <- geno3
                 if (length(unique(tgeno3[tgeno3 != -1])) < 3) {
-                    # we need to fall back on the 2 vs 1 group test
+                  if(doLog) {
+                      logfn(
+                          "three genotype test resulted in %i groups. Falling back on two genotype test.",
+                          length(unique(tgeno3[tgeno3 != -1])))
+                  }
+                  
+                  # we need to fall back on the 2 vs 1 group test
                   if (!isone) 
-                    geno <- .test12(tscore2, nm, tgeno2, rmid, thres, iig, nsize)
-                  v1 <- vinotype(nm, ns, geno)
+                    geno <- .test12(tscore2, nm, tgeno2, rmid, thresh, iig, nsize, logfn)
+                  v1 <- vinotype(nm, ns, geno, logfn)
                   vino <- v1$vino
                   conf <- v1$conf
                 }
                 else {
                   # at this point the 3 group scenario is still possible
-                  if (any(tgeno3 == -1)) {
+                  noCalls <- tgeno3 == -1
+                  if (any(noCalls)) {
                     # use vdist to assign membership where prev geno test did
                     # not succeed
                     tgeno3 <- .vdist(adata[, 1], adata[, 2]/5, tgeno3)
+                    if(doLog) {
+                        logfn("in three genotype test used vdist function to assign missing genotypes as follows:")
+                        for(i in which(noCalls)) {
+                            logfn("    %s: %i", sampleNames[i], tgeno3[i])
+                        }
+                    }
                   }
+                  
                   tscore3 <- silhouette(match(tgeno3[!rmid], unique(tgeno3[!rmid])), dist(nm[!rmid]))
                   if (isone) {
-                    geno <- .test13(tscore3, nm, tgeno3, rmid, geno)
-                    v1 <- vinotype(nm, ns, geno)
+                    geno <- .test13(tscore3, nm, tgeno3, rmid, geno, logfn)
+                    v1 <- vinotype(nm, ns, geno, logfn)
                     vino <- v1$vino
                     conf <- v1$conf
                   }
                   else {
-                    geno <- .test123(tscore2, tscore3, nm, tgeno2, tgeno3, rmid, thres, iig, nsize)
-                    v1 <- vinotype(nm, ns, geno)
+                    geno <- .test123(tscore2, tscore3, nm, tgeno2, tgeno3, rmid, thresh, iig, nsize, logfn)
+                    v1 <- vinotype(nm, ns, geno, logfn)
                     vino <- v1$vino
                     conf <- v1$conf
                   }
@@ -243,6 +345,7 @@ genotype <- function(nm, ns, hint1, trans) {
         #cat(proc.time()[3] - startTime, "\n")
         #cat("##############################\n")
     }
+    
     list(geno = geno, vino = vino, conf = conf)
 }
 
@@ -386,43 +489,84 @@ genotype <- function(nm, ns, hint1, trans) {
 .em2Genos <- .em2Genos.using_c
 
 # genotyping for probesets that we know are homozygous a priori
-genotypeHomozygous <- function(nm, ns, trans) {
+genotypeHomozygous <- function(nm, ns, trans, logfn=NULL) {
     onError <- function(e) {
+        if(!is.null(logfn)) {
+            logfn("caught an error in \"genotypeHomozygous\" function. setting all genotypes to -1")
+        }
         nsize <- length(nm)
         list(geno = rep(-1, nsize), vino = rep(0, nsize), conf = rep(0, nsize))
     }
-    tryCatch(.genotypeHomozygous(nm, ns, trans), error = onError)
+    tryCatch(.genotypeHomozygous(nm, ns, trans, logfn), error = onError)
 }
 
-.genotypeHomozygous <- function(nm, ns, trans) {
+.genotypeHomozygous <- function(nm, ns, trans, logfn=NULL) {
+    doLog <- !is.null(logfn)
+    
     nsize <- length(nm)
+    sampleNames <- names(nm)
     hint <- c(max(nm), min(nm))
     
-    # thres is for CCStrans 
-    thres <- c(-0.4, -0.3, -0.15, 0.15, 0.3, 0.4)
-    MAtransthres <- c(-0.8, -0.6, -0.3, 0.3, 0.6, 0.8)
-    if (is.element(trans, "MAtrans")) 
-        thres <- MAtransthres
-    rmid <- nm >= thres[2] & nm <= thres[5] & ns < quantile(ns, 0.2)
+    ccsThresh <- c(-0.4, -0.3, -0.15, 0.15, 0.3, 0.4)
+    maThresh  <- c(-0.8, -0.6, -0.3, 0.3, 0.6, 0.8)
+    if (is.element(trans, "MAtrans")) {
+        thresh <- maThresh
+    } else {
+        thresh <- ccsThresh
+    }
+    rmid <- nm >= thresh[2] & nm <= thresh[5] & ns < quantile(ns, 0.2)
     lnrmid <- sum(!rmid)
     
-    if (all(nm[!rmid] < thres[3])) {
+    if(doLog) {
+        logfn("Performing homozygous genotyping. Intensity contrast/average values per sample:")
+        for(i in seq_len(nsize)) {
+            logfn("    %s: %f/%f", sampleNames[i], nm[i], ns[i])
+        }
+        
+        if(any(rmid)) {
+            logfn(paste(
+                "the following samples are low-intensity and low-contrast so they",
+                "will be excluded from genotype thresholding and genotype",
+                "clustering:"))
+            for(n in sampleNames[rmid]) {
+                logfn("    %s", n)
+            }
+        }
+    }
+    
+    if (all(nm[!rmid] < thresh[3])) {
+        if(doLog) {
+            logfn("sample contrasts fall below %f so all genotypes are being set to 3 (BB)", thresh[3])
+        }
+        
         geno <- rep(3, nsize)
-        v1 <- vinotype(nm, ns, geno)
+        v1 <- vinotype(nm, ns, geno, logfn)
         vino <- v1$vino
         conf <- v1$conf
     }
-    else if (all(nm[!rmid] > thres[4])) {
+    else if (all(nm[!rmid] > thresh[4])) {
+        if(doLog) {
+            logfn("sample contrasts are above %f so all genotypes are being set to 1 (AA)", thresh[4])
+        }
+        
         geno <- rep(1, nsize)
-        v1 <- vinotype(nm, ns, geno)
+        v1 <- vinotype(nm, ns, geno, logfn)
         vino <- v1$vino
         conf <- v1$conf
     }
-    else if (all(nm[!rmid] <= thres[3] | nm[!rmid] >= thres[4])) {
+    else if (all(nm[!rmid] <= thresh[3] | nm[!rmid] >= thresh[4])) {
+        if(doLog) {
+            fmtMsg <- paste(
+                "sample contrasts fall outside of the range %f to %f. Negative ",
+                "contrasts are set to 3 (BB) and positive contrasts are set to 1 (AA)",
+                sep="")
+            logfn(fmtMsg, thresh[3], thresh[4])
+        }
+        
         # 1,3
         geno <- rep(1, nsize)
         geno[nm < 0] <- 3
-        v1 <- vinotype(nm, ns, geno)
+        v1 <- vinotype(nm, ns, geno, logfn)
         vino <- v1$vino
         conf <- v1$conf
     }
@@ -447,13 +591,29 @@ genotypeHomozygous <- function(nm, ns, trans) {
             geno <- rep(1, nsize)
             if (mm < 0) 
                 geno <- rep(3, nsize)
-            v1 <- vinotype(nm, ns, geno)
+            v1 <- vinotype(nm, ns, geno, logfn)
             vino <- v1$vino
             conf <- v1$conf
+            
+            if(doLog) {
+                fmtMsg <- paste(
+                    "the two state EM was only able to assign a single genotype group. ",
+                    "The contrast average is %f so genotypes have been set to %i",
+                    sep="")
+                logfn(fmtMsg, mm, geno[1])
+            }
         }
         else {
-            if (any(geno == -1))
+            noCalls <- geno == -1
+            if (any(noCalls)) {
                 geno <- .vdist(adata[, 1], adata[, 2] / 2, geno)
+                if(doLog) {
+                    logfn("in two genotype test used vdist function to assign missing genotypes as follows:")
+                    for(i in which(noCalls)) {
+                        logfn("    %s: %i", sampleNames[i], geno[i])
+                    }
+                }
+            }
             keepthis <- tapply(nm, geno, mean)
             if (keepthis[1] > keepthis[2]) 
                 geno[geno == 2] <- 3
@@ -461,16 +621,17 @@ genotypeHomozygous <- function(nm, ns, trans) {
                 geno[geno == 1] <- 3
                 geno[geno == 2] <- 1
             }
-            v1 <- vinotype(nm, ns, geno)
+            v1 <- vinotype(nm, ns, geno, logfn)
             vino <- v1$vino
             conf <- v1$conf
         }
     }
+    
     list(geno = geno, vino = vino, conf = conf)
 }
 
 # test three groups (the tscore parameters are silhoutte scores)
-.test123 <- function(tscore2, tscore3, nm, tgeno2, tgeno3, rmid, thres, iig, nsize) {
+.test123 <- function(tscore2, tscore3, nm, tgeno2, tgeno3, rmid, thresh, iig, nsize, logfn=NULL) {
     if (length(tscore3) < 3) {
         # the score is not available
         mscore3 <- 0
@@ -497,13 +658,20 @@ genotypeHomozygous <- function(nm, ns, trans) {
         geno <- tgeno3
     }
     else {
-        geno <- .test12(tscore2, nm, tgeno2, rmid, thres, iig, nsize)
+        if(!is.null(logfn)) {
+            msgFmt <- paste(
+                "\".test123\" is falling back on \".test12\" based on ",
+                "the following values: mscore2=%d, mscore3=%d, d1=%d, d2=%d",
+                sep="")
+            logfn(msgFmt, mscore2, mscore3, d1, d2)
+        }
+        geno <- .test12(tscore2, nm, tgeno2, rmid, thresh, iig, nsize, logfn)
     }
     
     geno
 }
 
-.test13 <- function(tscore3, nm, tgeno3, rmid, geno) {
+.test13 <- function(tscore3, nm, tgeno3, rmid, geno, logfn=NULL) {
     if (length(tscore3) < 3) {
         # the score is not available
         mscore3 <- 0
@@ -518,13 +686,19 @@ genotypeHomozygous <- function(nm, ns, trans) {
     d2 <- quantile(nm[tgeno3 == 2 & !rmid], 0.1) - quantile(nm[tgeno3 == 3 & !rmid], 0.9)
     if (mscore3 > 0.65 & (d1 > 0.1 & d2 > 0.1)) {
         geno <- tgeno3
+    } else if(!is.null(logfn)) {
+        msgFmt <- paste(
+            "in \".test13\" we will leave the genotypes unchanged based on ",
+            "the following values: mscore3=%d, d1=%d, d2=%d",
+            sep="")
+        logfn(msgFmt, mscore3, d1, d2)
     }
     
     geno
 }
 
 # test two groups
-.test12 <- function(tscore2, nm, tgeno, rmid, thres, iig, nsize) {
+.test12 <- function(tscore2, nm, tgeno, rmid, thresh, iig, nsize, logfn=NULL) {
     if (length(tscore2) < 3) {
         # the score is not available
         mscore <- 0
@@ -544,10 +718,10 @@ genotypeHomozygous <- function(nm, ns, trans) {
             # cases in the genotype function so now we need to figure out based
             # on threshold
             tmp <- c(median(nm[tgeno == 1]), median(nm[tgeno == 2]))
-            if (tmp[1] > thres[5] & tmp[2] < thres[2]) {
+            if (tmp[1] > thresh[5] & tmp[2] < thresh[2]) {
                 iig <- c(1, 3)
             }
-            else if (tmp[1] < thres[5]) { 
+            else if (tmp[1] < thresh[5]) {
                 iig <- c(2, 3)
             }
             else {
@@ -558,11 +732,20 @@ genotypeHomozygous <- function(nm, ns, trans) {
         tgeno <- iig[match(tgeno, sort(unique(tgeno)))]
     }
     else {
+        if(!is.null(logfn)) {
+            msgFmt <- paste(
+                "in \".test12\" we must fall back on assigning genotype based on ",
+                "thresholds since either the difference between contrast quantiles ",
+                "(%d) is too small or the average silhouette score (%d) is too small",
+                sep="")
+            logfn(msgFmt, d, mscore)
+        }
+        
         mm <- median(nm)
-        if (mm > thres[5]) {
+        if (mm > thresh[5]) {
             tgeno <- rep(1, nsize)
         }
-        else if (mm < thres[2]) {
+        else if (mm < thresh[2]) {
             tgeno <- rep(3, nsize)
         }
         else {
