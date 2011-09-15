@@ -43,12 +43,6 @@ inferGender <- function(
     isMale
 }
 
-.ccstrans <- function(a, b, k = 4) {
-    x <- asinh(k * (a - b)/(a + b))/asinh(k)
-    y <- (log2(a) + log2(b))/2
-    list(x = x, y = y)
-}
-
 genotypeAnyChrChunk <- function(
         chr,
         intensityConts, intensityAvgs,
@@ -353,72 +347,21 @@ genotypeAnyChrChunk <- function(
     lapply(maleResult, fillInNAFemaleCols)
 }
 
-# this function will convert SNP A/B intensity pairs into M/S values which are
-# suitable as input to the genotypeAnyChrChunk function
-convertToContrastAndAverage <- function(
-        aIntensities,
-        bIntensities,
-        transformMethod = c("CCStrans", "MAtrans"),
-        intensitiesAreLog2 = FALSE,
-        k = 4)
-{
-    transformMethod <- match.arg(transformMethod)
-    
-    if (transformMethod == "CCStrans")
-    {
-        if(intensitiesAreLog2)
-        {
-            aIntensities <- 2 ^ aIntensities
-            bIntensities <- 2 ^ bIntensities
-        }
-        
-        res <- .ccstrans(aIntensities, bIntensities, k)
-        M <- res$x
-        S <- res$y
-    }
-    else if (transformMethod == "MAtrans")
-    {
-        if(!intensitiesAreLog2)
-        {
-            aIntensities <- log2(aIntensities)
-            bIntensities <- log2(bIntensities)
-        }
-        
-        M <- aIntensities - bIntensities
-        S <- (aIntensities + bIntensities) / 2
-    }
-    else
-    {
-        stop(paste("bad transformation argument:", transformMethod))
-    }
-    
-    list(intensityConts = M, intensityAvgs = S)
-}
+normalizeCelFile <- function(
+        celFile,
+        snpProbeInfo,
+        referenceDistribution = NULL,
+        logFile = NULL) {
 
-normalizeCelFileByChr <- function(
-    celFileName,
-    snpProbeInfo,
-    snpInfo,
-    logFile = NULL,
-    chromosomes = c(as.character(1 : 19), "X", "Y", "M"),
-    referenceDistribution = NULL,
-    transformMethod = c("CCStrans", "MAtrans", "None"),
-    keepSNPIds = FALSE)
-{
-    if(inherits(logFile, "character")) {
-        logFile <- file(logFile, "wt")
-    } else if(!is.null(logFile) && !inherits(logFile, "connection")) {
-        stop("the logFile parameter should be either NULL, a file name, ",
-            "or a connection")
+    if(!is.null(logFile) && !inherits(logFile, "connection")) {
+        stop("the logFile parameter should be a connection")
     }
     
     if(!is.null(logFile)) {
-        cat("Reading and normalizing CEL file: ", celFileName, "\n", file=logFile, sep="")
+        cat("Reading and normalizing CEL file:", celFile, file=logFile)
     }
     
-    transformMethod <- match.arg(transformMethod)
-    
-    celData <- read.celfile(celFileName, intensity.means.only = TRUE)
+    celData <- read.celfile(celFile, intensity.means.only = TRUE)
     y <- log2(as.matrix(celData[["INTENSITY"]][["MEAN"]][snpProbeInfo$probeIndex]))
     if (length(snpProbeInfo$correction) > 0)
         # C+G and fragment length correction y
@@ -436,60 +379,19 @@ normalizeCelFileByChr <- function(
         matrix(allBint, ncol = 1),
         snpProbeInfo$snpId[!snpProbeInfo$isAAllele])
     
-    # TODO we could do something here which is more robust
     aSnpIds <- rownames(allAint)
     bSnpIds <- rownames(allBint)
     if(!all(aSnpIds == bSnpIds))
     {
         stop("The SNP IDs for the A alleles should match up with the SNP IDs ",
-             "for the B alleles but they do not.")
+            "for the B alleles but they do not.")
     }
     
-    if (transformMethod == "CCStrans") {
-        # fixed K??
-        res <- .ccstrans(2^allAint, 2^allBint)
-        M <- res$x
-        S <- res$y
-    }
-    else if (transformMethod == "MAtrans") {
-        # then prior??
-        M <- allAint - allBint
-        S <- (allAint + allBint)/2
-    }
+    currDataMatrix <- matrix(c(allAint, allBint), ncol = 2)
+    rownames(currDataMatrix) <- aSnpIds
+    colnames(currDataMatrix) <- c("A", "B")
     
-    # divide CEL file up into chromosome pieces
-    msList <- list()
-    for (chri in chromosomes) {
-        #currRows <- which(chrid == chri)
-        currChrSnps <- snpInfo$snpId[snpInfo$chrId == chri]
-        currRows <- match(currChrSnps, aSnpIds)
-        currRows <- currRows[!is.na(currRows)]
-        
-        numCurrRows <- length(currRows)
-        if(numCurrRows == 0)
-        {
-            stop("Failed to find any probes on chromosome ", chri)
-        }
-        
-        if (transformMethod == "None")
-        {
-            msList[[chri]]$a <- allAint[currRows]
-            msList[[chri]]$b <- allBint[currRows]
-        }
-        else
-        {
-            msList[[chri]]$intensityConts <- M[currRows]
-            msList[[chri]]$intensityAvgs <- S[currRows]
-        }
-        
-        if(keepSNPIds)
-        {
-            names(msList[[chri]][[1]]) <- aSnpIds[currRows]
-            names(msList[[chri]][[2]]) <- names(msList[[chri]][[1]])
-        }
-    }
-    
-    msList
+    currDataMatrix
 }
 
 .chunkIndices <- function(to, by) {
@@ -529,23 +431,6 @@ normalizeCelFileByChr <- function(
         referenceDistribution = NULL,
         logFile = NULL)
 {
-    if(!is.null(logFile) && !inherits(logFile, "connection")) {
-        stop("the logFile parameter should be a connection")
-    }
-    
-    logOn <- !is.null(logFile)
-    logf <- function(fmt, ...) {
-        if(logOn) {
-            cat(sprintf(fmt, ...), file=logFile)
-        }
-    }
-    logfn <- function(fmt, ...) {
-        if(logOn) {
-            logf(fmt, ...)
-            cat("\n", file=logFile)
-        }
-    }
-    
     readNext <- function(index)
     {
         if(index > length(celFiles))
@@ -554,38 +439,7 @@ normalizeCelFileByChr <- function(
         }
         else
         {
-            logfn("Reading and normalizing CEL file: %s", celFiles[index])
-            
-            celData <- read.celfile(celFiles[index], intensity.means.only = TRUE)
-            y <- log2(as.matrix(celData[["INTENSITY"]][["MEAN"]][snpProbeInfo$probeIndex]))
-            if (length(snpProbeInfo$correction) > 0)
-                # C+G and fragment length correction y
-                y <- y + snpProbeInfo$correction
-            if (length(referenceDistribution) > 0)
-                y <- normalize.quantiles.use.target(y, target = referenceDistribution)
-            
-            # separate A alleles from B alleles and summarize to the probeset level
-            allAint <- y[snpProbeInfo$isAAllele, 1, drop = FALSE]
-            allBint <- y[!snpProbeInfo$isAAllele, 1, drop = FALSE]
-            allAint <- subColSummarizeMedian(
-                    matrix(allAint, ncol = 1),
-                    snpProbeInfo$snpId[snpProbeInfo$isAAllele])
-            allBint <- subColSummarizeMedian(
-                    matrix(allBint, ncol = 1),
-                    snpProbeInfo$snpId[!snpProbeInfo$isAAllele])
-            
-            aSnpIds <- rownames(allAint)
-            bSnpIds <- rownames(allBint)
-            if(!all(aSnpIds == bSnpIds))
-            {
-                stop("The SNP IDs for the A alleles should match up with the SNP IDs ",
-                     "for the B alleles but they do not.")
-            }
-            
-            currDataMatrix <- matrix(c(allAint, allBint), ncol = 2)
-            rownames(currDataMatrix) <- aSnpIds
-            colnames(currDataMatrix) <- c("A", "B")
-            
+            currDataMatrix <- normalizeCelFile(celFiles[index], snpProbeInfo, referenceDistribution, logFile)
             sampleName <- .fileBaseWithoutExtension(celFiles[index])
             list(
                 head = list(sampleName = sampleName, sampleData = currDataMatrix),
@@ -707,25 +561,34 @@ normalizeCelFileByChr <- function(
     readNext(currSampleData)
 }
 
-.ccsTransformSample <- function(sample)
-{
-    result <- .ccstrans(2 ^ sample$sampleData[ , 1], 2 ^ sample$sampleData[ , 2])
-    sampleData <- matrix(c(result$x, result$y), ncol = 2)
-    rownames(sampleData) <- rownames(sample$sampleData)
-    colnames(sampleData) <- c("intensityConts", "intensityAvgs")
+ccsTransform <- function(abMat, k = 4) {
+    a <- abMat[ , 1]
+    twoPowA <- 2 ^ a
+    b <- abMat[ , 2]
+    twoPowB <- 2 ^ b
     
-    list(sampleName = sample$sampleName, sampleData = sampleData)
+    m <- asinh(k * (twoPowA - twoPowB) / (twoPowA + twoPowB)) / asinh(k)
+    s <- (a + b) / 2
+    
+    contAvgMat <- matrix(c(m, s), ncol = 2)
+    rownames(contAvgMat) <- rownames(abMat)
+    colnames(contAvgMat) <- c("intensityConts", "intensityAvgs")
+    
+    contAvgMat
 }
 
-.maTransformSample <- function(sample)
-{
-    m <- sample$sampleData[ , 1] - sample$sampleData[ , 2]
-    s <- (sample$sampleData[ , 1] + sample$sampleData[ , 2]) / 2
-    sampleData <- matrix(c(m, s), ncol = 2)
-    rownames(sampleData) <- rownames(sample$sampleData)
-    colnames(sampleData) <- c("intensityConts", "intensityAvgs")
+maTransform <- function(abMat) {
+    a <- abMat[ , 1]
+    b <- abMat[ , 2]
     
-    list(sampleName = sample$sampleName, sampleData = sampleData)
+    m <- a - b
+    s <- (a + b) / 2
+    
+    contAvgMat <- matrix(c(m, s), ncol = 2)
+    rownames(contAvgMat) <- rownames(abMat)
+    colnames(contAvgMat) <- c("intensityConts", "intensityAvgs")
+    
+    contAvgMat
 }
 
 .lazyApply <- function(f, xs)

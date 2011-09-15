@@ -185,21 +185,7 @@ buildPennCNVInputFiles <- function(
     
     for(celfile in celFiles)
     {
-        # wrapping this up as a local function def allows us to avoid doing the
-        # normalization work unless it's necessary
-        makeMsList <- function()
-        {
-            normalizeCelFileByChr(
-                celfile,
-                snpProbeInfo,
-                snpInfo,
-                verbose,
-                snpChromosomes,
-                snpReferenceDistribution,
-                transformMethod)
-        }
         msList <- NULL
-        
         for(currChr in snpChromosomes)
         {
             for(chunkIndex in 1 : length(chrChunks[[currChr]]))
@@ -219,13 +205,26 @@ buildPennCNVInputFiles <- function(
                     # do that now
                     if(is.null(msList))
                     {
-                        msList <- makeMsList()
+                        normCel <- normalizeCelFile(celfile, snpProbeInfo, snpReferenceDistribution)
+                        if(transformMethod == "CCStrans") {
+                            transCel <- ccsTransform(normCel)
+                        } else if(transformMethod == "MAtrans") {
+                            transCel <- maTransform(normCel)
+                        }
+                        
+                        msList <- list()
+                        for(chr in snpChromosomes) {
+                            chrSnpInfo <- snpInfo[snpInfo$chrId == chr, ]
+                            chrMatch <- match(chrSnpInfo$snpId, rownames(transCel))
+                            chrMatch <- chrMatch[!is.na(chrMatch)]
+                            msList[[chr]] <- transCel[chrMatch, ]
+                        }
                     }
                     
                     chunk <- chrChunks[[currChr]][[chunkIndex]]
                     probesetIndices <- chunk$start : chunk$end
-                    mChunk <- msList[[currChr]]$intensityConts[probesetIndices]
-                    sChunk <- msList[[currChr]]$intensityAvgs[probesetIndices]
+                    mChunk <- msList[[currChr]][ , "intensityConts"][probesetIndices]
+                    sChunk <- msList[[currChr]][ , "intensityAvgs"][probesetIndices]
                     
                     save(mChunk, sChunk, file = chunkFile)
                 }

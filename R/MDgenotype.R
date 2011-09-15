@@ -99,16 +99,19 @@ mouseDivGenotypeTab <- function(
     logFile = NULL)
 {
     transformMethod <- match.arg(transformMethod)
-    if(transformMethod == "CCStrans")
-    {
-        snpIntensities <- .lazyApply(.ccsTransformSample, snpIntensities)
-    }
-    else if(transformMethod == "MAtrans")
-    {
-        snpIntensities <- .lazyApply(.maTransformSample, snpIntensities)
-    }
-    else
-    {
+    if(transformMethod == "CCStrans") {
+        transSampleFunc <- function(sample) {
+            sample[["sampleData"]] <- ccsTransform(sample[["sampleData"]])
+            sample
+        }
+        snpIntensities <- .lazyApply(transSampleFunc, snpIntensities)
+    } else if(transformMethod == "MAtrans") {
+        transSampleFunc <- function(sample) {
+            sample[["sampleData"]] <- maTransform(sample[["sampleData"]])
+            sample
+        }
+        snpIntensities <- .lazyApply(transSampleFunc, snpIntensities)
+    } else {
         stop("transformMethod parameter is not valid")
     }
     
@@ -291,28 +294,16 @@ mouseDivGenotypeTab <- function(
     
     results <- list()
     outFileConnections <- NULL
+    argLists <- list()
     for (chri in chromosomes)
     {
         chrIndices <- which(snpInfo$chrId == chri)
-        argLists <- list()
-        
-        # pull out the hints for this chromosome (if they exist)
-        chrHint <- NULL
-        if(!is.null(snpInfo$snpHetHint))
-        {
-            chrHint <- snpInfo$snpHetHint[chrIndices]
-        }
-        
-        chrPAR <- NULL
-        if(!is.null(snpInfo$isInPAR))
-        {
-            chrPAR <- snpInfo$isInPAR[chrIndices]
-        }
+        chrSnpInfo <- snpInfo[chrIndices, , drop=FALSE]
         
         chrLogSNP <- NULL
-        if(!is.null(snpInfo$logSNP)) {
-            chrLogSNP <- snpInfo$logSNP[chrIndices]
-            names(chrLogSNP) <- snpInfo$snpId[chrIndices]
+        if(!is.null(chrSnpInfo$logSNP)) {
+            chrLogSNP <- chrSnpInfo$logSNP
+            names(chrLogSNP) <- chrSnpInfo$snpId
         }
         
         for(chunkIndex in 1 : length(chrChunks[[chri]]))
@@ -338,14 +329,17 @@ mouseDivGenotypeTab <- function(
                 rm(mChunk, sChunk)
             }
             
+            chunkRange <- chunk$start : chunk$end
+            
             colnames(MM) <- sampleNames
+            rownames(MM) <- chrSnpInfo$snpId[chunkRange]
             colnames(SS) <- sampleNames
+            rownames(SS) <- chrSnpInfo$snpId[chunkRange]
             
             #cat("time it took us to get to genotypethis\n")
             #timeReport(startTime)
             
             #startTime <- getTime()
-            chunkRange <- chunk$start : chunk$end
             if(length(cluster) >= 1)
             {
                 # the arg list is used to accumulate arguments until we're
@@ -354,14 +348,17 @@ mouseDivGenotypeTab <- function(
                     chr = chri,
                     intensityConts = MM,
                     intensityAvgs = SS,
-                    hint = chrHint[chunkRange],
-                    isInPAR = chrPAR[chunkRange],
+                    hint = chrSnpInfo$snpHetHint[chunkRange],
+                    isInPAR = chrSnpInfo$isInPAR[chunkRange],
                     transformMethod = transformMethod,
                     isMale = isMale,
                     confScoreThreshold = confScoreThreshold,
                     logOn = logOn,
                     logSnp = chrLogSNP[chunkRange])
-                if(length(argLists) >= length(cluster) || chunkIndex == length(chrChunks[[chri]]))
+                
+                if(length(argLists) >= length(cluster) ||
+                   (chri == chromosomes[length(chromosomes)] &&
+                   chunkIndex == length(chrChunks[[chri]])))
                 {
                     # parallel apply using snow then reset the arg list
                     chunkResultsList <- parLapply(cluster, argLists, .applyGenotypeAnyChrChunk)
@@ -375,7 +372,6 @@ mouseDivGenotypeTab <- function(
                         chunkResult <- chunkResultsList[[i]]$genoResult
                         if(is.null(outputDir))
                         {
-                            # we only accumulate results if there is no function
                             if(length(results) == 0)
                             {
                                 results <- chunkResult
@@ -397,7 +393,7 @@ mouseDivGenotypeTab <- function(
                             for(k in 1 : length(chunkResult))
                             {
                                 colnames(chunkResult[[k]]) <- sampleNames
-                                rownames(chunkResult[[k]]) <- chunkProbesetInfo$snpId
+                                rownames(chunkResult[[k]]) <- rownames(argLists[[i]][["intensityConts"]])
                             }
                             
                             if(is.null(outFileConnections))
@@ -422,8 +418,8 @@ mouseDivGenotypeTab <- function(
                     chr = chri,
                     intensityConts = MM,
                     intensityAvgs = SS,
-                    hint = chrHint[chunkRange],
-                    isInPAR = chrPAR[chunkRange],
+                    hint = chrSnpInfo$snpHetHint[chunkRange],
+                    isInPAR = chrSnpInfo$isInPAR[chunkRange],
                     transformMethod = transformMethod,
                     isMale = isMale,
                     confScoreThreshold = confScoreThreshold,
@@ -466,8 +462,8 @@ mouseDivGenotypeTab <- function(
             #cat("time it took us to genotype the current chunk:\n")
             #timeReport(startTime)
         }
-        rm(argLists)
     }
+    rm(argLists)
     
     # if the user asked us to use a function to process the results that means
     # we have not accumulated any results to return, otherwise we have a bit
