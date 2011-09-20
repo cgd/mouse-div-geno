@@ -33,7 +33,7 @@ inferGender <- function(
         # if the y intensity of the samples grouped as female is greater than
         # the smallest autosome mean intensity we infer that there are no
         # female samples
-        isMale <- rep(TRUE, length())
+        isMale <- rep(TRUE, length(meanIntensityXPerArray))
     }
     else
     {
@@ -358,7 +358,7 @@ normalizeCelFile <- function(
     }
     
     if(!is.null(logFile)) {
-        cat("Reading and normalizing CEL file:", celFile, file=logFile)
+        cat("Reading and normalizing CEL file: ", celFile, "\n", file=logFile, sep="")
     }
     
     celData <- read.celfile(celFile, intensity.means.only = TRUE)
@@ -429,29 +429,35 @@ normalizeCelFile <- function(
         celFiles,
         snpProbeInfo,
         referenceDistribution = NULL,
-        logFile = NULL)
-{
-    readNext <- function(index)
-    {
-        if(index > length(celFiles))
-        {
-            NULL
-        }
-        else
-        {
+        logFile = NULL) {
+
+    readNext <- function(index) {
+        headFunc <- function() {
             currDataMatrix <- normalizeCelFile(celFiles[index], snpProbeInfo, referenceDistribution, logFile)
             sampleName <- .fileBaseWithoutExtension(celFiles[index])
-            list(
-                head = list(sampleName = sampleName, sampleData = currDataMatrix),
-                tail = function() readNext(index + 1))
+            
+            list(sampleName = sampleName, sampleData = currDataMatrix)
         }
+        
+        tailFunc <-
+            if(index == length(celFiles)) {
+                NULL
+            } else {
+                function() readNext(index + 1)
+            }
+        
+        list(head = headFunc, tail = tailFunc)
     }
     
-    readNext(1)
+    if(1 > length(celFiles)) {
+        NULL
+    } else {
+        function() {readNext(1)}
+    }
 }
 
-.readSnpIntensitiesFromTab <- function(tabFile, logFile = NULL)
-{
+.readSnpIntensitiesFromTab <- function(tabFile, logFile = NULL) {
+
     if(!is.null(logFile) && !inherits(logFile, "connection")) {
         stop("the logFile parameter should be a connection")
     }
@@ -470,15 +476,13 @@ normalizeCelFile <- function(
     }
     
     mustCloseConnection <- FALSE
-    if(!inherits(tabFile, "connection"))
-    {
+    if(!inherits(tabFile, "connection")) {
         tabFile <- file(tabFile, "rt")
         mustCloseConnection <- TRUE
     }
     
     # wrap read.table function for convenience
-    readSnpIntenTable <- function(file, ...)
-    {
+    readSnpIntenTable <- function(file, ...) {
         read.table(
                 file,
                 header = FALSE,
@@ -491,74 +495,69 @@ normalizeCelFile <- function(
     }
     
     # for our initial read we need to determine a SNP count
-    currSampleData <- NULL
-    repeat
-    {
-        currBlock <- readSnpIntenTable(tabFile, nrows = 10000)
-        if(nrow(currBlock) == 0)
-        {
-            break
-        }
-        
-        currSampleData <- rbind(currSampleData, currBlock)
-        
-        if(currSampleData[[1]][1] != currSampleData[[1]][nrow(currSampleData)])
-        {
-            break
-        }
-    }
-    snpCount <- sum(currSampleData[[1]] == currSampleData[[1]][1])
-    
-    readNext <- function(leftovers)
-    {
-        numLeftovers <- if(is.null(leftovers)) 0 else nrow(leftovers)
-        numLeftoversToTake <- min(snpCount, numLeftovers)
-        if(numLeftoversToTake >= 1)
-        {
-            leftoversToTake <- 1 : numLeftoversToTake
-            taken <- leftovers[leftoversToTake, ]
-            leftovers <- leftovers[-leftoversToTake, ]
-        }
-        else
-        {
-            taken <- NULL
-        }
-        
-        numNewToTake <- snpCount - numLeftoversToTake
-        if(numNewToTake >= 1)
-        {
-            newData <- readSnpIntenTable(tabFile, nrows = numNewToTake)
-            currData <- rbind(taken, newData)
-        }
-        else
-        {
-            currData <- taken
-        }
-        
-        if(is.null(currData) || nrow(currData) == 0)
-        {
-            if(mustCloseConnection)
-            {
-                close(tabFile)
+    readFirst <- function() {
+        currSampleData <- NULL
+        repeat {
+            currBlock <- readSnpIntenTable(tabFile, nrows = 10000)
+            if(nrow(currBlock) == 0) {
+                break
             }
             
-            NULL
+            currSampleData <- rbind(currSampleData, currBlock)
+            
+            if(currSampleData[[1]][1] != currSampleData[[1]][nrow(currSampleData)]) {
+                break
+            }
         }
-        else
-        {
+        snpCount <- sum(currSampleData[[1]] == currSampleData[[1]][1])
+        
+        readNext <- function(leftovers) {
+            numLeftovers <- nrow(leftovers)
+            if(numLeftovers < snpCount + 1) {
+                numNewToTake <- 1 + snpCount - numLeftovers
+                newData <- readSnpIntenTable(tabFile, nrows = numNewToTake)
+                leftovers <- rbind(leftovers, newData)
+                numLeftovers <- nrow(leftovers)
+            }
+            
+            if(numLeftovers < snpCount) {
+                stop("bad row count")
+            }
+            
+            leftoversToTake <- 1 : snpCount
+            currData <- leftovers[leftoversToTake, , drop = FALSE]
+            leftovers <- leftovers[-leftoversToTake, , drop = FALSE]
+            numLeftovers <- nrow(leftovers)
+            
+            if(numLeftovers == 0) {
+                if(mustCloseConnection) {
+                    close(tabFile)
+                }
+                
+                tailFunc <- NULL
+            } else {
+                tailFunc <- function() {readNext(leftovers)}
+            }
+            
             logfn("Finished reading data for sample: %s", currData[[1]][1])
             
             currDataMatrix <- matrix(c(currData[[3]], currData[[4]]), ncol = 2)
             rownames(currDataMatrix) <- currData[[2]]
             colnames(currDataMatrix) <- c("A", "B")
             
+            headFunc <- function() {
+                list(sampleName = currData[[1]][1], sampleData = currDataMatrix)
+            }
+            
             list(
-                head = list(sampleName = currData[[1]][1], sampleData = currDataMatrix),
-                tail = function() readNext(leftovers))
+                head = headFunc,
+                tail = tailFunc)
         }
+        
+        readNext(currSampleData)
     }
     
-    readNext(currSampleData)
+    readFirst
 }
 
 ccsTransform <- function(abMat, k = 4) {
@@ -591,14 +590,17 @@ maTransform <- function(abMat) {
     contAvgMat
 }
 
-.lazyApply <- function(f, xs)
-{
-    if(is.null(xs))
-    {
+.lazyApply <- function(f, lazyVals) {
+    if(is.null(lazyVals)) {
         NULL
-    }
-    else
-    {
-        list(head = f(xs$head), tail = function() .lazyApply(f, xs$tail()))
+    } else {
+        newVals <- function() {
+            val <- lazyVals()
+            list(
+                head = function() {f(val$head())},
+                tail = .lazyApply(f, val$tail))
+        }
+        
+        newVals
     }
 }

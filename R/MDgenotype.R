@@ -198,7 +198,9 @@ mouseDivGenotypeTab <- function(
     sampleNames <- character()
     while(!is.null(snpIntensities))
     {
-        head <- snpIntensities$head
+        curr <- snpIntensities()
+        head <- curr$head()
+        snpIntensities <- curr$tail
         logfn("preprocessing intensities from %s ", head$sampleName)
         sampleNames <- c(sampleNames, head$sampleName)
         
@@ -245,8 +247,6 @@ mouseDivGenotypeTab <- function(
                 save(mChunk, sChunk, file = chunkFile)
             }
         }
-        
-        snpIntensities <- snpIntensities$tail()
     }
     
     nfile <- length(sampleNames)
