@@ -39,8 +39,7 @@ normalizeCelFile <- function(
     
     aSnpIds <- rownames(allAint)
     bSnpIds <- rownames(allBint)
-    if(!all(aSnpIds == bSnpIds))
-    {
+    if(!all(aSnpIds == bSnpIds)) {
         stop("The SNP IDs for the A alleles should match up with the SNP IDs ",
             "for the B alleles but they do not.")
     }

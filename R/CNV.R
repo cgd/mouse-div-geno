@@ -1,15 +1,15 @@
 buildPennCNVInputFiles <- function(
-    outdir = getwd(), allowOverwrite = FALSE,
-    genotypes, snpProbeInfo, snpInfo, snpReferenceDistribution = NULL,
-    invariantProbeInfo, invariantProbesetInfo, invariantReferenceDistribution = NULL,
-    transformMethod = c("CCStrans", "MAtrans"), celFiles = expandCelFiles(getwd()),
-    isMale = NULL,
-    chromosomes = c(1:19, "X", "Y", "M"),
-    chromosomeRenameMap = list(X = 20, Y = 21, M = 22),
-    cacheDir = tempdir(),
-    retainCache = FALSE, verbose = FALSE,
-    probesetChunkSize = 1000)
-{
+        outdir = getwd(), allowOverwrite = FALSE,
+        genotypes, snpProbeInfo, snpInfo, snpReferenceDistribution = NULL,
+        invariantProbeInfo, invariantProbesetInfo, invariantReferenceDistribution = NULL,
+        transformMethod = c("CCStrans", "MAtrans"), celFiles = expandCelFiles(getwd()),
+        isMale = NULL,
+        chromosomes = c(1:19, "X", "Y", "M"),
+        chromosomeRenameMap = list(X = 20, Y = 21, M = 22),
+        cacheDir = tempdir(),
+        retainCache = FALSE, verbose = FALSE,
+        probesetChunkSize = 1000) {
+
     snpCount <- nrow(snpInfo)
     sampleCount <- ncol(genotypes)
     
@@ -17,8 +17,7 @@ buildPennCNVInputFiles <- function(
     
     # validate snp info parameters
     if(!inherits(snpProbeInfo, "data.frame") ||
-       !all(c("probeIndex", "isAAllele", "snpId") %in% names(snpProbeInfo)))
-    {
+       !all(c("probeIndex", "isAAllele", "snpId") %in% names(snpProbeInfo))) {
         stop("You must supply a \"snpProbeInfo\" data frame parameter which has ",
             "at a minimum the \"probeIndex\", \"isAAllele\" and \"snpId\" ",
             "components. Please see the help documentation for more details.")
@@ -26,8 +25,7 @@ buildPennCNVInputFiles <- function(
     snpProbeInfo$snpId <- as.factor(snpProbeInfo$snpId)
     
     if(!inherits(snpInfo, "data.frame") ||
-       !all(c("snpId", "chrId", "positionBp") %in% names(snpInfo)))
-    {
+       !all(c("snpId", "chrId", "positionBp") %in% names(snpInfo))) {
         stop("You must supply a \"snpInfo\" data frame parameter which has ",
             "at a minimum the \"snpId\", \"chrId\" and \"positionBp\" ",
             "components. Please see the help documentation for more details.")
@@ -35,13 +33,11 @@ buildPennCNVInputFiles <- function(
     snpInfo$snpId <- as.factor(snpInfo$snpId)
     
     # if all are the same sex there is no need to separate
-    if(!is.null(isMale) && (all(isMale) || !any(isMale)))
-    {
+    if(!is.null(isMale) && (all(isMale) || !any(isMale))) {
         isMale <- NULL
     }
     
-    if(!is.null(isMale) && length(isMale) != length(celFiles))
-    {
+    if(!is.null(isMale) && length(isMale) != length(celFiles)) {
         stop("the length of isMale must match the length of celFiles")
     }
     
@@ -50,26 +46,21 @@ buildPennCNVInputFiles <- function(
     invariantProbesetInfo <- .listify(invariantProbesetInfo)
     invariantReferenceDistribution <- .listify(invariantReferenceDistribution)
     invariantGroupCount <- length(invariantProbeInfo)
-    if(length(invariantReferenceDistribution) == 0)
-    {
-        for(i in 1 : invariantGroupCount)
-        {
+    if(length(invariantReferenceDistribution) == 0) {
+        for(i in 1 : invariantGroupCount) {
             invariantReferenceDistribution[[i]] <- NULL
         }
     }
     
     if(invariantGroupCount != length(invariantProbesetInfo) ||
-       invariantGroupCount != length(invariantReferenceDistribution))
-    {
+       invariantGroupCount != length(invariantReferenceDistribution)) {
         stop("there is a missmatch between the \"invariantProbeInfo\", ",
             "\"invariantProbesetInfo\", \"invariantReferenceDistribution\"")
     }
     
-    for(i in 1 : invariantGroupCount)
-    {
+    for(i in 1 : invariantGroupCount) {
         if(!inherits(invariantProbeInfo[[i]], "data.frame") ||
-            !all(c("probeIndex", "probesetId") %in% names(invariantProbeInfo[[i]])))
-        {
+           !all(c("probeIndex", "probesetId") %in% names(invariantProbeInfo[[i]]))) {
             stop("You must supply a \"invariantProbeInfo\" data frame parameter which has ",
                 "at a minimum the \"probeIndex\", and \"probesetId\" ",
                 "components. Please see the help documentation for more details.")
@@ -77,8 +68,7 @@ buildPennCNVInputFiles <- function(
         invariantProbeInfo[[i]]$probesetId <- as.factor(invariantProbeInfo[[i]]$probesetId)
         
         if(!inherits(invariantProbesetInfo[[i]], "data.frame") ||
-            !all(c("probesetId", "chrId", "positionBp") %in% names(invariantProbesetInfo[[i]])))
-        {
+           !all(c("probesetId", "chrId", "positionBp") %in% names(invariantProbesetInfo[[i]]))) {
             stop("You must supply a \"invariantProbesetInfo\" data frame parameter which has ",
                 "at a minimum the \"probesetId\", \"chrId\" and \"positionBp\" ",
                 "components. Please see the help documentation for more details.")
@@ -86,8 +76,7 @@ buildPennCNVInputFiles <- function(
         invariantProbesetInfo[[i]]$probesetId <- as.factor(invariantProbesetInfo[[i]]$probesetId)
         
         if(!is.null(invariantReferenceDistribution[[i]]) &&
-            !is.numeric(invariantReferenceDistribution[[i]]))
-        {
+           !is.numeric(invariantReferenceDistribution[[i]])) {
             stop("The \"invariantReferenceDistribution\" should either be ",
                 "numeric or NULL")
         }
@@ -95,40 +84,32 @@ buildPennCNVInputFiles <- function(
     
     # if the user passes us a list (or data frame) rather than a vector of file
     # names we should attempt to pull out a fileName component
-    if(is.list(celFiles))
-    {
-        if(!("fileName" %in% names(celFiles)))
-        {
+    if(is.list(celFiles)) {
+        if(!("fileName" %in% names(celFiles))) {
             stop("failed to find \"fileName\" component in the \"celFiles\" list")
         }
         
         celFiles <- celFiles$fileName
     }
     
-    if(length(celFiles) != sampleCount)
-    {
+    if(length(celFiles) != sampleCount) {
         stop("the number of CEL files doesn't match the number of columns in ",
             "\"genotypes\" (", sampleCount, "). The expanded CEL files are: ",
             paste(celFiles, sep = ", "))
     }
     
     genoRownames <- rownames(genotypes)
-    if(is.null(genoRownames))
-    {
-        if(nrow(genotypes) != snpCount)
-        {
+    if(is.null(genoRownames)) {
+        if(nrow(genotypes) != snpCount) {
             stop("the number of rows in the \"genotypes\" parameter must match ",
                  "the number of rows in the \"snpInfo\" parameter. Alternatively ",
                  "you can set \"rownames(genotypes)\" to match up with the ",
                  "corresponding \"snpInfo$snpId\" values")
         }
-    }
-    else
-    {
+    } else {
         # make sure that the genotype rows all match up OK
         genoIndexMapping <- match(genoRownames, snpInfo$snpId)
-        if(any(is.na(genoIndexMapping)))
-        {
+        if(any(is.na(genoIndexMapping))) {
             stop("all of the \"rownames(genotypes)\" values must match up with ",
                  "a SNP ID in \"snpInfo$snpId\". Alternatively you can set ",
                  "\"rownames(genotypes)\" to NULL which implies that genotypes ",
@@ -146,8 +127,7 @@ buildPennCNVInputFiles <- function(
     chromosomes <- toupper(as.character(chromosomes))
     
     snpChromosomes <- unique(snpInfo$chrId)
-    if(!all(chromosomes %in% snpChromosomes))
-    {
+    if(!all(chromosomes %in% snpChromosomes)) {
         warning(
             "SNP data for the following requested chromosomes are not available: ",
             paste(setdiff(chromosomes, snpChromosomes), collapse = ", "),
@@ -156,11 +136,9 @@ buildPennCNVInputFiles <- function(
     snpChromosomes <- intersect(chromosomes, snpChromosomes)
     
     invariantChromosomes <- list()
-    for(i in 1 : invariantGroupCount)
-    {
+    for(i in 1 : invariantGroupCount) {
         invariantChromosomes[[i]] <- unique(invariantProbesetInfo[[i]]$chrId)
-        if(!all(chromosomes %in% invariantChromosomes[[i]]))
-        {
+        if(!all(chromosomes %in% invariantChromosomes[[i]])) {
             warning(
                 "Invariant data for the following requested chromosomes are not available: ",
                 paste(setdiff(chromosomes, invariantChromosomes[[i]]), collapse = ", "),
@@ -170,26 +148,21 @@ buildPennCNVInputFiles <- function(
     }
     rm(chromosomes)
     
-    if(verbose)
-    {
+    if(verbose) {
         cat("processing CEL files for SNP probes\n")
     }
     
     # figure out how many chunks there will be per chromosome
     chrChunks <- list()
-    for(currChr in snpChromosomes)
-    {
+    for(currChr in snpChromosomes) {
         chrProbesetCount <- sum(snpInfo$chrId == currChr)
         chrChunks[[currChr]] <- .chunkIndices(chrProbesetCount, probesetChunkSize)
     }
     
-    for(celfile in celFiles)
-    {
+    for(celfile in celFiles) {
         msList <- NULL
-        for(currChr in snpChromosomes)
-        {
-            for(chunkIndex in 1 : length(chrChunks[[currChr]]))
-            {
+        for(currChr in snpChromosomes) {
+            for(chunkIndex in 1 : length(chrChunks[[currChr]])) {
                 chunkFile <- .chunkFileName(
                         cacheDir,
                         "snp",
@@ -199,12 +172,10 @@ buildPennCNVInputFiles <- function(
                         chunkIndex)
                 chunkFileAlreadyExists <- file.exists(chunkFile)
                 
-                if(!chunkFileAlreadyExists)
-                {
+                if(!chunkFileAlreadyExists) {
                     # if we haven't yet normalized the CEL file we'll have to
                     # do that now
-                    if(is.null(msList))
-                    {
+                    if(is.null(msList)) {
                         normCel <- normalizeCelFile(celfile, snpProbeInfo, snpReferenceDistribution)
                         if(transformMethod == "CCStrans") {
                             transCel <- ccsTransform(normCel)
@@ -237,8 +208,7 @@ buildPennCNVInputFiles <- function(
     # initialize the connections for BAF & LRR files and write the header rows
     lrrAndBafBaseNames <- paste(.fileBaseWithoutExtension(celFiles), ".txt", sep = "")
     lrrAndBafOutputFiles <- file.path(outdir, lrrAndBafBaseNames)
-    if(!allowOverwrite && any(file.exists(lrrAndBafOutputFiles)))
-    {
+    if(!allowOverwrite && any(file.exists(lrrAndBafOutputFiles))) {
         stop("refusing to overwrite the following files: ",
              paste(lrrAndBafOutputFiles[file.exists(lrrAndBafOutputFiles)], collapse = ", "),
              ". In order to procede you can either set allowOverwrite to TRUE or ",
@@ -248,16 +218,14 @@ buildPennCNVInputFiles <- function(
     names(lrrAndBafOutputFiles) <- .fileBaseWithoutExtension(celFiles)
     
     pfbOutputFile <- file.path(outdir, "pfbdata.txt")
-    if(!allowOverwrite && file.exists(pfbOutputFile))
-    {
+    if(!allowOverwrite && file.exists(pfbOutputFile)) {
         stop("refusing to overwrite : ", pfbOutputFile,
             ". In order to procede you can either set allowOverwrite to TRUE or ",
             "you can manually delete the files.")
     }
     
     # write the header row for LRR and BAF files
-    for(celName in names(lrrAndBafOutputFiles))
-    {
+    for(celName in names(lrrAndBafOutputFiles)) {
         con <- file(lrrAndBafOutputFiles[[celName]], "wt")
         header <- c(
             "Name",
@@ -282,26 +250,22 @@ buildPennCNVInputFiles <- function(
         row.names = FALSE,
         col.names = FALSE)
     
-    if(verbose)
-    {
+    if(verbose) {
         cat("generating PennCNV input for SNP probes\n")
     }
     
     # append the SNP-based LRR/BAF values
-    for(currChr in snpChromosomes)
-    {
+    for(currChr in snpChromosomes) {
         chrIndices <- which(snpInfo$chrId == currChr)
         chrGenos <- genotypes[chrIndices, ]
         chrSnpInfo <- snpInfo[chrIndices, ]
         
-        if(currChr %in% names(chromosomeRenameMap))
-        {
+        if(currChr %in% names(chromosomeRenameMap)) {
             chrRename <- chromosomeRenameMap[[currChr]]
             chrSnpInfo$chrId <- rep(as.character(chrRename), length(chrSnpInfo$chrId))
         }
         
-        for(chunkIndex in 1 : length(chrChunks[[currChr]]))
-        {
+        for(chunkIndex in 1 : length(chrChunks[[currChr]])) {
             chunk <- chrChunks[[currChr]][[chunkIndex]]
             chunkIndices <- chunk$start : chunk$end
             chunkSize <- 1 + chunk$end - chunk$start
@@ -311,8 +275,7 @@ buildPennCNVInputFiles <- function(
             sMatrix <- matrix(0, nrow = chunkSize, ncol = length(celFiles))
             
             # stitch together the M and S chunks
-            for(fileIndex in 1 : length(celFiles))
-            {
+            for(fileIndex in 1 : length(celFiles)) {
                 celfile <- celFiles[fileIndex]
                 
                 # loads mChunk and sChunk into scope
@@ -340,25 +303,20 @@ buildPennCNVInputFiles <- function(
         }
     }
     
-    if(verbose)
-    {
+    if(verbose) {
         cat("processing CEL files for invariant probes\n")
     }
     
     # append the invariant LRR/BAF values
-    for(i in 1 : invariantGroupCount)
-    {
+    for(i in 1 : invariantGroupCount) {
         invariantChrChunks <- list()
-        for(currChr in invariantChromosomes[[i]])
-        {
+        for(currChr in invariantChromosomes[[i]]) {
             chrProbesetCount <- sum(invariantProbesetInfo[[i]]$chrId == currChr)
             invariantChrChunks[[currChr]] <- .chunkIndices(chrProbesetCount, probesetChunkSize)
         }
         
-        for(celfile in celFiles)
-        {
-            makeNormInvariantList <- function()
-            {
+        for(celfile in celFiles) {
+            makeNormInvariantList <- function() {
                 .normalizeCelFileForInvariants(
                     celfile,
                     verbose,
@@ -369,10 +327,8 @@ buildPennCNVInputFiles <- function(
             }
             normInvariantList <- NULL
             
-            for(currChr in invariantChromosomes[[i]])
-            {
-                for(chunkIndex in 1 : length(invariantChrChunks[[currChr]]))
-                {
+            for(currChr in invariantChromosomes[[i]]) {
+                for(chunkIndex in 1 : length(invariantChrChunks[[currChr]])) {
                     chunkFile <- .chunkFileName(
                         cacheDir,
                         paste("invariant", i, sep = ""),
@@ -382,12 +338,10 @@ buildPennCNVInputFiles <- function(
                         chunkIndex)
                     chunkFileAlreadyExists <- file.exists(chunkFile)
                     
-                    if(!chunkFileAlreadyExists)
-                    {
+                    if(!chunkFileAlreadyExists) {
                         # if we haven't yet normalized the CEL file we'll have to
                         # do that now
-                        if(is.null(normInvariantList))
-                        {
+                        if(is.null(normInvariantList)) {
                             normInvariantList <- makeNormInvariantList()
                         }
                         
@@ -403,23 +357,19 @@ buildPennCNVInputFiles <- function(
             rm(normInvariantList)
         }
         
-        if(verbose)
-        {
+        if(verbose) {
             cat("generating PennCNV input for invariant probes\n")
         }
         
-        for(currChr in invariantChromosomes[[i]])
-        {
+        for(currChr in invariantChromosomes[[i]]) {
             chrInvariantProbesetInfo <- invariantProbesetInfo[[i]][invariantProbesetInfo[[i]]$chrId == currChr, ]
             
-            if(currChr %in% names(chromosomeRenameMap))
-            {
+            if(currChr %in% names(chromosomeRenameMap)) {
                 chrRename <- chromosomeRenameMap[[currChr]]
                 chrInvariantProbesetInfo$chrId <- rep(as.character(chrRename), length(chrInvariantProbesetInfo$chrId))
             }
             
-            for(chunkIndex in 1 : length(invariantChrChunks[[currChr]]))
-            {
+            for(chunkIndex in 1 : length(invariantChrChunks[[currChr]])) {
                 chunk <- invariantChrChunks[[currChr]][[chunkIndex]]
                 chunkIndices <- chunk$start : chunk$end
                 chunkSize <- 1 + chunk$end - chunk$start
@@ -428,8 +378,7 @@ buildPennCNVInputFiles <- function(
                 intensityMatrix <- matrix(0, nrow = chunkSize, ncol = length(celFiles))
                 
                 # stitch together the intensity chunks
-                for(fileIndex in 1 : length(celFiles))
-                {
+                for(fileIndex in 1 : length(celFiles)) {
                     celfile <- celFiles[fileIndex]
                     
                     # loads intensityChunk into scope
@@ -472,27 +421,24 @@ buildPennCNVInputFiles <- function(
 #   pfbConnection:
 #       the connection to use for the PBF file.
 .appendToPennCNVForInvariants <- function(
-    probesetInfo,
-    probesetIntensities,
-    lrrAndBafOutputFiles,
-    pfbConnection)
-{
+        probesetInfo,
+        probesetIntensities,
+        lrrAndBafOutputFiles,
+        pfbConnection) {
+
     probesetCount <- nrow(probesetInfo)
     sampleCount <- length(lrrAndBafOutputFiles)
     
-    if(!all(c("probesetId", "chrId", "positionBp") %in% names(probesetInfo)))
-    {
+    if(!all(c("probesetId", "chrId", "positionBp") %in% names(probesetInfo))) {
         stop("the \"probesetInfo\" parameter must contain the following components: ",
              "probesetId, chrId, positionBp")
     }
     
-    if(!inherits(pfbConnection, "connection"))
-    {
+    if(!inherits(pfbConnection, "connection")) {
         stop("pfbConnection should inherit from the \"connection\" class")
     }
     
-    if(!all(sapply(lrrAndBafOutputFiles, inherits, "character")))
-    {
+    if(!all(sapply(lrrAndBafOutputFiles, inherits, "character"))) {
         stop("all lrrAndBafOutputFiles should inherit from the \"character\" class")
     }
     
@@ -500,8 +446,7 @@ buildPennCNVInputFiles <- function(
     bafs <- rep(2, probesetCount)
     lrrs <- log2(probesetIntensities / apply(probesetIntensities, 1, mean))
     
-    for(sampleIndex in 1 : sampleCount)
-    {
+    for(sampleIndex in 1 : sampleCount) {
         con <- file(lrrAndBafOutputFiles[[sampleIndex]], "at")
         write.table(
             data.frame(probesetInfo$probesetId, lrrs[, sampleIndex], bafs),
@@ -550,21 +495,19 @@ buildPennCNVInputFiles <- function(
 #   pfbConnection:
 #       the connection to use for the PBF file.
 .appendToPennCNVForSNPs <- function(
-    snpInfo,
-    intensityConts,
-    intensityAvgs,
-    genotypes,
-    isMale,
-    lrrAndBafOutputFiles,
-    pfbConnection)
-{
-    if(!inherits(pfbConnection, "connection"))
-    {
+        snpInfo,
+        intensityConts,
+        intensityAvgs,
+        genotypes,
+        isMale,
+        lrrAndBafOutputFiles,
+        pfbConnection) {
+
+    if(!inherits(pfbConnection, "connection")) {
         stop("pfbConnection should inherit from the \"connection\" class")
     }
     
-    if(!all(sapply(lrrAndBafOutputFiles, inherits, "character")))
-    {
+    if(!all(sapply(lrrAndBafOutputFiles, inherits, "character"))) {
         stop("all lrrAndBafOutputFiles should inherit from the \"character\" class")
     }
     
@@ -575,10 +518,8 @@ buildPennCNVInputFiles <- function(
     # each SNP
     bafs <- matrix(0.0, nrow = snpCount, ncol = sampleCount)
     lrrs <- matrix(0.0, nrow = snpCount, ncol = sampleCount)
-    if(is.null(isMale))
-    {
-        for(snpIndex in 1 : snpCount)
-        {
+    if(is.null(isMale)) {
+        for(snpIndex in 1 : snpCount) {
             # calc BAF and LRR for all samples together
             bafAndLrr <- .calcLRRAndBAF(
                 intensityConts[snpIndex, ],
@@ -587,11 +528,8 @@ buildPennCNVInputFiles <- function(
             bafs[snpIndex, ] <- bafAndLrr$BAF
             lrrs[snpIndex, ] <- bafAndLrr$LRR
         }
-    }
-    else
-    {
-        for(snpIndex in 1 : snpCount)
-        {
+    } else {
+        for(snpIndex in 1 : snpCount) {
             # calc BAF and LRR for male and female samples seperately
             bafAndLrr <- .calcLRRAndBAF(
                 intensityConts[snpIndex, isMale],
@@ -610,8 +548,7 @@ buildPennCNVInputFiles <- function(
     }
     
     # write the LRR/BAF files per-sample
-    for(sampleIndex in 1 : sampleCount)
-    {
+    for(sampleIndex in 1 : sampleCount) {
         con <- file(lrrAndBafOutputFiles[[sampleIndex]], "at")
         write.table(
             data.frame(snpInfo$snpId, lrrs[, sampleIndex], bafs[, sampleIndex]),
@@ -647,12 +584,11 @@ buildPennCNVInputFiles <- function(
 # RETURNS:
 #   A data.frame object with B-Allele Frequency (BAF) and Log R Ratio (LRR)
 #   components. The row count of this dataframe will equal length(genos)
-.calcLRRAndBAF <- function(intensityConts, intensityAvgs, genos)
-{
+.calcLRRAndBAF <- function(intensityConts, intensityAvgs, genos) {
+
     # remove the NA's and -1's genotypes first
     validGenos <- sapply(genos, function(geno) {!is.na(geno) && geno != -1})
-    if(!all(validGenos))
-    {
+    if(!all(validGenos)) {
         intensityConts <- intensityConts[validGenos]
         intensityAvgs <- intensityAvgs[validGenos]
         genos <- genos[validGenos]
@@ -666,21 +602,17 @@ buildPennCNVInputFiles <- function(
     
     medianContPerGeno <- numeric(uniqueGenoCount)
     medianAvgsPerGeno <- numeric(uniqueGenoCount)
-    for(genoIndex in 1 : uniqueGenoCount)
-    {
+    for(genoIndex in 1 : uniqueGenoCount) {
         genoCode <- uniqueGenos[genoIndex]
         currIndices <- which(genos == genoCode)
         
         currIntensityConts <- intensityConts[currIndices]
         currIntensityAvgs <- intensityAvgs[currIndices]
         
-        if(length(currIndices) == 1)
-        {
+        if(length(currIndices) == 1) {
             medianContPerGeno[genoIndex] <- currIntensityConts
             medianAvgsPerGeno[genoIndex] <- currIntensityAvgs
-        }
-        else
-        {
+        } else {
             medianContPerGeno[genoIndex] <- median(currIntensityConts)
             medianAvgsPerGeno[genoIndex] <- median(currIntensityAvgs)
         }
@@ -852,8 +784,7 @@ buildPennCNVInputFiles <- function(
     }
     
     # fill in 0's for the NA's and -1's genotypes
-    if(!all(validGenos))
-    {
+    if(!all(validGenos)) {
         newBAF <- rep(0, length(validGenos))
         newBAF[validGenos] <- BAF
         BAF <- newBAF
@@ -867,13 +798,13 @@ buildPennCNVInputFiles <- function(
 }
 
 .normalizeCelFileForInvariants <- function(
-    celFileName,
-    verbose,
-    invariantProbeInfo,
-    invariantProbesetInfo,
-    allChr,
-    referenceDistribution)
-{
+        celFileName,
+        verbose,
+        invariantProbeInfo,
+        invariantProbesetInfo,
+        allChr,
+        referenceDistribution) {
+
     if(verbose) cat("Reading and normalizing CEL file: ", celFileName, "\n", sep="")
     
     celData <- read.celfile(celFileName, intensity.means.only = TRUE)
@@ -889,8 +820,7 @@ buildPennCNVInputFiles <- function(
     # now that the data is normalized by probeset,
     # organize the data into chromosome groups
     chrIntensityList <- list()
-    for(chr in allChr)
-    {
+    for(chr in allChr) {
         chrIntensityList[[chr]] <- y[invariantProbesetInfo$chrId == chr]
     }
     
@@ -899,14 +829,10 @@ buildPennCNVInputFiles <- function(
 
 # a little function to make sure that we turn any item which is not a list into
 # a list (which makes some algorithms more general/consistent)
-.listify <- function(x)
-{
-    if(is.na(x) || is.null(x))
-    {
+.listify <- function(x) {
+    if(is.na(x) || is.null(x)) {
         x <- list()
-    }
-    else if(inherits(x, "data.frame") || !is.list(x))
-    {
+    } else if(inherits(x, "data.frame") || !is.list(x)) {
         x <- list(x)
     }
     
@@ -914,21 +840,20 @@ buildPennCNVInputFiles <- function(
 }
 
 simpleCNV <- function(
-    snpProbeInfo, snpInfo, snpReferenceDistribution = NULL,
-    invariantProbeInfo, invariantProbesetInfo, invariantReferenceDistribution = NULL,
-    celFiles = expandCelFiles(getwd()),
-    referenceCelFile,
-    chromosomes = c(1:19, "X", "Y", "M"),
-    verbose = FALSE,
-    cluster = NULL,
-    summaryOutputFile = NULL)
-{
+        snpProbeInfo, snpInfo, snpReferenceDistribution = NULL,
+        invariantProbeInfo, invariantProbesetInfo, invariantReferenceDistribution = NULL,
+        celFiles = expandCelFiles(getwd()),
+        referenceCelFile,
+        chromosomes = c(1:19, "X", "Y", "M"),
+        verbose = FALSE,
+        cluster = NULL,
+        summaryOutputFile = NULL) {
+
     snpCount <- nrow(snpInfo)
     
     # validate snp info parameters
     if(!inherits(snpProbeInfo, "data.frame") ||
-        !all(c("probeIndex", "isAAllele", "snpId") %in% names(snpProbeInfo)))
-    {
+       !all(c("probeIndex", "isAAllele", "snpId") %in% names(snpProbeInfo))) {
         stop("You must supply a \"snpProbeInfo\" data frame parameter which has ",
             "at a minimum the \"probeIndex\", \"isAAllele\" and \"snpId\" ",
             "components. Please see the help documentation for more details.")
@@ -936,8 +861,7 @@ simpleCNV <- function(
     snpProbeInfo$snpId <- as.factor(snpProbeInfo$snpId)
     
     if(!inherits(snpInfo, "data.frame") ||
-        !all(c("snpId", "chrId", "positionBp") %in% names(snpInfo)))
-    {
+       !all(c("snpId", "chrId", "positionBp") %in% names(snpInfo))) {
         stop("You must supply a \"snpInfo\" data frame parameter which has ",
             "at a minimum the \"snpId\", \"chrId\" and \"positionBp\"",
             "components. Please see the help documentation for more details.")
@@ -951,26 +875,21 @@ simpleCNV <- function(
     invariantProbesetInfo <- .listify(invariantProbesetInfo)
     invariantReferenceDistribution <- .listify(invariantReferenceDistribution)
     invariantGroupCount <- length(invariantProbeInfo)
-    if(length(invariantReferenceDistribution) == 0)
-    {
-        for(i in 1 : invariantGroupCount)
-        {
+    if(length(invariantReferenceDistribution) == 0) {
+        for(i in 1 : invariantGroupCount) {
             invariantReferenceDistribution[[i]] <- NULL
         }
     }
     
     if(invariantGroupCount != length(invariantProbesetInfo) ||
-       invariantGroupCount != length(invariantReferenceDistribution))
-    {
+       invariantGroupCount != length(invariantReferenceDistribution)) {
         stop("there is a missmatch between the \"invariantProbeInfo\", ",
             "\"invariantProbesetInfo\", \"invariantReferenceDistribution\"")
     }
     
     # initialize the summary output
-    if(!is.null(summaryOutputFile))
-    {
-        if(is.character(summaryOutputFile))
-        {
+    if(!is.null(summaryOutputFile)) {
+        if(is.character(summaryOutputFile)) {
             summaryOutputFile <- file(summaryOutputFile, "wt")
         }
         invStrs <- paste("Number of exon", 1 : invariantGroupCount, sep = "")
@@ -994,11 +913,9 @@ simpleCNV <- function(
                 col.names = FALSE)
     }
     
-    for(i in 1 : invariantGroupCount)
-    {
+    for(i in 1 : invariantGroupCount) {
         if(!inherits(invariantProbeInfo[[i]], "data.frame") ||
-           !all(c("probeIndex", "probesetId") %in% names(invariantProbeInfo[[i]])))
-        {
+           !all(c("probeIndex", "probesetId") %in% names(invariantProbeInfo[[i]]))) {
             stop("You must supply a \"invariantProbeInfo\" data frame parameter which has ",
                 "at a minimum the \"probeIndex\", and \"probesetId\" ",
                 "components. Please see the help documentation for more details.")
@@ -1006,8 +923,7 @@ simpleCNV <- function(
         invariantProbeInfo[[i]]$probesetId <- as.factor(invariantProbeInfo[[i]]$probesetId)
         
         if(!inherits(invariantProbesetInfo[[i]], "data.frame") ||
-           !all(c("probesetId", "chrId", "positionBp") %in% names(invariantProbesetInfo[[i]])))
-        {
+           !all(c("probesetId", "chrId", "positionBp") %in% names(invariantProbesetInfo[[i]]))) {
             stop("You must supply a \"invariantProbesetInfo\" data frame parameter which has ",
                 "at a minimum the \"probesetId\", \"chrId\" and \"positionBp\" ",
                 "components. Please see the help documentation for more details.")
@@ -1018,8 +934,7 @@ simpleCNV <- function(
         combinedInfo <- rbind(combinedInfo, newInfo)
         
         if(!is.null(invariantReferenceDistribution[[i]]) &&
-            !is.numeric(invariantReferenceDistribution[[i]]))
-        {
+           !is.numeric(invariantReferenceDistribution[[i]])) {
             stop("The \"invariantReferenceDistribution\" should either be ",
                 "numeric or NULL")
         }
@@ -1027,10 +942,8 @@ simpleCNV <- function(
     
     # if the user passes us a list (or data frame) rather than a vector of file
     # names we should attempt to pull out a fileName component
-    if(is.list(celFiles))
-    {
-        if(!("fileName" %in% names(celFiles)))
-        {
+    if(is.list(celFiles)) {
+        if(!("fileName" %in% names(celFiles))) {
             stop("failed to find \"fileName\" component in the \"celFiles\" list")
         }
         
@@ -1045,8 +958,7 @@ simpleCNV <- function(
     chromosomes <- toupper(as.character(chromosomes))
     
     snpChromosomes <- unique(snpInfo$chrId)
-    if(!all(chromosomes %in% snpChromosomes))
-    {
+    if(!all(chromosomes %in% snpChromosomes)) {
         warning(
             "SNP data for the following requested chromosomes are not available: ",
             paste(setdiff(chromosomes, snpChromosomes), collapse = ", "),
@@ -1058,8 +970,7 @@ simpleCNV <- function(
     invariantChromosomes <- as.character(unique(unlist(
             lapply(invariantProbesetInfo, function(x) {x$chrId}),
             use.names=F)))
-    if(!all(chromosomes %in% invariantChromosomes))
-    {
+    if(!all(chromosomes %in% invariantChromosomes)) {
         warning(
             "Invariant data for the following requested chromosomes are not available: ",
             paste(setdiff(chromosomes, invariantChromosomes), collapse = ", "),
@@ -1068,19 +979,16 @@ simpleCNV <- function(
     chromosomes <- unique(chromosomes, invariantChromosomes)
     rm(invariantChromosomes)
     
-    if(length(chromosomes) == 0)
-    {
+    if(length(chromosomes) == 0) {
         stop("Stopping CNV analysis. There are no chromosomes to process")
     }
     
-    if(verbose)
-    {
+    if(verbose) {
         cat("processing CEL files\n")
     }
     
     combinedInfoByChr <- list()
-    for(chr in chromosomes)
-    {
+    for(chr in chromosomes) {
         info <- combinedInfo[combinedInfo$chrId == chr, , drop = FALSE]
         info <- info[order(info$positionBp, as.character(info$ID)), , drop = FALSE]
         combinedInfoByChr[[chr]] <- info
@@ -1098,21 +1006,16 @@ simpleCNV <- function(
     
     # a list of matrices by chromosome initialized to NULLs
     allCnvsByChr <- list()
-    for(currCelFile in celFiles)
-    {
-        if(normRefPath == normalizePath(currCelFile))
-        {
+    for(currCelFile in celFiles) {
+        if(normRefPath == normalizePath(currCelFile)) {
             # the reference cannot have any CNV losses or gains against itself
             noCopyChange <- 2
             cnvs <- list()
-            for(currChr in names(refIntensities))
-            {
+            for(currChr in names(refIntensities)) {
                 cnvs[[currChr]] <- rep(noCopyChange, length(refIntensities[[currChr]]))
                 names(cnvs[[currChr]]) <- names(refIntensities[[currChr]])
             }
-        }
-        else
-        {
+        } else {
             # normalizes intensities and sorts by position
             currIntensities <- .normalizeForSimpleCNV(
                 currCelFile,
@@ -1121,32 +1024,25 @@ simpleCNV <- function(
                 invariantProbeInfo, invariantProbesetInfo, invariantReferenceDistribution,
                 verbose)
             
-            if(length(cluster) == 0)
-            {
+            if(length(cluster) == 0) {
                 cnvs <- list()
-                for(chr in names(currIntensities))
-                {
-                    if(verbose)
-                    {
+                for(chr in names(currIntensities)) {
+                    if(verbose) {
                         cat("inferring CNVs for chromosome ", chr, " of ", currCelFile, "\n")
                     }
                     cnvs[[chr]] <- .inferCNVFromIntensity(
                         currIntensities[[chr]],
                         refIntensities[[chr]])
                 }
-            }
-            else
-            {
-                if(verbose)
-                {
+            } else {
+                if(verbose) {
                     cat("Applying cluster resources to infer CNVs for ", currCelFile, "\n")
                 }
                 
                 # we need to do some strange data massaging here so that we
                 # can apply cluster resources
                 combinedIntList <- mapply(
-                    function(intToTest, refInt)
-                    {
+                    function(intToTest, refInt) {
                         list(testInt = intToTest, refInt = refInt)
                     },
                     currIntensities,
@@ -1155,14 +1051,11 @@ simpleCNV <- function(
                 cnvs <- parLapply(cluster, combinedIntList, .applyInferCNVFromIntensity)
             }
             
-            if(!is.null(summaryOutputFile))
-            {
-                if(verbose)
-                {
+            if(!is.null(summaryOutputFile)) {
+                if(verbose) {
                     cat("Summarizing results for ", currCelFile, "\n", sep = "")
                 }
-                for(chr in names(currIntensities))
-                {
+                for(chr in names(currIntensities)) {
                     summaryTbl <- .summarizeSimpleCNV(
                             .fileBaseWithoutExtension(currCelFile),
                             chr,
@@ -1171,8 +1064,7 @@ simpleCNV <- function(
                             invariantGroupCount,
                             currIntensities[[chr]],
                             refIntensities[[chr]])
-                    if(!is.null(summaryTbl))
-                    {
+                    if(!is.null(summaryTbl)) {
                         write.table(
                                 summaryTbl,
                                 file = summaryOutputFile,
@@ -1183,37 +1075,33 @@ simpleCNV <- function(
             }
         }
         
-        for(chr in names(cnvs))
-        {
+        for(chr in names(cnvs)) {
             allCnvsByChr[[chr]] <- cbind(allCnvsByChr[[chr]], cnvs[[chr]])
         }
     }
     
-    if(!is.null(summaryOutputFile))
-    {
+    if(!is.null(summaryOutputFile)) {
         close(summaryOutputFile)
     }
     
     # give column names based on the CEL file
-    for(chr in names(allCnvsByChr))
-    {
+    for(chr in names(allCnvsByChr)) {
         colnames(allCnvsByChr[[chr]]) <- .fileBaseWithoutExtension(celFiles)
     }
     
     allCnvsByChr
 }
 
-.applyInferCNVFromIntensity <- function(combinedInt)
-{
+.applyInferCNVFromIntensity <- function(combinedInt) {
     .inferCNVFromIntensity(combinedInt$testInt, combinedInt$refInt)
 }
 
 .inferCNVFromIntensity <- function(
-    intensities,
-    refIntensities,
-    sameStateProb = 0.9999,
-    th = 0.1)
-{
+        intensities,
+        refIntensities,
+        sameStateProb = 0.9999,
+        th = 0.1) {
+
     library(HiddenMarkov)
     
     # the transition matrix (pi) and initial state probabilities (delta)
@@ -1247,12 +1135,12 @@ simpleCNV <- function(
 }
 
 .normalizeForSimpleCNV <- function(
-    celFileName,
-    chromosomes,
-    snpProbeInfo, snpInfo, snpReferenceDistribution,
-    invariantProbeInfo, invariantProbesetInfo, invariantReferenceDistribution,
-    verbose)
-{
+        celFileName,
+        chromosomes,
+        snpProbeInfo, snpInfo, snpReferenceDistribution,
+        invariantProbeInfo, invariantProbesetInfo, invariantReferenceDistribution,
+        verbose) {
+
     if(verbose) cat("Reading and normalizing CEL file: ", celFileName, "\n", sep="")
     
     invariantGroupCount <- length(invariantProbeInfo)
@@ -1263,8 +1151,7 @@ simpleCNV <- function(
     
     # normalize invariants
     invY <- list()
-    for(i in 1 : invariantGroupCount)
-    {
+    for(i in 1 : invariantGroupCount) {
         invY[[i]] <- celData[invariantProbeInfo[[i]]$probeIndex, , drop = FALSE]
         if(length(invariantProbeInfo[[i]]$correction) > 0)
             # C+G and fragment length correction for Y
@@ -1300,8 +1187,7 @@ simpleCNV <- function(
     
     aSnpIds <- rownames(aSnpInt)
     bSnpIds <- rownames(bSnpInt)
-    if(!all(aSnpIds == bSnpIds))
-    {
+    if(!all(aSnpIds == bSnpIds)) {
         stop("The SNP IDs for the A alleles should match up with the SNP IDs ",
             "for the B alleles but they do not.")
     }
@@ -1326,8 +1212,7 @@ simpleCNV <- function(
     # "vectorize" highSnpInt
     highSnpInt <- highSnpInt[ , 1, drop = TRUE]
     
-    if(length(snpInfo$snpId) != length(highSnpInt))
-    {
+    if(length(snpInfo$snpId) != length(highSnpInt)) {
         stop("internal error: vector lengths should match but they do not")
     }
     
@@ -1337,10 +1222,8 @@ simpleCNV <- function(
         stop("Failed to match up SNP probe IDs")
     highSnpInt <- highSnpInt[snpIdOrdering]
     
-    for(i in 1 : invariantGroupCount)
-    {
-        if(length(invariantProbesetInfo[[i]]$probesetId) != length(invY[[i]]))
-        {
+    for(i in 1 : invariantGroupCount) {
+        if(length(invariantProbesetInfo[[i]]$probesetId) != length(invY[[i]])) {
             stop("internal error: vector lengths should match but they do not")
         }
         
@@ -1351,13 +1234,11 @@ simpleCNV <- function(
     }
     
     combinedIntensities <- list()
-    for(chr in chromosomes)
-    {
+    for(chr in chromosomes) {
         # combine the SNP and invariant intensities, then sort by position
         chrInvInt <- NULL
         chrInvPos <- NULL
-        for(i in 1 : invariantGroupCount)
-        {
+        for(i in 1 : invariantGroupCount) {
             chrInvIndices <- which(invariantProbesetInfo[[i]]$chrId == chr)
             chrInvInt <- c(chrInvInt, invY[[i]][chrInvIndices])
             chrInvPos <- c(chrInvPos, invariantProbesetInfo[[i]]$positionBp[chrInvIndices])
@@ -1377,16 +1258,16 @@ simpleCNV <- function(
     combinedIntensities
 }
 
-.summarizeSimpleCNV <- function(sampleName, chr, cnvs, combinedInfo, numInvariantGroups, currIntensities, refIntensities)
-{
+.summarizeSimpleCNV <- function(sampleName, chr, cnvs, combinedInfo, numInvariantGroups, currIntensities, refIntensities) {
+
     combinedInfo <- combinedInfo[combinedInfo[ , "ID"] %in% names(cnvs), ]
     if(nrow(combinedInfo) != length(cnvs) ||
        nrow(combinedInfo) != length(refIntensities) ||
        nrow(combinedInfo) != length(currIntensities) ||
        any(combinedInfo[ , "ID"] != names(cnvs)) ||
        any(combinedInfo[ , "ID"] != names(refIntensities)) ||
-       any(combinedInfo[ , "ID"] != names(currIntensities)))
-    {
+       any(combinedInfo[ , "ID"] != names(currIntensities))) {
+
         stop("internal error: missmatch between probeset IDs in .summarizeSimpleCNV")
     }
     
@@ -1395,13 +1276,11 @@ simpleCNV <- function(
     contigCNV <- rle(cnvs)
     grpStart <- 1
     cnvSummary <- NULL
-    for(i in 1 : length(contigCNV$lengths))
-    {
+    for(i in 1 : length(contigCNV$lengths)) {
         val <- contigCNV$values[i]
         len <- contigCNV$lengths[i]
         grpEnd <- grpStart + len - 1
-        if(val %in% c(1, 3))
-        {
+        if(val %in% c(1, 3)) {
             startPos <- combinedInfo[, "positionBp"][grpStart]
             endPos <- combinedInfo[, "positionBp"][grpEnd]
             types <- combinedInfo[grpStart : grpEnd, "type"]
@@ -1414,19 +1293,15 @@ simpleCNV <- function(
                     len,
                     endPos + 1 - startPos,
                     sum(types == 0))
-            for(invIndex in 1 : numInvariantGroups)
-            {
+            for(invIndex in 1 : numInvariantGroups) {
                 nextRow[[length(nextRow) + 1]] <- sum(types == invIndex)
             }
             nextRow[[length(nextRow) + 1]] <- mean(refIntensities[grpStart : grpEnd])
             nextRow[[length(nextRow) + 1]] <- mean(currIntensities[grpStart : grpEnd])
             
-            if(is.null(cnvSummary))
-            {
+            if(is.null(cnvSummary)) {
                 cnvSummary <- as.data.frame(nextRow, stringsAsFactors = FALSE)
-            }
-            else
-            {
+            } else {
                 cnvSummary <- rbind(cnvSummary, nextRow)
             }
         }

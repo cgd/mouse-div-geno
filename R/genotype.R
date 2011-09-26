@@ -92,8 +92,7 @@ genotype <- function(nm, ns, hint1, trans, logfn=NULL) {
         v1 <- vinotype(nm, ns, geno, logfn)
         vino <- v1$vino
         conf <- v1$conf
-    }
-    else if (all(nm[!rmid] > thresh[6])) {
+    } else if (all(nm[!rmid] > thresh[6])) {
         if(doLog) {
             logfn("sample contrasts are above %f so all genotypes are being set to 1 (AA)", thresh[6])
         }
@@ -102,8 +101,7 @@ genotype <- function(nm, ns, hint1, trans, logfn=NULL) {
         v1 <- vinotype(nm, ns, geno, logfn)
         vino <- v1$vino
         conf <- v1$conf
-    }
-    else if (all(nm[!rmid] >= thresh[3] & nm[!rmid] <= thresh[4])) {
+    } else if (all(nm[!rmid] >= thresh[3] & nm[!rmid] <= thresh[4])) {
         if(doLog) {
             logfn("sample contrasts fall between %f and %f so all genotypes are being set to 2 (AB)", thresh[3], thresh[4])
         }
@@ -112,8 +110,7 @@ genotype <- function(nm, ns, hint1, trans, logfn=NULL) {
         v1 <- vinotype(nm, ns, geno, logfn)
         vino <- v1$vino
         conf <- v1$conf
-    }
-    else if (all(nm[!rmid] <= thresh[2] | nm[!rmid] >= thresh[5])) {
+    } else if (all(nm[!rmid] <= thresh[2] | nm[!rmid] >= thresh[5])) {
         if(doLog) {
             fmtMsg <- paste(
                 "sample contrasts fall outside of the range %f to %f. Negative ",
@@ -128,8 +125,7 @@ genotype <- function(nm, ns, hint1, trans, logfn=NULL) {
         v1 <- vinotype(nm, ns, geno, logfn)
         vino <- v1$vino
         conf <- v1$conf
-    }
-    else {
+    } else {
         #cat("timing section 1\n")
         #startTime <- proc.time()[3]
         
@@ -225,8 +221,7 @@ genotype <- function(nm, ns, hint1, trans, logfn=NULL) {
                 vino <- v1$vino
                 conf <- v1$conf
             }
-        }
-        else {
+        } else {
             noCalls <- tgeno2 == -1
             if (any(noCalls)) {
                 # use vdist to give membership
@@ -290,8 +285,7 @@ genotype <- function(nm, ns, hint1, trans, logfn=NULL) {
                 v1 <- vinotype(nm, ns, geno, logfn)
                 vino <- v1$vino
                 conf <- v1$conf
-            }
-            else {
+            } else {
                 out[out1 < out] <- out1[out1 < out]
                 geno3[T[, mm[1, 3]] >= out[mm[1, 3]]] <- mm[1, 3]
                 geno3[T[, mm[2, 3]] >= out[mm[2, 3]]] <- mm[2, 3]
@@ -310,8 +304,7 @@ genotype <- function(nm, ns, hint1, trans, logfn=NULL) {
                   v1 <- vinotype(nm, ns, geno, logfn)
                   vino <- v1$vino
                   conf <- v1$conf
-                }
-                else {
+                } else {
                   # at this point the 3 group scenario is still possible
                   noCalls <- tgeno3 == -1
                   if (any(noCalls)) {
@@ -332,8 +325,7 @@ genotype <- function(nm, ns, hint1, trans, logfn=NULL) {
                     v1 <- vinotype(nm, ns, geno, logfn)
                     vino <- v1$vino
                     conf <- v1$conf
-                  }
-                  else {
+                  } else {
                     geno <- .test123(tscore2, tscore3, nm, tgeno2, tgeno3, rmid, thresh, iig, nsize, logfn)
                     v1 <- vinotype(nm, ns, geno, logfn)
                     vino <- v1$vino
@@ -350,8 +342,7 @@ genotype <- function(nm, ns, hint1, trans, logfn=NULL) {
 }
 
 # Run the EM algorithm for 3 genotypes
-.em3Genos.using_r <- function(hint, nmSubset)
-{
+.em3Genos.using_r <- function(hint, nmSubset) {
     otheta1 <- list(
         tau = c(1/3, 1/3, 1/3),
         mu1 = hint[1],
@@ -397,8 +388,7 @@ genotype <- function(nm, ns, hint1, trans, logfn=NULL) {
     list(T = T, tau = theta1$tau)
 }
 
-.em3Genos.using_c <- function(hint, nmSubset)
-{
+.em3Genos.using_c <- function(hint, nmSubset) {
     sample_count <- as.integer(length(nmSubset))
     geno_count <- as.integer(3)
     
@@ -417,8 +407,7 @@ genotype <- function(nm, ns, hint1, trans, logfn=NULL) {
 
 .em3Genos <- .em3Genos.using_c
 
-.em2Genos.using_r <- function(hint, nmSubset)
-{
+.em2Genos.using_r <- function(hint, nmSubset) {
     # Start with priors
     theta1 <- list(
         tau = c(0.5, 0.5),
@@ -468,8 +457,7 @@ genotype <- function(nm, ns, hint1, trans, logfn=NULL) {
     list(T = T, tau = theta1$tau)
 }
 
-.em2Genos.using_c <- function(hint, nmSubset)
-{
+.em2Genos.using_c <- function(hint, nmSubset) {
     sample_count <- as.integer(length(nmSubset))
     geno_count <- as.integer(2)
     
@@ -543,8 +531,7 @@ genotypeHomozygous <- function(nm, ns, trans, logfn=NULL) {
         v1 <- vinotype(nm, ns, geno, logfn)
         vino <- v1$vino
         conf <- v1$conf
-    }
-    else if (all(nm[!rmid] > thresh[4])) {
+    } else if (all(nm[!rmid] > thresh[4])) {
         if(doLog) {
             logfn("sample contrasts are above %f so all genotypes are being set to 1 (AA)", thresh[4])
         }
@@ -553,8 +540,7 @@ genotypeHomozygous <- function(nm, ns, trans, logfn=NULL) {
         v1 <- vinotype(nm, ns, geno, logfn)
         vino <- v1$vino
         conf <- v1$conf
-    }
-    else if (all(nm[!rmid] <= thresh[3] | nm[!rmid] >= thresh[4])) {
+    } else if (all(nm[!rmid] <= thresh[3] | nm[!rmid] >= thresh[4])) {
         if(doLog) {
             fmtMsg <- paste(
                 "sample contrasts fall outside of the range %f to %f. Negative ",
@@ -569,8 +555,7 @@ genotypeHomozygous <- function(nm, ns, trans, logfn=NULL) {
         v1 <- vinotype(nm, ns, geno, logfn)
         vino <- v1$vino
         conf <- v1$conf
-    }
-    else {
+    } else {
         adata <- cbind(nm, ns/(max(ns) - min(ns)))
         #======== test 2
         emResult <- .em2Genos(hint, nm[!rmid])
@@ -602,8 +587,7 @@ genotypeHomozygous <- function(nm, ns, trans, logfn=NULL) {
                     sep="")
                 logfn(fmtMsg, mm, geno[1])
             }
-        }
-        else {
+        } else {
             noCalls <- geno == -1
             if (any(noCalls)) {
                 geno <- .vdist(adata[, 1], adata[, 2] / 2, geno)
@@ -615,9 +599,9 @@ genotypeHomozygous <- function(nm, ns, trans, logfn=NULL) {
                 }
             }
             keepthis <- tapply(nm, geno, mean)
-            if (keepthis[1] > keepthis[2]) 
+            if (keepthis[1] > keepthis[2]) {
                 geno[geno == 2] <- 3
-            else {
+            } else {
                 geno[geno == 1] <- 3
                 geno[geno == 2] <- 1
             }
@@ -635,8 +619,7 @@ genotypeHomozygous <- function(nm, ns, trans, logfn=NULL) {
     if (length(tscore3) < 3) {
         # the score is not available
         mscore3 <- 0
-    }
-    else {
+    } else {
         # use the mean of the 3rd column which stores avg scores
         mscore3 <- mean(tscore3[, 3])
     }
@@ -644,8 +627,7 @@ genotypeHomozygous <- function(nm, ns, trans, logfn=NULL) {
     if (length(tscore2) < 3) {
         # the score is not available
         mscore2 <- 0
-    }
-    else {
+    } else {
         # use the mean of the 3rd column which stores avg scores
         mscore2 <- mean(tscore2[, 3])
     }
@@ -656,8 +638,7 @@ genotypeHomozygous <- function(nm, ns, trans, logfn=NULL) {
     if (((mscore2 - mscore3 <= 0.15) | mscore3 > 0.8) & (d1 > 0.1 & d2 > 0.1)) {
         # three groups
         geno <- tgeno3
-    }
-    else {
+    } else {
         if(!is.null(logfn)) {
             msgFmt <- paste(
                 "\".test123\" is falling back on \".test12\" based on ",
@@ -675,8 +656,7 @@ genotypeHomozygous <- function(nm, ns, trans, logfn=NULL) {
     if (length(tscore3) < 3) {
         # the score is not available
         mscore3 <- 0
-    }
-    else {
+    } else {
         # use the mean of the 3rd column which stores avg scores
         mscore3 <- mean(tscore3[, 3])
     }
@@ -702,8 +682,7 @@ genotypeHomozygous <- function(nm, ns, trans, logfn=NULL) {
     if (length(tscore2) < 3) {
         # the score is not available
         mscore <- 0
-    }
-    else {
+    } else {
         # use the mean of the 3rd column which stores avg scores
         mscore <- mean(tscore2[, 3])
     }
@@ -720,11 +699,9 @@ genotypeHomozygous <- function(nm, ns, trans, logfn=NULL) {
             tmp <- c(median(nm[tgeno == 1]), median(nm[tgeno == 2]))
             if (tmp[1] > thresh[5] & tmp[2] < thresh[2]) {
                 iig <- c(1, 3)
-            }
-            else if (tmp[1] < thresh[5]) {
+            } else if (tmp[1] < thresh[5]) {
                 iig <- c(2, 3)
-            }
-            else {
+            } else {
                 iig <- c(1, 2)
             }
         }
@@ -744,11 +721,9 @@ genotypeHomozygous <- function(nm, ns, trans, logfn=NULL) {
         mm <- median(nm)
         if (mm > thresh[5]) {
             tgeno <- rep(1, nsize)
-        }
-        else if (mm < thresh[2]) {
+        } else if (mm < thresh[2]) {
             tgeno <- rep(3, nsize)
-        }
-        else {
+        } else {
             tgeno <- rep(2, nsize)
         }
     }
@@ -781,8 +756,7 @@ genotypeHomozygous <- function(nm, ns, trans, logfn=NULL) {
             # if there is only 1 unassigned genotype assign it to the
             # nearest valid genotype
             t2[la] <- t3[which(min(tmp) == tmp)[1]]
-        }
-        else {
+        } else {
             # id is the index from tmp with the smallest distance
             id <- which(tmp == min(tmp))[1]
             

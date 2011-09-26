@@ -53,12 +53,10 @@ vinotype <- function(nm, ns, geno, logfn=NULL) {
     #   * often vino is near H rather than A or B
     if (ngeno == 1) {
         mms <- median(ns[!rmid])
-    }
-    else if (ngeno == 3) {
+    } else if (ngeno == 3) {
         # for 3 we can use median pair
         mms <- min(tapply(ns[geno == 1 | geno == 3], geno[geno == 1 | geno == 3], median))
-    }
-    else if (ngeno == 2) {
+    } else if (ngeno == 2) {
         mms <- min(tapply(ns[!rmid], geno[!rmid], median))
     }
     mm <- rep(0, 3)
@@ -147,8 +145,7 @@ vinotype <- function(nm, ns, geno, logfn=NULL) {
             # sum the covariances as m (we will later make this an average
             m <- m + ss[[ik]]
             lm <- lm + 1
-        }
-        else {
+        } else {
             mm[ik] <- nm[geno == ik]
             ms[ik] <- ns[geno == ik]
             
@@ -164,9 +161,11 @@ vinotype <- function(nm, ns, geno, logfn=NULL) {
     # covariance
     m <- m/lm
     for (ik in iig) {
-        if (is.na(ss[ik])) 
+        if (is.na(ss[ik])) {
             ss[[ik]] <- m
-        else ss[[ik]] <- ss[[ik]] * 0.5 + m * 0.5
+        } else {
+            ss[[ik]] <- ss[[ik]] * 0.5 + m * 0.5
+        }
     }
     
     #=========== test 2 vs. 3
@@ -225,16 +224,14 @@ vinotype <- function(nm, ns, geno, logfn=NULL) {
                 }
             }
         }
-    }
-    else if (ngeno == 2) {
+    } else if (ngeno == 2) {
         l1 <- sum(geno == iig[1])
         l2 <- sum(geno == iig[2])
         mdd <- rep(0, nsize)
         th <- c(0.99, 0.95, 0.99)
         th <- th[iig]
         if (l1 > 1 & det(ss[[iig[1]]]) > 10^(-10)) {
-            tmp <- mahalanobis(adata[geno == iig[1], ], c(mm[iig[1]], ms[iig[1]]), 
-                ss[[iig[1]]])
+            tmp <- mahalanobis(adata[geno == iig[1], ], c(mm[iig[1]], ms[iig[1]]), ss[[iig[1]]])
             dd1 <- pchisq(tmp, df = 2)
             mdd[geno == iig[1]] <- dd1
             vino1[geno == iig[1]][dd1 < th[1]] <- 2
@@ -250,8 +247,7 @@ vinotype <- function(nm, ns, geno, logfn=NULL) {
             }
         }
         if (l2 > 1 & det(ss[[iig[2]]]) > 10^(-10)) {
-            tmp <- mahalanobis(adata[geno == iig[2], ], c(mm[iig[2]], ms[iig[2]]), 
-                ss[[iig[2]]])
+            tmp <- mahalanobis(adata[geno == iig[2], ], c(mm[iig[2]], ms[iig[2]]), ss[[iig[2]]])
             dd2 <- pchisq(tmp, df = 2)
             mdd[geno == iig[2]] <- dd2
             vino1[geno == iig[2]][dd2 < th[2]] <- 2
@@ -266,8 +262,7 @@ vinotype <- function(nm, ns, geno, logfn=NULL) {
                 }
             }
         }
-    }
-    else if (ngeno == 1) {
+    } else if (ngeno == 1) {
         tmp <- mahalanobis(adata, c(mm[iig[1]], ms[iig[1]]), ss[[iig[1]]])
         mdd <- pchisq(tmp, df = 2)
         vino1[mdd < 0.99] <- 2

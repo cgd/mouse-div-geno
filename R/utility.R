@@ -18,15 +18,13 @@ plotMouseDivArrayImage <- function(celFilename)
         ylab = "")
 }
 
-mouseDivDensityPlot <- function(celFilenames, snpProbeInfo, type = c("Average", "MatchedSet"))
-{
+mouseDivDensityPlot <- function(celFilenames, snpProbeInfo, type = c("Average", "MatchedSet")) {
     snpProbeInfo$snpId <- as.factor(snpProbeInfo$snpId)
     
     type <- match.arg(type)
     isMatchedSet <- type == "MatchedSet"
     
-    for(i in 1 : length(celFilenames))
-    {
+    for(i in 1 : length(celFilenames)) {
         y <- as.matrix(read.celfile(as.character(celFilenames[i]), intensity.means.only = TRUE)[["INTENSITY"]][["MEAN"]][snpProbeInfo$probeIndex])
         y <- log2(y)
         allAint <- y[snpProbeInfo$isAAllele, 1, drop = FALSE]
@@ -38,31 +36,22 @@ mouseDivDensityPlot <- function(celFilenames, snpProbeInfo, type = c("Average", 
             matrix(allBint, ncol = 1),
             snpProbeInfo$snpId[!snpProbeInfo$isAAllele])
         
-        if(isMatchedSet)
-        {
+        if(isMatchedSet) {
             tmp <- allAint
             tmp[allAint < allBint] <- allBint[allAint < allBint]
-        }
-        else
-        {
+        } else {
             tmp <- (allAint + allBint) / 2
         }
         
-        if(i == 1)
-        {
-            if(isMatchedSet)
-            {
+        if(i == 1) {
+            if(isMatchedSet) {
                 xlab <- "Matched sequence intensity"
-            }
-            else
-            {
+            } else {
                 xlab <- "Average intensity"
             }
             
             plot(density(tmp), xlab = xlab, ylab = "", main = "")
-        }
-        else
-        {
+        } else {
             lines(density(tmp))
         }
     }
@@ -73,11 +62,10 @@ mouseDivDensityPlot <- function(celFilenames, snpProbeInfo, type = c("Average", 
         matrices,
         sep = "\t",
         prefix = "mouseDivResults_",
-        suffix = ".txt")
-{
+        suffix = ".txt") {
+
     connections <- list()
-    for(name in names(matrices))
-    {
+    for(name in names(matrices)) {
         outFileName <- file.path(dir, paste(prefix, name, suffix, sep = ""))
         con <- file(description = outFileName, open = "wt")
         connections[[name]] <- con
@@ -95,16 +83,13 @@ mouseDivDensityPlot <- function(celFilenames, snpProbeInfo, type = c("Average", 
     connections
 }
 
-.writeResultsToFlatFile <- function(connections, matrices, sep = "\t")
-{
+.writeResultsToFlatFile <- function(connections, matrices, sep = "\t") {
     n <- length(connections)
-    if(length(matrices) != n)
-    {
+    if(length(matrices) != n) {
         stop("number of file connections must match number of matrices")
     }
     
-    for(i in 1 : n)
-    {
+    for(i in 1 : n) {
         write.table(
                 matrices[[i]],
                 file = connections[[i]],
@@ -148,21 +133,15 @@ mouseDivDensityPlot <- function(celFilenames, snpProbeInfo, type = c("Average", 
 # a simple function that will return all CEL file in a dir if given a
 # dir argument, or a single CEL file if that is what it's given. If the given
 # file is not null and does not end in ".CEL" then NULL is returned
-expandCelFiles <- function(filename)
-{
+expandCelFiles <- function(filename) {
     retVal <- NULL
-    if(!file.exists(filename))
-    {
+    if(!file.exists(filename)) {
         stop("failed to find file named \"", filename, "\"")
-    }
-    else if(file.info(filename)$isdir)
-    {
+    } else if(file.info(filename)$isdir) {
         # if it's a dir expand it to all CEL file contents
         fileListing <- dir(filename, full.names = TRUE)
         retVal <- fileListing[grep("*.CEL$", toupper(fileListing))]
-    }
-    else if(grep("*.CEL$", toupper(filename)))
-    {
+    } else if(grep("*.CEL$", toupper(filename))) {
         retVal <- filename
     }
     
@@ -172,11 +151,9 @@ expandCelFiles <- function(filename)
 .chunkIndices <- function(to, by) {
     chunks <- list()
     chunkNumber <- 0
-    for(chunkStart in seq(from = 1, to = to, by = by))
-    {
+    for(chunkStart in seq(from = 1, to = to, by = by)) {
         chunkEnd <- chunkStart + by - 1
-        if(chunkEnd > to)
-        {
+        if(chunkEnd > to) {
             chunkEnd <- to
         }
         
