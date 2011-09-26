@@ -168,3 +168,62 @@ expandCelFiles <- function(filename)
     
     retVal
 }
+
+.chunkIndices <- function(to, by) {
+    chunks <- list()
+    chunkNumber <- 0
+    for(chunkStart in seq(from = 1, to = to, by = by))
+    {
+        chunkEnd <- chunkStart + by - 1
+        if(chunkEnd > to)
+        {
+            chunkEnd <- to
+        }
+        
+        chunkNumber <- chunkNumber + 1
+        chunks[[chunkNumber]] <- list(start=chunkStart, end=chunkEnd)
+    }
+    
+    chunks
+}
+
+# TODO we need more parameters to make sure this is really meaningfully unique
+.chunkFileName <- function(baseDir, kind, sampleName, chrName, chunkSize, chunkIndex) {
+    chunkFile <- paste(sampleName, "-", kind, "-", chrName, "-", chunkSize, "-", chunkIndex, ".RData", sep="")
+    
+    file.path(baseDir, chunkFile)
+}
+
+.fileBaseWithoutExtension <- function(celFileName) {
+    sub("\\.[^\\.]*$", "", basename(celFileName))
+}
+
+ccsTransform <- function(abMat, k = 4) {
+    a <- abMat[ , 1]
+    twoPowA <- 2 ^ a
+    b <- abMat[ , 2]
+    twoPowB <- 2 ^ b
+    
+    m <- asinh(k * (twoPowA - twoPowB) / (twoPowA + twoPowB)) / asinh(k)
+    s <- (a + b) / 2
+    
+    contAvgMat <- matrix(c(m, s), ncol = 2)
+    rownames(contAvgMat) <- rownames(abMat)
+    colnames(contAvgMat) <- c("intensityConts", "intensityAvgs")
+    
+    contAvgMat
+}
+
+maTransform <- function(abMat) {
+    a <- abMat[ , 1]
+    b <- abMat[ , 2]
+    
+    m <- a - b
+    s <- (a + b) / 2
+    
+    contAvgMat <- matrix(c(m, s), ncol = 2)
+    rownames(contAvgMat) <- rownames(abMat)
+    colnames(contAvgMat) <- c("intensityConts", "intensityAvgs")
+    
+    contAvgMat
+}
