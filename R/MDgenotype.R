@@ -383,13 +383,6 @@ mouseDivGenotypeTab <- function(
                         }
                         else
                         {
-                            # this is a bit tricky, but we need to grab the chunk object
-                            # that matches up correctly with the chunk result that
-                            # we are iterating over
-                            clustChunk <- chrChunks[[chri]][[chunkIndex - (length(chunkResultsList) - i)]]
-                            clustChunkRange <- clustChunk$start : clustChunk$end
-                            chunkProbesetInfo <- snpInfo[chrIndices[clustChunkRange], ]
-                            
                             for(k in 1 : length(chunkResult))
                             {
                                 colnames(chunkResult[[k]]) <- sampleNames
