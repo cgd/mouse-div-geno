@@ -74,18 +74,19 @@
 # a simple function that will return all CEL file in a dir if given a
 # dir argument, or a single CEL file if that is what it's given. If the given
 # file is not null and does not end in ".CEL" then NULL is returned
-expandCelFiles <- function(filename) {
+.expandCelFiles <- function(filenames) {
     retVal <- NULL
-    if(!file.exists(filename)) {
-        stop("failed to find file named \"", filename, "\"")
-    } else if(file.info(filename)$isdir) {
-        # if it's a dir expand it to all CEL file contents
-        fileListing <- dir(filename, full.names = TRUE)
-        retVal <- fileListing[grep("*.CEL$", toupper(fileListing))]
-    } else if(grep("*.CEL$", toupper(filename))) {
-        retVal <- filename
+    for(f in filenames) {
+        if(!file.exists(f)) {
+            stop("failed to find file named \"", f, "\"")
+        } else if(file.info(f)$isdir) {
+            # if it's a dir expand it to all CEL file contents
+            fileListing <- dir(f, full.names=TRUE)
+            retVal <- c(retVal, fileListing[grep("*.CEL$", toupper(fileListing))])
+        } else {
+            retVal <- c(retVal, f)
+        }
     }
-    
     retVal
 }
 
@@ -116,32 +117,240 @@ expandCelFiles <- function(filename) {
     sub("\\.[^\\.]*$", "", basename(celFileName))
 }
 
-ccsTransform <- function(abMat, k = 4) {
-    a <- abMat[ , 1]
+makeProbesetSampleMatrixes <- function(mats, probesetIds, sampleNames) {
+    matNames <- names(mats)
+    mats[["probesetIds"]] <- as.character(probesetIds)
+    mats[["sampleNames"]] <- as.character(sampleNames)
+    class(mats) <- c("probesetSampleMatrixes", class(mats))
+    attr(mats, "matrixNames") <- matNames
+    
+    mats
+}
+
+makeSnpIntensities <- function(aIntensities, bIntensities, snpIds, sampleNames) {
+    if(!is.matrix(aIntensities)) {
+        aIntensities <- matrix(aIntensities, ncol=1)
+    }
+    if(!is.matrix(bIntensities)) {
+        bIntensities <- matrix(bIntensities, ncol=1)
+    }
+    
+    retVal <- list(
+        A=aIntensities,
+        B=bIntensities,
+        probesetIds=as.character(snpIds),
+        sampleNames=as.character(sampleNames))
+    class(retVal) <- c("snpIntensities", "probesetSampleMatrixes", class(retVal))
+    attr(retVal, "matrixNames") <- c("A", "B")
+    retVal
+}
+
+makeSnpContAvg <- function(snpContrasts, snpAverages, snpIds, sampleNames, transformMethod=NULL) {
+    if(!is.matrix(snpContrasts)) {
+        snpContrasts <- matrix(snpContrasts, ncol=1)
+    }
+    if(!is.matrix(snpAverages)) {
+        snpAverages <- matrix(snpAverages, ncol=1)
+    }
+    
+    retVal <- list(
+        snpContrasts=snpContrasts,
+        snpAverages=snpAverages,
+        probesetIds=as.character(snpIds),
+        sampleNames=as.character(sampleNames))
+    class(retVal) <- c("snpContAvg", "probesetSampleMatrixes", class(retVal))
+    attr(retVal, "matrixNames") <- c("snpContrasts", "snpAverages")
+    if(!is.null(transformMethod)) {
+        attr(retVal, "transformMethod") <- transformMethod
+    }
+    retVal
+}
+
+dim.probesetSampleMatrixes <- function(x) {
+    c(length(x$probesetIds), length(x$sampleNames))
+}
+
+dimnames.probesetSampleMatrixes <- function(x) {
+    list(x$probesetIds, x$sampleNames)
+}
+
+cbind.probesetSampleMatrixes <- function(x, ...) {
+    if(is.null(x)) {
+        if(length(list(...))) {
+            cbind.probesetSampleMatrixes(...)
+        } else {
+            x
+        }
+    } else {
+        probesetIds <- x$probesetIds
+        numProbesets <- length(probesetIds)
+        
+        for(curr in list(...)) {
+            if(!is.null(curr)) {
+                if(!inherits(curr, "probesetSampleMatrixes")) {
+                    stop("cbind.probesetSampleMatrixes requires arguments to inherit from the probesetSampleMatrixes class")
+                }
+                
+                if(length(curr$probesetIds) != numProbesets || any(curr$probesetIds != probesetIds)) {
+                    stop("in cbind.probesetSampleMatrixes probesetIds do not match up")
+                }
+                
+                for(mName in attr(x, "matrixNames", exact=TRUE)) {
+                    x[[mName]] <- cbind(x[[mName]], curr[[mName]])
+                }
+                
+                x$sampleNames <- c(x$sampleNames, curr$sampleNames)
+            }
+        }
+        
+        x
+    }
+}
+
+rbind.probesetSampleMatrixes <- function(x, ...) {
+    if(is.null(x)) {
+        if(length(list(...))) {
+            rbind.probesetSampleMatrixes(...)
+        } else {
+            x
+        }
+    } else {
+        sampleNames <- x$sampleNames
+        numSamples <- length(sampleNames)
+        
+        for(curr in list(...)) {
+            if(!is.null(curr)) {
+                if(!inherits(curr, "probesetSampleMatrixes")) {
+                    stop("rbind.probesetSampleMatrixes requires arguments to inherit from the probesetSampleMatrixes class")
+                }
+                
+                if(length(curr$sampleNames) != numSamples || any(curr$sampleNames != sampleNames)) {
+                    stop("in rbind.probesetSampleMatrixes sampleNames do not match up")
+                }
+                
+                for(mName in attr(x, "matrixNames", exact=TRUE)) {
+                    x[[mName]] <- rbind(x[[mName]], curr[[mName]])
+                }
+                
+                x$probesetIds <- c(x$probesetIds, curr$probesetIds)
+            }
+        }
+        
+        x
+    }
+}
+
+`[.probesetSampleMatrixes` <- function(x, i, j, drop=FALSE) {
+    if(drop) {
+        stop("drop=TRUE is not supported for probesetSampleMatrixes")
+    }
+    
+    hasI <- !missing(i)
+    hasJ <- !missing(j)
+    
+    # convert i and j to integer indexes if necessary
+    toIntIndex <- function(index, isRow) {
+        if(is.numeric(index)) {
+            index
+        } else if(is.logical(index)) {
+            which(index)
+        } else if(is.character(index) || is.factor(index)) {
+            match(index, if(isRow) x$probesetIds else x$sampleNames)
+        } else {
+            stop(paste("bad index type:", class(index), collapse=", "))
+        }
+    }
+    
+    if(hasI) {
+        i <- toIntIndex(i, TRUE)
+        x$probesetIds <- x$probesetIds[i]
+    }
+    if(hasJ) {
+        j <- toIntIndex(j, FALSE)
+        x$sampleNames <- x$sampleNames[j]
+    }
+    
+    if(hasI && hasJ) {
+        for(mName in attr(x, "matrixNames", exact=TRUE)) {
+            x[[mName]] <- x[[mName]][i, j, drop=FALSE]
+        }
+    } else if(hasI) {
+        for(mName in attr(x, "matrixNames", exact=TRUE)) {
+            x[[mName]] <- x[[mName]][i, , drop=FALSE]
+        }
+    } else if(hasJ) {
+        for(mName in attr(x, "matrixNames", exact=TRUE)) {
+            x[[mName]] <- x[[mName]][, j, drop=FALSE]
+        }
+    }
+    
+    x
+}
+
+#keepSnpsInChr <- function(mat, chrs, info) {
+#    mat[rownames(mat) %in% info$snpId[info$chrId %in% chrs], , drop=FALSE]
+#}
+#
+#dropSnpsInChr <- function(mat, chrs, info) {
+#    mat[rownames(mat) %in% info$snpId[!(info$chrId %in% chrs)], , drop=FALSE]
+#}
+
+ccsTransform <- function(ab, k = 4) {
+    UseMethod("ccsTransform")
+}
+
+ccsTransform.matrix <- function(ab, k = 4) {
+    a <- ab[ , 1]
     twoPowA <- 2 ^ a
-    b <- abMat[ , 2]
+    b <- ab[ , 2]
     twoPowB <- 2 ^ b
     
     m <- asinh(k * (twoPowA - twoPowB) / (twoPowA + twoPowB)) / asinh(k)
     s <- (a + b) / 2
     
     contAvgMat <- matrix(c(m, s), ncol = 2)
-    rownames(contAvgMat) <- rownames(abMat)
+    rownames(contAvgMat) <- rownames(ab)
     colnames(contAvgMat) <- c("intensityConts", "intensityAvgs")
     
     contAvgMat
 }
 
-maTransform <- function(abMat) {
-    a <- abMat[ , 1]
-    b <- abMat[ , 2]
+ccsTransform.snpIntensities <- function(ab, k = 4) {
+    a <- ab$A
+    twoPowA <- 2 ^ a
+    b <- ab$B
+    twoPowB <- 2 ^ b
+    
+    m <- asinh(k * (twoPowA - twoPowB) / (twoPowA + twoPowB)) / asinh(k)
+    s <- (a + b) / 2
+    
+    makeSnpContAvg(m, s, rownames(ab), colnames(ab), "CCS")
+}
+
+maTransform <- function(ab) {
+    UseMethod("maTransform")
+}
+
+maTransform.matrix <- function(ab) {
+    a <- ab[ , 1]
+    b <- ab[ , 2]
     
     m <- a - b
     s <- (a + b) / 2
     
     contAvgMat <- matrix(c(m, s), ncol = 2)
-    rownames(contAvgMat) <- rownames(abMat)
+    rownames(contAvgMat) <- rownames(ab)
     colnames(contAvgMat) <- c("intensityConts", "intensityAvgs")
     
     contAvgMat
+}
+
+maTransform.snpIntensities <- function(ab) {
+    a <- ab$A
+    b <- ab$B
+    
+    m <- a - b
+    s <- (a + b) / 2
+    
+    makeSnpContAvg(m, s, rownames(ab), colnames(ab), "MA")
 }

@@ -2,10 +2,10 @@ buildPennCNVInputFiles <- function(
         outdir = getwd(), allowOverwrite = FALSE,
         genotypes, snpProbeInfo, snpInfo, snpReferenceDistribution = NULL,
         invariantProbeInfo, invariantProbesetInfo, invariantReferenceDistribution = NULL,
-        transformMethod = c("CCStrans", "MAtrans"), celFiles = expandCelFiles(getwd()),
+        transformMethod = c("CCS", "MA"), celFiles = getwd(),
         isMale = NULL,
         chromosomes = c(1:19, "X", "Y", "M"),
-        chromosomeRenameMap = list(X = 20, Y = 21, M = 22),
+        chromosomeRenameMap = list(X = "20", Y = "21", M = "22"),
         cacheDir = tempdir(),
         retainCache = FALSE, verbose = FALSE,
         probesetChunkSize = 1000) {
@@ -32,12 +32,18 @@ buildPennCNVInputFiles <- function(
     }
     snpInfo$snpId <- as.factor(snpInfo$snpId)
     
-    # if all are the same sex there is no need to separate
-    if(!is.null(isMale) && (all(isMale) || !any(isMale))) {
-        isMale <- NULL
+    celFiles <- .expandCelFiles(celFiles)
+    if(length(celFiles) != sampleCount) {
+        stop("the number of CEL files doesn't match the number of columns in ",
+            "\"genotypes\" (", sampleCount, "). The expanded CEL files are: ",
+            paste(celFiles, sep = ", "))
     }
     
-    if(!is.null(isMale) && length(isMale) != length(celFiles)) {
+    if(!is.null(isMale) && (all(isMale) || !any(isMale))) {
+        # if all are the same sex there is no need to separate into groups
+        # so we can just set isMale to NULL
+        isMale <- NULL
+    } else if(!is.null(isMale) && length(isMale) != length(celFiles)) {
         stop("the length of isMale must match the length of celFiles")
     }
     
@@ -80,22 +86,6 @@ buildPennCNVInputFiles <- function(
             stop("The \"invariantReferenceDistribution\" should either be ",
                 "numeric or NULL")
         }
-    }
-    
-    # if the user passes us a list (or data frame) rather than a vector of file
-    # names we should attempt to pull out a fileName component
-    if(is.list(celFiles)) {
-        if(!("fileName" %in% names(celFiles))) {
-            stop("failed to find \"fileName\" component in the \"celFiles\" list")
-        }
-        
-        celFiles <- celFiles$fileName
-    }
-    
-    if(length(celFiles) != sampleCount) {
-        stop("the number of CEL files doesn't match the number of columns in ",
-            "\"genotypes\" (", sampleCount, "). The expanded CEL files are: ",
-            paste(celFiles, sep = ", "))
     }
     
     genoRownames <- rownames(genotypes)
@@ -176,11 +166,13 @@ buildPennCNVInputFiles <- function(
                     # if we haven't yet normalized the CEL file we'll have to
                     # do that now
                     if(is.null(msList)) {
-                        normCel <- normalizeCelFile(celfile, snpProbeInfo, snpReferenceDistribution)
-                        if(transformMethod == "CCStrans") {
+                        normCel <- readCELFiles(celfile, snpProbeInfo, snpReferenceDistribution)
+                        if(transformMethod == "CCS") {
                             transCel <- ccsTransform(normCel)
-                        } else if(transformMethod == "MAtrans") {
+                        } else if(transformMethod == "MA") {
                             transCel <- maTransform(normCel)
+                        } else {
+                            stop("expected transformMethod to be \"CCS\" or \"MA\"")
                         }
                         
                         msList <- list()
@@ -194,10 +186,9 @@ buildPennCNVInputFiles <- function(
                     
                     chunk <- chrChunks[[currChr]][[chunkIndex]]
                     probesetIndices <- chunk$start : chunk$end
-                    mChunk <- msList[[currChr]][ , "intensityConts"][probesetIndices]
-                    sChunk <- msList[[currChr]][ , "intensityAvgs"][probesetIndices]
                     
-                    save(mChunk, sChunk, file = chunkFile)
+                    chunkData <- msList[[currChr]][probesetIndices, , drop=FALSE]
+                    save(chunkData, file=chunkFile)
                 }
             }
         }
@@ -278,7 +269,7 @@ buildPennCNVInputFiles <- function(
             for(fileIndex in 1 : length(celFiles)) {
                 celfile <- celFiles[fileIndex]
                 
-                # loads mChunk and sChunk into scope
+                # loads chunkData into scope
                 chunkFile <- .chunkFileName(
                         cacheDir,
                         "snp",
@@ -288,8 +279,8 @@ buildPennCNVInputFiles <- function(
                         chunkIndex)
                 load(chunkFile)
                 
-                mMatrix[, fileIndex] <- mChunk
-                sMatrix[, fileIndex] <- sChunk
+                mMatrix[, fileIndex] <- c(chunkData$snpContrasts)
+                sMatrix[, fileIndex] <- c(chunkData$snpAverages)
             }
             
             .appendToPennCNVForSNPs(
@@ -316,17 +307,7 @@ buildPennCNVInputFiles <- function(
         }
         
         for(celfile in celFiles) {
-            makeNormInvariantList <- function() {
-                .normalizeCelFileForInvariants(
-                    celfile,
-                    verbose,
-                    invariantProbeInfo[[i]],
-                    invariantProbesetInfo[[i]],
-                    invariantChromosomes[[i]],
-                    invariantReferenceDistribution[[i]])
-            }
             normInvariantList <- NULL
-            
             for(currChr in invariantChromosomes[[i]]) {
                 for(chunkIndex in 1 : length(invariantChrChunks[[currChr]])) {
                     chunkFile <- .chunkFileName(
@@ -342,7 +323,13 @@ buildPennCNVInputFiles <- function(
                         # if we haven't yet normalized the CEL file we'll have to
                         # do that now
                         if(is.null(normInvariantList)) {
-                            normInvariantList <- makeNormInvariantList()
+                            normInvariantList <- .readCELFilesForInvariants(
+                                celfile,
+                                verbose,
+                                invariantProbeInfo[[i]],
+                                invariantProbesetInfo[[i]],
+                                invariantChromosomes[[i]],
+                                invariantReferenceDistribution[[i]])
                         }
                         
                         chunk <- invariantChrChunks[[currChr]][[chunkIndex]]
@@ -797,7 +784,7 @@ buildPennCNVInputFiles <- function(
     data.frame(BAF = BAF, LRR = LRR)
 }
 
-.normalizeCelFileForInvariants <- function(
+.readCELFilesForInvariants <- function(
         celFileName,
         verbose,
         invariantProbeInfo,
@@ -842,7 +829,7 @@ buildPennCNVInputFiles <- function(
 simpleCNV <- function(
         snpProbeInfo, snpInfo, snpReferenceDistribution = NULL,
         invariantProbeInfo, invariantProbesetInfo, invariantReferenceDistribution = NULL,
-        celFiles = expandCelFiles(getwd()),
+        celFiles = getwd(),
         referenceCelFile,
         chromosomes = c(1:19, "X", "Y", "M"),
         verbose = FALSE,
@@ -940,15 +927,7 @@ simpleCNV <- function(
         }
     }
     
-    # if the user passes us a list (or data frame) rather than a vector of file
-    # names we should attempt to pull out a fileName component
-    if(is.list(celFiles)) {
-        if(!("fileName" %in% names(celFiles))) {
-            stop("failed to find \"fileName\" component in the \"celFiles\" list")
-        }
-        
-        celFiles <- celFiles$fileName
-    }
+    celFiles <- .expandCelFiles(celFiles)
     sampleCount <- length(celFiles)
     
     # make sure that the chromosome vector is not numeric

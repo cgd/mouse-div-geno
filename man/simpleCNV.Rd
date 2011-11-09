@@ -1,4 +1,4 @@
-\author{Hyuna Yang}
+\author{Hyuna Yang and Keith Sheppard}
 \name{simpleCNV}
 \alias{simpleCNV}
 \title{Simplified CNV Analysis for the Mouse Diversity Array}
@@ -8,14 +8,14 @@
 }
 \usage{
 simpleCNV(
-    snpProbeInfo, snpInfo, snpReferenceDistribution = NULL,
-    invariantProbeInfo, invariantProbesetInfo, invariantReferenceDistribution = NULL,
-    celFiles = expandCelFiles(getwd()),
-    referenceCelFile,
-    chromosomes = c(1:19, "X", "Y", "M"),
-    verbose = FALSE,
-    cluster = NULL,
-    summaryOutputFile = NULL)
+        snpProbeInfo, snpInfo, snpReferenceDistribution = NULL,
+        invariantProbeInfo, invariantProbesetInfo, invariantReferenceDistribution = NULL,
+        celFiles = getwd(),
+        referenceCelFile,
+        chromosomes = c(1:19, "X", "Y", "M"),
+        verbose = FALSE,
+        cluster = NULL,
+        summaryOutputFile = NULL)
 }
 
 \arguments{
@@ -89,7 +89,10 @@ simpleCNV(
         seperately from the others.
     }
   
-  \item{celFiles}{the vector of CEL files to process}
+    \item{celFiles}{
+        either a vector of CEL file name(s) or directory name(s). Any directories
+        will be expanded to the listing of CEL files found in the directory
+    }
   
   \item{referenceCelFile}{the CEL file used as a reference when testing for CNV gains and losses}
   

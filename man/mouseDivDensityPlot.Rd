@@ -1,4 +1,4 @@
-\author{Hyuna Yang}
+\author{Hyuna Yang and Keith Sheppard}
 \name{mouseDivDensityPlot}
 \alias{mouseDivDensityPlot}
 \title{plot density of probe set intensities.}

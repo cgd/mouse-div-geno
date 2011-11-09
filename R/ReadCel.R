@@ -5,8 +5,8 @@
 #
 #########################################################################
 
-normalizeCelFile <- function(
-        celFile,
+readCELFiles <- function(
+        celFiles,
         snpProbeInfo,
         referenceDistribution = NULL,
         logFile = NULL) {
@@ -15,40 +15,47 @@ normalizeCelFile <- function(
         stop("the logFile parameter should be a connection")
     }
     
-    if(!is.null(logFile)) {
-        cat("Reading and normalizing CEL file: ", celFile, "\n", file=logFile, sep="")
+    aIntMatrix <- NULL
+    bIntMatrix <- NULL
+    
+    snpId <- as.factor(snpProbeInfo$snpId)
+    
+    celFiles <- .expandCelFiles(celFiles)
+    for(celFile in celFiles) {
+        if(!is.null(logFile)) {
+            cat("Reading and normalizing CEL file: ", celFile, "\n", file=logFile, sep="")
+        }
+        
+        celData <- read.celfile(celFile, intensity.means.only = TRUE)
+        y <- log2(as.matrix(celData[["INTENSITY"]][["MEAN"]][snpProbeInfo$probeIndex]))
+        if (length(snpProbeInfo$correction) > 0)
+            # C+G and fragment length correction y
+            y <- y + snpProbeInfo$correction
+        if (length(referenceDistribution) > 0)
+            y <- normalize.quantiles.use.target(y, target = referenceDistribution)
+        
+        # separate A alleles from B alleles and summarize to the probeset level
+        allAint <- y[snpProbeInfo$isAAllele, 1, drop = FALSE]
+        allBint <- y[!snpProbeInfo$isAAllele, 1, drop = FALSE]
+        allAint <- subColSummarizeMedian(
+            matrix(allAint, ncol = 1),
+            snpId[snpProbeInfo$isAAllele])
+        allBint <- subColSummarizeMedian(
+            matrix(allBint, ncol = 1),
+            snpId[!snpProbeInfo$isAAllele])
+        
+        aSnpIds <- rownames(allAint)
+        bSnpIds <- rownames(allBint)
+        if(!all(aSnpIds == bSnpIds)) {
+            stop("The SNP IDs for the A alleles should match up with the SNP IDs ",
+                "for the B alleles but they do not.")
+        }
+        
+        aIntMatrix <- cbind(aIntMatrix, allAint)
+        bIntMatrix <- cbind(bIntMatrix, allBint)
     }
     
-    celData <- read.celfile(celFile, intensity.means.only = TRUE)
-    y <- log2(as.matrix(celData[["INTENSITY"]][["MEAN"]][snpProbeInfo$probeIndex]))
-    if (length(snpProbeInfo$correction) > 0)
-        # C+G and fragment length correction y
-        y <- y + snpProbeInfo$correction
-    if (length(referenceDistribution) > 0)
-        y <- normalize.quantiles.use.target(y, target = referenceDistribution)
-    
-    # separate A alleles from B alleles and summarize to the probeset level
-    allAint <- y[snpProbeInfo$isAAllele, 1, drop = FALSE]
-    allBint <- y[!snpProbeInfo$isAAllele, 1, drop = FALSE]
-    allAint <- subColSummarizeMedian(
-        matrix(allAint, ncol = 1),
-        snpProbeInfo$snpId[snpProbeInfo$isAAllele])
-    allBint <- subColSummarizeMedian(
-        matrix(allBint, ncol = 1),
-        snpProbeInfo$snpId[!snpProbeInfo$isAAllele])
-    
-    aSnpIds <- rownames(allAint)
-    bSnpIds <- rownames(allBint)
-    if(!all(aSnpIds == bSnpIds)) {
-        stop("The SNP IDs for the A alleles should match up with the SNP IDs ",
-            "for the B alleles but they do not.")
-    }
-    
-    currDataMatrix <- matrix(c(allAint, allBint), ncol = 2)
-    rownames(currDataMatrix) <- aSnpIds
-    colnames(currDataMatrix) <- c("A", "B")
-    
-    currDataMatrix
+    makeSnpIntensities(aIntMatrix, bIntMatrix, rownames(aIntMatrix), .fileBaseWithoutExtension(celFiles))
 }
 
 .readSnpIntensitiesFromCEL <- function(
@@ -59,10 +66,7 @@ normalizeCelFile <- function(
 
     readNext <- function(index) {
         headFunc <- function() {
-            currDataMatrix <- normalizeCelFile(celFiles[index], snpProbeInfo, referenceDistribution, logFile)
-            sampleName <- .fileBaseWithoutExtension(celFiles[index])
-            
-            list(sampleName = sampleName, sampleData = currDataMatrix)
+            readCELFiles(celFiles[index], snpProbeInfo, referenceDistribution, logFile)
         }
         
         tailFunc <-
@@ -75,10 +79,10 @@ normalizeCelFile <- function(
         list(head = headFunc, tail = tailFunc)
     }
     
-    if(1 > length(celFiles)) {
-        NULL
-    } else {
+    if(length(celFiles)) {
         function() {readNext(1)}
+    } else {
+        NULL
     }
 }
 
@@ -167,17 +171,11 @@ normalizeCelFile <- function(
             
             logfn("Finished reading data for sample: %s", currData[[1]][1])
             
-            currDataMatrix <- matrix(c(currData[[3]], currData[[4]]), ncol = 2)
-            rownames(currDataMatrix) <- currData[[2]]
-            colnames(currDataMatrix) <- c("A", "B")
-            
             headFunc <- function() {
-                list(sampleName = currData[[1]][1], sampleData = currDataMatrix)
+                makeSnpIntensities(currData[[3]], currData[[4]], currData[[2]], currData[[1]][1])
             }
             
-            list(
-                head = headFunc,
-                tail = tailFunc)
+            list(head = headFunc, tail = tailFunc)
         }
         
         readNext(currSampleData)

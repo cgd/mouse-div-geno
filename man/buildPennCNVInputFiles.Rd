@@ -1,4 +1,4 @@
-\author{Hyuna Yang}
+\author{Hyuna Yang and Keith Sheppard}
 \name{buildPennCNVInputFiles}
 \alias{buildPennCNVInputFiles}
 \title{Build PennCNV input files for the Mouse Diversity Array}
@@ -7,16 +7,16 @@
 }
 \usage{
 buildPennCNVInputFiles(
-    outdir = getwd(), allowOverwrite = FALSE,
-    genotypes, snpProbeInfo, snpInfo, snpReferenceDistribution = NULL,
-    invariantProbeInfo, invariantProbesetInfo, invariantReferenceDistribution = NULL,
-    transformMethod = c("CCStrans", "MAtrans"), celFiles = expandCelFiles(getwd()),
-    isMale = NULL,
-    chromosomes = c(1:19, "X", "Y", "M"),
-    chromosomeRenameMap = list(X = 20, Y = 21, M = 22),
-    cacheDir = tempdir(),
-    retainCache = FALSE, verbose = FALSE,
-    probesetChunkSize = 1000)
+        outdir = getwd(), allowOverwrite = FALSE,
+        genotypes, snpProbeInfo, snpInfo, snpReferenceDistribution = NULL,
+        invariantProbeInfo, invariantProbesetInfo, invariantReferenceDistribution = NULL,
+        transformMethod = c("CCS", "MA"), celFiles = getwd(),
+        isMale = NULL,
+        chromosomes = c(1:19, "X", "Y", "M"),
+        chromosomeRenameMap = list(X = "20", Y = "21", M = "22"),
+        cacheDir = tempdir(),
+        retainCache = FALSE, verbose = FALSE,
+        probesetChunkSize = 1000)
 }
 
 \arguments{
@@ -99,7 +99,7 @@ buildPennCNVInputFiles(
         seperately from the others.
     }
   \item{transformMethod}{The MouseDivGenotype package genotype the array based on contrast and summation, and offers two transformations to obtain contrast; CCS and MA transformation. CCS (contrast centers stretch) transformation proposed by BRLMM-P algorithm obtains contrast via asinh(K*(A-B)/(A+B))/asinh(K), where A and B is intensity of A and B allele and K is a hyperparameter. MA transformation obtains contrast by log2(A) - log2(B). In both cases summation is defined by (log2(A) + log2(B))/2}
-  \item{celFiles}{the vector of CEL files to process}
+  \item{celFiles}{either a vector of CEL file name(s) or directory name(s). Any directories will be expanded to the listing of CEL files found in the directory}
   \item{isMale}{a logical vector the same length as celFiles that you can use if gender is known}
   \item{chromosomes}{character vector of chromosome IDs that you want to CNV. These should correspond to the values in \code{snpInfo$chrId}. Eg: \code{chromosomes=c(1 : 19, "X", "Y", "M")}.}
   \item{chromosomeRenameMap}{A list that allows you to rename chromosomes for the PennCNV files. This is needed because PennCNV uses all numeric chromosome values where this packages uses "X", "Y" and "M"}

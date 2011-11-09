@@ -7,6 +7,24 @@ useDynLib(
 	.run_em_from_r                             = run_em_from_r,
 	.vdist_from_r                              = vdist_from_r)
 
-import(affyio, preprocessCore, cluster)
+import(affyio, preprocessCore, cluster, graphics)
 
-exportPattern("^[^\\.]")
+#exportPattern("^[^\\.]")
+export(
+    buildPennCNVInputFiles, simpleCNV,
+    genotype, genotypeHomozygous,
+    mouseDivGenotype, mouseDivGenotypeCEL, mouseDivGenotypeTab, inferGender, inferGenderFromSnpContAvg, genotypeSnps,
+    plotSnpContAvg, pointsSnpContAvg, plotMouseDivArrayImage, mouseDivDensityPlot,
+    readCELFiles, makeProbesetSampleMatrixes, makeSnpIntensities, makeSnpContAvg, ccsTransform, maTransform,
+    vinotype)
+
+S3method("[", "probesetSampleMatrixes")
+S3method("dim", "probesetSampleMatrixes")
+S3method("dimnames", "probesetSampleMatrixes")
+S3method("cbind", "probesetSampleMatrixes")
+S3method("rbind", "probesetSampleMatrixes")
+S3method("ccsTransform", "snpIntensities")
+S3method("ccsTransform", "matrix")
+S3method("maTransform", "snpIntensities")
+S3method("maTransform", "matrix")
+S3method("boxplot", "snpIntensities")

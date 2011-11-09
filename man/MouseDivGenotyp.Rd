@@ -1,34 +1,62 @@
-\author{Hyuna Yang}
+\author{Hyuna Yang and Keith Sheppard}
 \name{mouseDivGenotype}
 \alias{mouseDivGenotype}
+\alias{mouseDivGenotypeCEL}
 \alias{mouseDivGenotypeTab}
 \title{Genotype the Mouse Diversity Array}
 \description{
-  This function reads the .CEL files, normalizes the intensities, genotypes and vinotypes the Mouse Diversity Array. It also provides the input files used for the pennCNV (Wang, et al, 2007, a software to detect the copy number variance. Refer to CNV.R for detail information for detecting CNV.).  
+    This function reads the .CEL files, normalizes the intensities, genotypes
+    and vinotypes the Mouse Diversity Array. It also provides the input files
+    used for the pennCNV (Wang, et al, 2007, a software to detect the copy
+    number variance. Refer to CNV.R for detail information for detecting CNV.).
 
-  This function is highly tailored to Mouse Diversity Array. All annotation data required to use this function can be obtained from \url{http://genomedynamics.org/tools/MouseDivGeno/CDFfiles}. Coefficients to normalize the array (\code{snpProbeInfo$correction} and \code{referenceDistribution}) or hint file used to genotype the array (\code{snpInfo$snpHetHint}) were calculated based on 350 training .CEL files, and they can be obtained from the \url{http://genomedynamics.org/tools/MouseDivGeno/CDFfiles}.  
-
+    This function is highly tailored to Mouse Diversity Array. All annotation
+    data required to use this function can be obtained from
+    \url{http://genomedynamics.org/tools/MouseDivGeno/CDFfiles}. Coefficients to
+    normalize the array (\code{snpProbeInfo$correction} and
+    \code{referenceDistribution}) or hint file used to genotype the array
+    (\code{snpInfo$snpHetHint}) were calculated based on 350 training .CEL
+    files, and they can be obtained from the
+    \url{http://genomedynamics.org/tools/MouseDivGeno/CDFfiles}.
 }
+
 \usage{
 mouseDivGenotype(
+        snpIntensities,
         snpProbeInfo, snpInfo, referenceDistribution = NULL,
-        transformMethod = c("CCStrans", "MAtrans"),
-        celFiles = expandCelFiles(getwd()), isMale = NULL, confScoreThreshold = 1e-05,
-        chromosomes = c(1:19, "X", "Y", "M"),
-        cluster = NULL,
-        probesetChunkSize = 1000, outputDir = NULL, outputFilePrefix = "mouseDivResults_",
-        logFile)
-mouseDivGenotypeTab(
-        snpIntensityFile, snpInfo,
-        transformMethod = c("CCStrans", "MAtrans"),
+        transformFunction = ccsTransform,
         isMale = NULL, confScoreThreshold = 1e-05,
         chromosomes = c(1:19, "X", "Y", "M"),
         cluster = NULL,
         probesetChunkSize = 1000, outputDir = NULL, outputFilePrefix = "mouseDivResults_",
-        logFile)
+        logFile = NULL)
+mouseDivGenotypeCEL(
+        celFiles = getwd(),
+        snpProbeInfo, snpInfo, referenceDistribution = NULL,
+        transformFunction = ccsTransform,
+        isMale = NULL, confScoreThreshold = 1e-05,
+        chromosomes = c(1:19, "X", "Y", "M"),
+        cluster = NULL,
+        probesetChunkSize = 1000, outputDir = NULL, outputFilePrefix = "mouseDivResults_",
+        logFile = NULL)
+mouseDivGenotypeTab(
+        snpIntensityFile, snpInfo,
+        transformFunction = ccsTransform,
+        isMale = NULL, confScoreThreshold = 1e-05,
+        chromosomes = c(1:19, "X", "Y", "M"),
+        cluster = NULL,
+        probesetChunkSize = 1000, outputDir = NULL, outputFilePrefix = "mouseDivResults_",
+        logFile = NULL)
 }
 
 \arguments{
+    \item{snpIntensities}{an object of class \code{snpIntensities}. See documentation for \code{makeSnpIntensities(...)} for details}
+    \item{celFiles}{
+        The CEL files to process. Must be a vector of CEL file name(s) or
+        directory name(s). Any directories will be expanded to the listing of
+        CEL files found in the directory
+    }
+    
     \item{snpIntensityFile}{a tab delimited file with columns for "sampleID", "snpId", "A", "B" where the A and B columns contain log-normalized summarized per-SNP intensities}
     \item{snpProbeInfo}{
         A data-frame containing probe-level data for the SNPs we are genotyping.
@@ -57,9 +85,8 @@ mouseDivGenotypeTab(
     }
     
   \item{referenceDistribution}{Reference distribution used for the quantile normalization. If there is an evidence that the density distribution of samples follows more than one distribution or different from that of classical laboratory strain, this normalization should not be used and leave as a default i.e. \code{referenceDistribution = NULL}.}
-  \item{transformMethod}{The MouseDivGenotype package genotype the array based on contrast and summation, and offers two transformations to obtain contrast; CCS and MA transformation. CCS (contrast centers stretch) transformation proposed by BRLMM-P algorithm obtains contrast via asinh(K*(A-B)/(A+B))/asinh(K), where A and B is intensity of A and B allele and K is a hyperparameter. MA transformation obtains contrast by log2(A) - log2(B). In both cases summation is defined by (log2(A) + log2(B))/2}
+  \item{transformFunction}{function used to transform SNP A/B intensities into intensity averages and contrasts. This function should either be ccsTransform, maTransform or your own function built using the CCS and MA code as an example}
   
-  \item{celFiles}{this parameter should be a vector of CEL files to process}
   \item{isMale}{a logical vector the same length as celFiles or NULL if gender should be inferred from the CEL file intensities}
   \item{confScoreThreshold}{if confidence scores fall below this threshold we assign a genotype value of -1}
   \item{chromosomes}{character vector of chromosome IDs that you want to genotype. These should correspond to the values in \code{snpInfo$chrId}. Eg: \code{chromosomes=c(1 : 19, "X", "Y", "M")}.}

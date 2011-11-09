@@ -1,4 +1,4 @@
-\author{Hyuna Yang}
+\author{Hyuna Yang and Keith Sheppard}
 \name{genotype}
 \alias{genotype}
 \alias{genotypeHomozygous}

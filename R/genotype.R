@@ -50,10 +50,12 @@ genotype <- function(nm, ns, hint1, trans, logfn=NULL) {
     #              <--B          H-----H         A-->
     ccsThresh <- c(-0.4, -0.3, -0.15, 0.15, 0.3, 0.4)
     maThresh  <- c(-0.8, -0.6, -0.3,  0.3,  0.6, 0.8)
-    if (is.element(trans, "MAtrans")) {
+    if (is.element(trans, "MA")) {
         thresh <- maThresh
-    } else {
+    } else if(is.element(trans, "CCS")) {
         thresh <- ccsThresh
+    } else {
+        stop("expected transformMethod to be \"CCS\" or \"MA\"")
     }
     
     # rmid is used to remove the values that fall outside of our chosen
@@ -497,10 +499,12 @@ genotypeHomozygous <- function(nm, ns, trans, logfn=NULL) {
     
     ccsThresh <- c(-0.4, -0.3, -0.15, 0.15, 0.3, 0.4)
     maThresh  <- c(-0.8, -0.6, -0.3, 0.3, 0.6, 0.8)
-    if (is.element(trans, "MAtrans")) {
+    if (is.element(trans, "MA")) {
         thresh <- maThresh
-    } else {
+    } else if(is.element(trans, "CCS")){
         thresh <- ccsThresh
+    } else {
+        stop("expected transformMethod to be \"CCS\" or \"MA\"")
     }
     rmid <- nm >= thresh[2] & nm <= thresh[5] & ns < quantile(ns, 0.2)
     lnrmid <- sum(!rmid)

@@ -9,16 +9,85 @@
 #########################################################################
 
 mouseDivGenotype <- function(
+        snpIntensities,
         snpProbeInfo, snpInfo, referenceDistribution = NULL,
-        transformMethod = c("CCStrans", "MAtrans"),
-        celFiles = expandCelFiles(getwd()), isMale = NULL, confScoreThreshold = 1e-05,
+        transformFunction = ccsTransform,
+        isMale = NULL, confScoreThreshold = 1e-05,
         chromosomes = c(1:19, "X", "Y", "M"),
         cluster = NULL,
         probesetChunkSize = 1000, outputDir = NULL, outputFilePrefix = "mouseDivResults_",
         logFile = NULL) {
 
-    transformMethod <- match.arg(transformMethod)
+    if(inherits(logFile, "character")) {
+        logFile <- file(logFile, "wt")
+    } else if(!is.null(logFile) && !inherits(logFile, "connection")) {
+        stop("the logFile parameter should be either NULL, a file name, or a connection")
+    }
     
+    if(!inherits(snpProbeInfo, "data.frame") ||
+        !all(c("probeIndex", "isAAllele", "snpId") %in% names(snpProbeInfo))) {
+        stop("You must supply a \"snpProbeInfo\" data frame parameter which has ",
+            "at a minimum the \"probeIndex\", \"isAAllele\" and \"snpId\" ",
+            "components. Please see the help documentation for more details.")
+    }
+    snpProbeInfo$snpId <- as.factor(snpProbeInfo$snpId)
+    
+    if(!inherits(snpIntensities, "snpIntensities")) {
+        stop(
+            "mouseDivGenotype(...) expects the snpIntensities argument to ",
+            "inherit from the snpIntensities class")
+    }
+    
+    # TODO what I'm doing here is very inefficient. It's probably best to have
+    # a version of .mouseDivGenotypeInternal which is speciallized just for
+    # snpIntensity objects rather than turning them into lazy lists
+    colCount <- ncol(snpIntensities)
+    lazyReadNext <- function(index) {
+        headFunc <- function() {
+            snpIntensities[, index, drop=FALSE]
+        }
+        
+        tailFunc <-
+            if(index == colCount) {
+                NULL
+            } else {
+                function() {lazyReadNext(index + 1)}
+            }
+        
+        list(head = headFunc, tail = tailFunc)
+    }
+    
+    lazySnpIntensities <-
+        if(colCount) {
+            function() {lazyReadNext(1)}
+        } else {
+            NULL
+        }
+    
+    .mouseDivGenotypeInternal(
+        snpIntensities      = lazySnpIntensities,
+        snpInfo             = snpInfo,
+        transformFunction   = transformFunction,
+        isMale              = isMale,
+        confScoreThreshold  = confScoreThreshold,
+        chromosomes         = chromosomes,
+        cluster             = cluster,
+        probesetChunkSize   = probesetChunkSize,
+        outputDir           = outputDir,
+        outputFilePrefix    = outputFilePrefix,
+        logFile             = logFile)
+}
+
+mouseDivGenotypeCEL <- function(
+        celFiles = getwd(),
+        snpProbeInfo, snpInfo, referenceDistribution = NULL,
+        transformFunction = ccsTransform,
+        isMale = NULL, confScoreThreshold = 1e-05,
+        chromosomes = c(1:19, "X", "Y", "M"),
+        cluster = NULL,
+        probesetChunkSize = 1000, outputDir = NULL, outputFilePrefix = "mouseDivResults_",
+        logFile = NULL) {
+
     if(inherits(logFile, "character")) {
         logFile <- file(logFile, "wt")
     } else if(!is.null(logFile) && !inherits(logFile, "connection")) {
@@ -33,6 +102,7 @@ mouseDivGenotype <- function(
     }
     snpProbeInfo$snpId <- as.factor(snpProbeInfo$snpId)
     
+    celFiles <- .expandCelFiles(celFiles)
     snpIntensities <- .readSnpIntensitiesFromCEL(
             celFiles                = celFiles,
             snpProbeInfo            = snpProbeInfo,
@@ -41,7 +111,7 @@ mouseDivGenotype <- function(
     .mouseDivGenotypeInternal(
             snpIntensities      = snpIntensities,
             snpInfo             = snpInfo,
-            transformMethod     = transformMethod,
+            transformFunction   = transformFunction,
             isMale              = isMale,
             confScoreThreshold  = confScoreThreshold,
             chromosomes         = chromosomes,
@@ -54,15 +124,13 @@ mouseDivGenotype <- function(
 
 mouseDivGenotypeTab <- function(
         snpIntensityFile, snpInfo,
-        transformMethod = c("CCStrans", "MAtrans"),
+        transformFunction = ccsTransform,
         isMale = NULL, confScoreThreshold = 1e-05,
         chromosomes = c(1:19, "X", "Y", "M"),
         cluster = NULL,
         probesetChunkSize = 1000, outputDir = NULL, outputFilePrefix = "mouseDivResults_",
         logFile = NULL) {
 
-    transformMethod <- match.arg(transformMethod)
-    
     if(inherits(logFile, "character")) {
         logFile <- file(logFile, "wt")
     } else if(!is.null(logFile) && !inherits(logFile, "connection")) {
@@ -76,7 +144,7 @@ mouseDivGenotypeTab <- function(
     .mouseDivGenotypeInternal(
             snpIntensities      = snpIntensities,
             snpInfo             = snpInfo,
-            transformMethod     = transformMethod,
+            transformFunction   = transformFunction,
             isMale              = isMale,
             confScoreThreshold  = confScoreThreshold,
             chromosomes         = chromosomes,
@@ -89,34 +157,17 @@ mouseDivGenotypeTab <- function(
 
 .mouseDivGenotypeInternal <- function(
         snpIntensities, snpInfo,
-        transformMethod = c("CCStrans", "MAtrans"),
+        transformFunction = ccsTransform,
         isMale = NULL, confScoreThreshold = 1e-05,
         chromosomes = c(1:19, "X", "Y", "M"), cacheDir = tempdir(),
         retainCache = FALSE, cluster = NULL,
         probesetChunkSize = 1000, outputDir = NULL, outputFilePrefix = "mouseDivResults_",
         logFile = NULL) {
 
-    transformMethod <- match.arg(transformMethod)
-    if(transformMethod == "CCStrans") {
-        transSampleFunc <- function(sample) {
-            sample[["sampleData"]] <- ccsTransform(sample[["sampleData"]])
-            sample
-        }
-        snpIntensities <- .lazyApply(transSampleFunc, snpIntensities)
-    } else if(transformMethod == "MAtrans") {
-        transSampleFunc <- function(sample) {
-            sample[["sampleData"]] <- maTransform(sample[["sampleData"]])
-            sample
-        }
-        snpIntensities <- .lazyApply(transSampleFunc, snpIntensities)
-    } else {
-        stop("transformMethod parameter is not valid")
-    }
+    snpIntensities <- .lazyApply(transformFunction, snpIntensities)
     
-    if(!inherits(snpInfo, "data.frame") ||
-       !all(c("snpId", "chrId") %in% names(snpInfo)))
-    {
-        stop("You must supply a \"snpInfo\" data frame parameter which has ",
+    if(!inherits(snpInfo, "data.frame") || !all(c("snpId", "chrId") %in% names(snpInfo))) {
+       stop("You must supply a \"snpInfo\" data frame parameter which has ",
              "at a minimum the \"snpId\" and \"chrId\" ",
              "components. Please see the help documentation for more details.")
     }
@@ -193,41 +244,43 @@ mouseDivGenotypeTab <- function(
         curr <- snpIntensities()
         head <- curr$head()
         snpIntensities <- curr$tail
-        logfn("preprocessing intensities from %s ", head$sampleName)
-        sampleNames <- c(sampleNames, head$sampleName)
+        logfn("preprocessing intensities from %s ", head$sampleNames)
+        if(ncol(head) != 1) {
+            stop("expected there to be exactly 1 sample but there are ", ncol(head))
+        }
+        sampleNames <- c(sampleNames, head$sampleNames)
         
         if(genderInferenceRequired) {
-            meanIntensityXPerArray[head$sampleName] <- 0
-            meanIntensityYPerArray[head$sampleName] <- 0
+            meanIntensityXPerArray[head$sampleNames] <- 0
+            meanIntensityYPerArray[head$sampleNames] <- 0
         }
         
         for(currChr in allChr) {
-            chrSnpInfo <- snpInfo[snpInfo$chrId == currChr, ]
-            chrMatch <- match(chrSnpInfo$snpId, rownames(head$sampleData))
+            chrSnpInfo <- snpInfo[snpInfo$chrId == currChr, , drop=FALSE]
+            chrMatch <- match(chrSnpInfo$snpId, rownames(head))
             chrMatch <- chrMatch[!is.na(chrMatch)]
-            chrData <- head$sampleData[chrMatch, ]
+            chrData <- head[chrMatch, , drop=FALSE]
             for(chunkIndex in 1 : length(chrChunks[[currChr]])) {
                 chunk <- chrChunks[[currChr]][[chunkIndex]]
                 probesetIndices <- chunk$start : chunk$end
-                mChunk <- chrData[ , "intensityConts"][probesetIndices]
-                sChunk <- chrData[ , "intensityAvgs"][probesetIndices]
+                chunkData <- chrData[probesetIndices, , drop=FALSE]
                 
                 if(genderInferenceRequired) {
                     if(currChr %in% allAutosomes) {
                         meanIntensityPerAutosome[currChr] <-
-                            meanIntensityPerAutosome[currChr] + sum(as.double(sChunk))
+                            meanIntensityPerAutosome[currChr] + sum(as.double(chunkData$snpAverages))
                     } else if(currChr == "X") {
-                    	meanIntensityXPerArray[head$sampleName] <-
-                            meanIntensityXPerArray[head$sampleName] + sum(as.double(sChunk))
+                    	meanIntensityXPerArray[head$sampleNames] <-
+                            meanIntensityXPerArray[head$sampleNames] + sum(as.double(chunkData$snpAverages))
                     } else if(currChr == "Y") {
-                        meanIntensityYPerArray[head$sampleName] <-
-                            meanIntensityYPerArray[head$sampleName] + sum(as.double(sChunk))
+                        meanIntensityYPerArray[head$sampleNames] <-
+                            meanIntensityYPerArray[head$sampleNames] + sum(as.double(chunkData$snpAverages))
                     }
                 }
                 
                 # cache the data
-                chunkFile <- .chunkFileName(cacheDir, "snp", head$sampleName, currChr, probesetChunkSize, chunkIndex)
-                save(mChunk, sChunk, file = chunkFile)
+                chunkFile <- .chunkFileName(cacheDir, "snp", head$sampleNames, currChr, probesetChunkSize, chunkIndex)
+                save(chunkData, file=chunkFile)
             }
         }
     }
@@ -296,22 +349,15 @@ mouseDivGenotypeTab <- function(
             #startTime <- getTime()
         
             # paste the samples together for genotyping
-            MM <- NULL
-            SS <- NULL
+            chunkMatrix <- NULL
             for (i in 1:nfile) {
                 chunkFile <- .chunkFileName(cacheDir, "snp", sampleNames[i], chri, probesetChunkSize, chunkIndex)
                 load(chunkFile)
-                MM <- cbind(MM, mChunk)
-                SS <- cbind(SS, sChunk)
-                rm(mChunk, sChunk)
+                chunkMatrix <- cbind(chunkMatrix, chunkData)
+                rm(chunkData)
             }
             
             chunkRange <- chunk$start : chunk$end
-            
-            colnames(MM) <- sampleNames
-            rownames(MM) <- chrSnpInfo$snpId[chunkRange]
-            colnames(SS) <- sampleNames
-            rownames(SS) <- chrSnpInfo$snpId[chunkRange]
             
             #cat("time it took us to get to genotypethis\n")
             #timeReport(startTime)
@@ -322,11 +368,9 @@ mouseDivGenotypeTab <- function(
                 # ready to execute them in parallel
                 argLists[[length(argLists) + 1]] <- list(
                     chr = chri,
-                    intensityConts = MM,
-                    intensityAvgs = SS,
+                    snpContAvg = chunkMatrix,
                     hint = chrSnpInfo$snpHetHint[chunkRange],
                     isInPAR = chrSnpInfo$isInPAR[chunkRange],
-                    transformMethod = transformMethod,
                     isMale = isMale,
                     confScoreThreshold = confScoreThreshold,
                     logOn = logOn,
@@ -354,7 +398,7 @@ mouseDivGenotypeTab <- function(
                         } else {
                             for(k in 1 : length(chunkResult)) {
                                 colnames(chunkResult[[k]]) <- sampleNames
-                                rownames(chunkResult[[k]]) <- rownames(argLists[[i]][["intensityConts"]])
+                                rownames(chunkResult[[k]]) <- rownames(argLists[[i]][["snpContAvg"]])
                             }
                             
                             if(is.null(outFileConnections)) {
@@ -372,13 +416,11 @@ mouseDivGenotypeTab <- function(
                     argLists <- list()
                 }
             } else {
-                chunkResult <- genotypeAnyChrChunk(
+                chunkResult <- .genotypeAnyChrChunk(
                     chr = chri,
-                    intensityConts = MM,
-                    intensityAvgs = SS,
+                    snpContAvg = chunkMatrix,
                     hint = chrSnpInfo$snpHetHint[chunkRange],
                     isInPAR = chrSnpInfo$isInPAR[chunkRange],
-                    transformMethod = transformMethod,
                     isMale = isMale,
                     confScoreThreshold = confScoreThreshold,
                     logSnp = chrLogSNP[chunkRange],
@@ -446,6 +488,8 @@ mouseDivGenotypeTab <- function(
             rownames(results[[i]]) <- snpIdsInOrder
             colnames(results[[i]]) <- sampleNames
         }
+        
+        results <- makeProbesetSampleMatrixes(results, snpIdsInOrder, sampleNames)
     }
     
     # clean-up unless we were asked to retain the cache
@@ -496,13 +540,11 @@ mouseDivGenotypeTab <- function(
         logfn <- NULL
     }
 
-    genoResult <- genotypeAnyChrChunk(
+    genoResult <- .genotypeAnyChrChunk(
         argList$chr,
-        argList$intensityConts,
-        argList$intensityAvgs,
+        argList$snpContAvg,
         argList$hint,
         argList$isInPAR,
-        argList$transformMethod,
         argList$isMale,
         argList$confScoreThreshold,
         argList$logSnp,
@@ -543,28 +585,142 @@ inferGender <- function(
     isMale
 }
 
-genotypeAnyChrChunk <- function(
+inferGenderFromSnpContAvg <- function(snpContAvg, snpInfo) {
+
+    if(!inherits(snpInfo, "data.frame") || !all(c("snpId", "chrId") %in% names(snpInfo))) {
+        stop("You must supply a \"snpInfo\" data frame parameter which has ",
+            "at a minimum the \"snpId\" and \"chrId\" ",
+            "components. Please see the help documentation for more details.")
+    }
+    
+    if(!inherits(snpContAvg, "snpContAvg")) {
+        stop("the snpContAvg argument should inherit from the snpContAvg class")
+    }
+    
+    allChr <- as.character(unique(snpInfo$chrId))
+    allAutosomes <- setdiff(allChr, c("X", "Y", "M"))
+    
+    getChrSnpAvgs <- function(chrName) {
+        chrSnpInfo <- snpInfo[snpInfo$chrId == chrName, ]
+        chrMatch <- match(chrSnpInfo$snpId, rownames(snpContAvg))
+        chrMatch <- chrMatch[!is.na(chrMatch)]
+        if(length(chrMatch) == 0) {
+            stop("failed to find any data matches for chromosome ", chrName)
+        }
+        
+        snpContAvg$snpAverages[chrMatch, , drop=FALSE]
+    }
+    
+    meanChrIntensityPerArray <- function(chrName) {
+        chrSnpAvgs <- getChrSnpAvgs(chrName)
+        meanPerArr <- apply(chrSnpAvgs, 2, sum) / nrow(chrSnpAvgs)
+        names(meanPerArr) <- colnames(snpContAvg)
+        meanPerArr
+    }
+    
+    meanIntensityPerAutosome <- NULL
+    for(currChr in allAutosomes) {
+        chrSnpAvgs <- getChrSnpAvgs(currChr)
+        meanIntensityPerAutosome[currChr] <- sum(chrSnpAvgs) / length(chrSnpAvgs)
+    }
+    
+    inferGender(
+        meanIntensityXPerArray = meanChrIntensityPerArray("X"),
+        meanIntensityYPerArray = meanChrIntensityPerArray("Y"),
+        meanIntensityPerAutosome = meanIntensityPerAutosome)
+}
+
+genotypeSnps <- function(
+        snpContAvg,
+        snpInfo,
+        isMale = NULL,
+        chromosomes = c(1:19, "X", "Y", "M"),
+        confScoreThreshold = 1e-05,
+        logFile = NULL) {
+
+    if(!inherits(snpInfo, "data.frame") || !all(c("snpId", "chrId") %in% names(snpInfo))) {
+        stop("You must supply a \"snpInfo\" data frame parameter which has ",
+             "at a minimum the \"snpId\" and \"chrId\" ",
+             "components. Please see the help documentation for more details.")
+    }
+    snpInfo$snpId <- as.factor(snpInfo$snpId)
+
+    if(inherits(logFile, "character")) {
+        logFile <- file(logFile, "wt")
+    } else if(!is.null(logFile) && !inherits(logFile, "connection")) {
+        stop("the logFile parameter should be either NULL, a file name, ",
+             "or a connection")
+    }
+
+    logfn <- NULL
+    if(!is.null(logFile)) {
+        logfn <- function(fmt, ...) {
+            logfnTry <- function() {
+                cat(sprintf(fmt, ...), file=logFile)
+                cat("\n", file=logFile)
+            }
+            onError <- function(e) {
+                warning("failed to log message")
+            }
+            tryCatch(logfnTry(), error=onError)
+        }
+    }
+    
+    if(is.null(isMale)) {
+        isMale <- inferGenderFromSnpContAvg(snpContAvg, snpInfo)
+    }
+    
+    results <- NULL
+    allChr <- intersect(chromosomes, as.character(unique(snpInfo$chrId)))
+    for(currChr in allChr) {
+        if(!is.null(logfn)) {
+            logfn("genotyping and vinotyping chromosome %s", currChr)
+        }
+        chrSnpInfo <- snpInfo[snpInfo$chrId == currChr, , drop=FALSE]
+        chrMatch <- match(chrSnpInfo$snpId, rownames(snpContAvg))
+        chrSnpInfo <- chrSnpInfo[!is.na(chrMatch), , drop=FALSE]
+        chrMatch <- chrMatch[!is.na(chrMatch)]
+        chrData <- snpContAvg[chrMatch, , drop=FALSE]
+        chrResults <- .genotypeAnyChrChunk(
+            chr = currChr,
+            snpContAvg = chrData,
+            hint = chrSnpInfo$snpHetHint,
+            isInPAR = chrSnpInfo$isInPAR,
+            isMale = isMale,
+            confScoreThreshold = confScoreThreshold,
+            logSnp = chrSnpInfo$logSNP,
+            logfn)
+        chrResults <- makeProbesetSampleMatrixes(chrResults, chrSnpInfo$snpId, colnames(snpContAvg))
+        results <- rbind(results, chrResults)
+    }
+    
+    results$isMale <- isMale
+    
+    outOfOrderSnpIds <- rownames(results)
+    reorderIndexes <- match(snpInfo$snpId, outOfOrderSnpIds)
+    reorderIndexes <- reorderIndexes[!is.na(reorderIndexes)]
+    results[reorderIndexes, , drop=FALSE]
+}
+
+.genotypeAnyChrChunk <- function(
         chr,
-        intensityConts, intensityAvgs,
+        snpContAvg,
         hint = NULL,
         isInPAR = NULL,
-        transformMethod = c("CCStrans", "MAtrans"),
         isMale = NULL,
         confScoreThreshold = 1e-05,
         logSnp = NULL,
         logfn = NULL) {
 
-    transformMethod <- match.arg(transformMethod)
-    
     if(chr == "X") {
-        .genotypeXChromosomeChunk(intensityConts, intensityAvgs, hint, isInPAR, transformMethod, isMale, confScoreThreshold, logSnp, logfn)
+        .genotypeXChromosomeChunk(snpContAvg, hint, isInPAR, isMale, confScoreThreshold, logSnp, logfn)
     } else if(chr == "Y") {
-        .genotypeYChromosomeChunk(intensityConts, intensityAvgs, hint, transformMethod, isMale, confScoreThreshold, logSnp, logfn)
+        .genotypeYChromosomeChunk(snpContAvg, hint, isMale, confScoreThreshold, logSnp, logfn)
     } else if(chr == "M") {
-        .genotypeHomozygousChunk(intensityConts, intensityAvgs, transformMethod, confScoreThreshold, logSnp, logfn, "M")
+        .genotypeHomozygousChunk(snpContAvg, confScoreThreshold, logSnp, logfn, "M")
     } else {
         # chr is an autosome
-        .genotypeChunk(intensityConts, intensityAvgs, hint, transformMethod, confScoreThreshold, logSnp, logfn, "autosome")
+        .genotypeChunk(snpContAvg, hint, confScoreThreshold, logSnp, logfn, "autosome")
     }
 }
 
@@ -572,24 +728,20 @@ genotypeAnyChrChunk <- function(
 # columns map to arrays (CEL files). This function is useful for genotyping
 # autosomes and other sections of the genome where it is possible to have 3
 # genotyping outcomes. Otherwise use genotypeHomozygousChunk
-.genotypeChunk <- function(ms, ss, hint, trans, confScoreThreshold, logSnp=NULL, logfn=NULL, kind = c("autosome", "PAR", "femaleX")) {
-
+.genotypeChunk <- function(snpContAvg, hint, confScoreThreshold, logSnp=NULL, logfn=NULL, kind = c("autosome", "PAR", "femaleX")) {
+    
     kind <- match.arg(kind)
     if(!is.null(logfn)) {
         kindDescrip <- switch(kind, autosome="autosome", PAR="pseudoautosomal", "female X chromosome")
         logfn(
             "performing standard genotyping for %i %s SNPs and %i samples",
-            nrow(ms),
+            nrow(snpContAvg),
             kindDescrip,
-            ncol(ms))
+            ncol(snpContAvg))
     }
     
-    numArrays <- ncol(ms)
-    numProbesets <- nrow(ms)
-    
-    if(ncol(ss) != numArrays || nrow(ss) != numProbesets) {
-        stop("Internal error: ms matrix dimensions should match ss matrix dimensions")
-    }
+    numArrays <- ncol(snpContAvg)
+    numProbesets <- nrow(snpContAvg)
     
     if(length(hint) == 0) {
         hint <- rep(0, numProbesets)
@@ -599,9 +751,12 @@ genotypeAnyChrChunk <- function(
         logSnp <- NULL
     }
     
-    snpNames <- rownames(ms)
+    snpNames <- rownames(snpContAvg)
+    ms <- snpContAvg$snpContrasts
+    ss <- snpContAvg$snpAverages    
     
     # geno/vinotype each of the probesets in this chunk
+    transformMethod <- attr(snpContAvg, "transformMethod", exact=TRUE)
     geno <- matrix(0, nrow = numProbesets, ncol = numArrays)
     vino <- matrix(0, nrow = numProbesets, ncol = numArrays)
     conf <- matrix(0, nrow = numProbesets, ncol = numArrays)
@@ -618,7 +773,7 @@ genotypeAnyChrChunk <- function(
             ms[probesetIndex, ],
             ss[probesetIndex, ],
             hint[probesetIndex],
-            trans,
+            transformMethod,
             if(!is.null(logSnp) && logSnp[probesetIndex]) logfn else NULL)
         geno[probesetIndex, ] <- currVals$geno
         vino[probesetIndex, ] <- currVals$vino
@@ -646,37 +801,54 @@ genotypeAnyChrChunk <- function(
 # columns map to arrays (CEL files). This function is useful for genotyping
 # the parts of the genome where you do not expect to observe heterozygous
 # alleles
-.genotypeHomozygousChunk <- function(ms, ss, trans, confScoreThreshold, logSnp=NULL, logfn=NULL, kind = c("M", "maleX", "Y")) {
+.genotypeHomozygousChunk <- function(snpContAvg, confScoreThreshold, logSnp=NULL, logfn=NULL, kind = c("M", "maleX", "Y")) {
     kind <- match.arg(kind)
     if(!is.null(logfn)) {
         kindDescrip <- switch(kind, M="mitochondrial", maleX="male X chromosome", Y="Y chromosome")
         logfn(
             "performing homozygous genotyping for %i %s SNPs and %i samples",
-            nrow(ms),
+            nrow(snpContAvg),
             kindDescrip,
-            ncol(ms))
+            ncol(snpContAvg))
     }
     
-    numArrays <- ncol(ms)
-    numProbesets <- nrow(ms)
+    numArrays <- ncol(snpContAvg)
+    numProbesets <- nrow(snpContAvg)
     
-    if(ncol(ss) != numArrays || nrow(ss) != numProbesets) {
-        stop("Internal error: ms matrix dimensions should match ss matrix dimensions")
-    }
+    snpNames <- rownames(snpContAvg)
+    ms <- snpContAvg$snpContrasts
+    ss <- snpContAvg$snpAverages
     
     # geno/vinotype each of the probesets in this chunk
+    transformMethod <- attr(snpContAvg, "transformMethod", exact=TRUE)
     geno <- matrix(0, nrow = numProbesets, ncol = numArrays)
     vino <- matrix(0, nrow = numProbesets, ncol = numArrays)
     conf <- matrix(0, nrow = numProbesets, ncol = numArrays)
     for(probesetIndex in 1 : numProbesets) {
+        if(!is.null(logSnp) && logSnp[probesetIndex]) {
+            if(is.null(snpNames)) {
+                logfn("==== GENOTYPING AND VINOTYPING SNP ====")
+            } else {
+                logfn("==== GENOTYPING AND VINOTYPING %s ====", snpNames[probesetIndex])
+            }
+        }
+        
         currVals <- genotypeHomozygous(
             ms[probesetIndex, ],
             ss[probesetIndex, ],
-            trans,
+            transformMethod,
             if(!is.null(logSnp) && logSnp[probesetIndex]) logfn else NULL)
         geno[probesetIndex, ] <- currVals$geno
         vino[probesetIndex, ] <- currVals$vino
         conf[probesetIndex, ] <- currVals$conf
+        
+        if(!is.null(logSnp) && logSnp[probesetIndex]) {
+            if(is.null(snpNames)) {
+                logfn("==== FINISHED GENOTYPING AND VINOTYPING SNP ====")
+            } else {
+                logfn("==== FINISHED GENOTYPING AND VINOTYPING %s ====", snpNames[probesetIndex])
+            }
+        }
     }
     chunkResult <- list(geno = geno, vino = vino, conf = conf)
     
@@ -688,14 +860,10 @@ genotypeAnyChrChunk <- function(
     chunkResult
 }
 
-.genotypeXChromosomeChunk <- function(ms, ss, hint, isInPAR, trans, isMale, confScoreThreshold, logSnp=NULL, logfn=NULL) {
+.genotypeXChromosomeChunk <- function(snpContAvg, hint, isInPAR, isMale, confScoreThreshold, logSnp=NULL, logfn=NULL) {
     parIndices <- which(as.logical(isInPAR))
-    numArrays <- ncol(ms)
-    numProbesets <- nrow(ms)
-    
-    if(ncol(ss) != numArrays || nrow(ss) != numProbesets) {
-        stop("Internal error: ms matrix dimensions should match ss matrix dimensions")
-    }
+    numArrays <- ncol(snpContAvg)
+    numProbesets <- nrow(snpContAvg)
     
     if(length(hint) == 0) {
         hint <- rep(0, numProbesets)
@@ -726,16 +894,11 @@ genotypeAnyChrChunk <- function(
     
     # we can treat the females like autosomes for the purposes of genotyping
     if(length(femaleColumns) >= 2) {
-        normalFemaleMs <- ms[normalIndices, femaleColumns, drop = FALSE]
-        normalFemaleSs <- ss[normalIndices, femaleColumns, drop = FALSE]
-        
         # we are going to treat the female probesets just like autosomes for
         # the purposes of geno/vinotyping
         normalFemaleResult <- .genotypeChunk(
-            normalFemaleMs,
-            normalFemaleSs,
+            snpContAvg[normalIndices, femaleColumns, drop = FALSE],
             normalHint,
-            trans,
             confScoreThreshold,
             normalLogSnp,
             logfn,
@@ -748,13 +911,8 @@ genotypeAnyChrChunk <- function(
     
     # the non-PAR male probesets will get genotyped as homozygous
     if(length(maleColumns) >= 2) {
-        normalMaleMs <- ms[normalIndices, maleColumns, drop = FALSE]
-        normalMaleSs <- ss[normalIndices, maleColumns, drop = FALSE]
-        
         normalMaleResult <- .genotypeHomozygousChunk(
-            normalMaleMs,
-            normalMaleSs,
-            trans,
+            snpContAvg[normalIndices, maleColumns, drop = FALSE],
             confScoreThreshold,
             normalLogSnp,
             logfn,
@@ -767,16 +925,12 @@ genotypeAnyChrChunk <- function(
     
     # the PAR probesets will be treated as autosomes whether they're male or female
     if(length(parIndices) >= 1) {
-        parMs <- ms[parIndices, , drop = FALSE]
-        parSs <- ss[parIndices, , drop = FALSE]
         parHint <- hint[parIndices]
         parLogSnp <- logSnp[parIndices]
         
         parResult <- .genotypeChunk(
-            parMs,
-            parSs,
+            snpContAvg[parIndices, , drop = FALSE],
             parHint,
-            trans,
             confScoreThreshold,
             parLogSnp,
             logfn,
@@ -790,19 +944,18 @@ genotypeAnyChrChunk <- function(
     results
 }
 
-.genotypeYChromosomeChunk <- function(ms, ss, hint, trans, isMale, confScoreThreshold, logSnp=NULL, logfn=NULL) {
-    numArrays <- ncol(ms)
-    numProbesets <- nrow(ms)
-    
-    if(ncol(ss) != numArrays || nrow(ss) != numProbesets) {
-        stop("Internal error: ms matrix dimensions should match ss matrix dimensions")
-    }
+.genotypeYChromosomeChunk <- function(snpContAvg, hint, isMale, confScoreThreshold, logSnp=NULL, logfn=NULL) {
+    numArrays <- ncol(snpContAvg)
+    numProbesets <- nrow(snpContAvg)
     
     maleColumns <- which(isMale)
     
-    maleMs <- ms[, maleColumns, drop = FALSE]
-    maleSs <- ss[, maleColumns, drop = FALSE]
-    maleResult <- .genotypeHomozygousChunk(maleMs, maleSs, trans, confScoreThreshold, logSnp, logfn, "Y")
+    maleResult <- .genotypeHomozygousChunk(
+        snpContAvg[, maleColumns, drop = FALSE],
+        confScoreThreshold,
+        logSnp,
+        logfn,
+        "Y")
     
     # fill in the female columns using NA so that the dimensions of the
     # input data match the dimensions of the output data

@@ -1,39 +1,84 @@
-plotSNP <- function(nm, ns, geno, vino, main = "", xlab = "Contrast", ylab = "Average Intensity") {
-    plot(nm, ns, xlab = xlab, ylab = ylab, main = main)
-    points(nm[geno == 1], ns[geno == 1], col = 2)           # red
-    points(nm[geno == 2], ns[geno == 2], col = 3)           # green
-    points(nm[geno == 3], ns[geno == 3], col = 4)           # blue
-    points(nm[vino == 1], ns[vino == 1], pch = 19, col = 6) # filled point
+plotSnpContAvg <- function(
+        snpContAvg,
+        renderMask=matrix(TRUE, nrow=nrow(snpContAvg), ncol=ncol(snpContAvg)),
+        xlab="Contrast",
+        ylab="Average Intensity",
+        main="",
+        col=rgb(0, 0, 0, 0.25),
+        pch=20,
+        xlim=c(-max(snpContAvg$snpContrasts), max(snpContAvg$snpContrasts)),
+        ylim=c(0, max(snpContAvg$snpAverages)),
+        ...) {
+
+    xVals <- c(snpContAvg$snpContrasts)
+    yVals <- c(snpContAvg$snpAverages)
+    
+    renderMask <- c(renderMask)
+    if(!is.null(renderMask)) {
+        xVals <- xVals[renderMask]
+        yVals <- yVals[renderMask]
+    }
+    
+    plot(
+        xVals, yVals,
+        xlab=xlab,
+        ylab=ylab,
+        main=main,
+        xlim=xlim,
+        ylim=ylim,
+        col=col,
+        pch=pch,
+        ...)
 }
 
-plotArrayAvgContDensity <- function(
-    arrData,
-    main="Mean Intensity vs. Intensity Contrast",
-    xlab="Intensity Contrast",
-    ylab="Mean Intensity",
-    useAbs=TRUE,
-    pch=20) {
+pointsSnpContAvg <- function(
+        snpContAvg,
+        renderMask=matrix(TRUE, nrow=nrow(snpContAvg), ncol=ncol(snpContAvg)),
+        col=rgb(0, 0, 1),
+        pch=20,
+        ...) {
     
-    contFun <-
-        if(useAbs) {
-            function(x) {abs(x$intensityConts)}
-        } else {
-            function(x) {x$intensityConts}
-        }
+    xVals <- c(snpContAvg$snpContrasts)
+    yVals <- c(snpContAvg$snpAverages)
     
-    allCont <- unlist(lapply(arrData, contFun))
-    allAvgs <- unlist(lapply(arrData, function(x) {x$intensityAvgs}))
+    renderMask <- c(renderMask)
+    if(!is.null(renderMask)) {
+        xVals <- xVals[renderMask]
+        yVals <- yVals[renderMask]
+    }
     
-    colors <- densCols(allCont, allAvgs, col=topo.colors)
-    plot(allCont, allAvgs, col=colors, main=main, xlab=xlab, ylab=ylab, pch=pch)
+    points(
+        xVals, yVals,
+        col=col,
+        pch=pch,
+        ...)
+}
+
+boxplot.snpIntensities <- function(x, ...) {
+    plotList <- list()
+    for(sampleIndex in seq_len(ncol(x))) {
+        name <- x$sampleNames[sampleIndex]
+        aName <- paste(name, ": A", sep="")
+        bName <- paste(name, ": B", sep="")
+        plotList[[aName]] <- x$A[ , sampleIndex, drop=TRUE]
+        plotList[[bName]] <- x$B[ , sampleIndex, drop=TRUE]
+    }
+    
+    args <- list(...)
+    tempPar <- par()
+    par(
+        las=if("las" %in% names(args)) args$las else 3,
+        mar=if("mar" %in% names(args)) args$mar else c(11, 4, 4, 2))
+    boxplot(plotList, ...)
+    par(las=tempPar$las, mar=tempPar$mar)
 }
 
 plotMouseDivArrayImage <- function(celFilename) {
-    my <- as.matrix(read.celfile(celFilename, intensity.means.only = TRUE)[["INTENSITY"]][["MEAN"]][1:6892960])
+    celData <- as.matrix(read.celfile(celFilename, intensity.means.only = TRUE)[["INTENSITY"]][["MEAN"]][1:6892960])
     image(
         1 : 2572,
         1 : 2680,
-        matrix(log2(my), byrow = T, ncol = 2680),
+        matrix(log2(celData), byrow = T, ncol = 2680),
         col = c("green", "black", "red"),
         xlab = "",
         ylab = "")

@@ -1,0 +1,16 @@
+Version 1.0.2
+=============
+* added SNP-level tracing functionality. Various functions now allow you to
+  specify which SNPs should generate detailed logging information for diagnostic
+  purposes
+* better parallelization. Chunk processing batches are now allowed to cross
+  chromosome boundaries
+* added matrix-like S3 classes which can be indexed using the same indexing operators
+  used for matrices:
+    - snpIntensities: contains AB intensity info. see makeSnpIntensities documentation
+    - snpContAvg: contains AB average and contrast info. see makeSnpContAvg documentation
+* made the process of genotyping more modular and simplified workflow for cases
+  where the user is not working with musdiv CEL files: readCELFiles, genotypeSnps,
+  inferGenderFromSnpContAvg, 
+* function parameters that used to expect a vector of CEL file names now will
+  also allow the directory containing the CEL files to be specified instead
