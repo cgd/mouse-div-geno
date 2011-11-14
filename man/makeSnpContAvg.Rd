@@ -1,4 +1,4 @@
-\author{Keith Sheppard}
+\author{Hyuna Yang and Keith Sheppard}
 \name{makeSnpContAvg}
 \alias{makeSnpContAvg}
 \title{Create a matrix-like object for storing SNP contrasts, SNP averages, SNP IDs and sample names}

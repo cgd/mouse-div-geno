@@ -1,4 +1,4 @@
-\author{Keith Sheppard}
+\author{Hyuna Yang and Keith Sheppard}
 \name{makeSnpIntensities}
 \alias{makeSnpIntensities}
 \title{Create a matrix-like object for storing SNP A and B intensities, SNP IDs and sample names}

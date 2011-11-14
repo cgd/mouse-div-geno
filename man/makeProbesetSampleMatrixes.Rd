@@ -1,4 +1,4 @@
-\author{Keith Sheppard}
+\author{Hyuna Yang and Keith Sheppard}
 \name{makeProbesetSampleMatrixes}
 \alias{makeProbesetSampleMatrixes}
 \title{Create a matrix-like object from data matrices, probeset IDs and sample names}
