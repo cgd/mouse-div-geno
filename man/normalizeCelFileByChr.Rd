@@ -21,16 +21,28 @@ readCELFiles(
         A data-frame containing probe-level data for the SNPs we are genotyping.
         The data-frame should contain the following components:
         
-        \code{isAAllele}: \code{TRUE} for A allele probes and \code{FALSE} for B allele probes
+        \code{isAAllele}: \code{TRUE} for A allele probes and \code{FALSE} for
+        B allele probes
         
-        \code{snpId}: the ID of the SNP that this probe belongs to. These IDs should correspond to the same component in the \code{snpInfo} argument
+        \code{snpId}: the ID of the SNP that this probe belongs to. These IDs
+        should correspond to the same component in the \code{snpInfo} argument
         
         \code{probeIndex}: the index for the probe (used to get intensity data)
         
-        \code{correction} (optional): if present this correction will be applied by adding it to probe mean intesity vales
+        \code{correction} (optional): if present this correction will be applied
+        by adding it to probe mean intesity vales
     }
-    \item{referenceDistribution}{Reference distribution used for the quantile normalization. If there is an evidence that the density distribution of samples follows more than one distribution or different from that of classical laboratory strain, this normalization should not be used and leave as a default i.e. \code{referenceDistribution = NULL}.}
-    \item{logFile}{if non-NULL this must be a connection type to which log messages will be written}
+    \item{referenceDistribution}{
+        Reference distribution used for the quantile normalization. If there is
+        an evidence that the density distribution of samples follows more than
+        one distribution or different from that of classical laboratory strain,
+        this normalization should not be used and leave as a default
+        i.e. \code{referenceDistribution = NULL}.
+    }
+    \item{logFile}{
+        if non-NULL this must be a connection type to which log messages will
+        be written
+    }
 }
 \value{
     This function returns an object of class \code{snpIntensities}. See the

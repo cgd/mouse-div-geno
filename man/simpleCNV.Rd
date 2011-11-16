@@ -23,13 +23,16 @@ simpleCNV(
         A data-frame containing probe-level data for the SNPs we are performing CNV on.
         The data-frame should contain the following components:
         
-        \code{isAAllele}: \code{TRUE} for A allele probes and \code{FALSE} for B allele probes
+        \code{isAAllele}: \code{TRUE} for A allele probes and \code{FALSE} for
+        B allele probes
         
-        \code{snpId}: the ID of the SNP that this probe belongs to. These IDs should correspond to the same component in the \code{snpInfo} argument
+        \code{snpId}: the ID of the SNP that this probe belongs to. These IDs
+        should correspond to the same component in the \code{snpInfo} argument
         
         \code{probeIndex}: the index for the probe (used to get intensity data)
         
-        \code{correction} (optional): if present this correction will be applied by adding it to probe mean intesity vales
+        \code{correction} (optional): if present this correction will be applied
+        by adding it to probe mean intesity vales
     }
     
     \item{snpInfo}{
@@ -38,13 +41,17 @@ simpleCNV(
         
         \code{snpId}: the ID of this SNP
         
-        \code{chrId}: the chromosome that this SNP belongs to. Like \dQuote{15} or \dQuote{X}
+        \code{chrId}: the chromosome that this SNP belongs to.
+        Like \dQuote{15} or \dQuote{X}
         
         \code{positionBp}: the chromosome position in base pairs
         
-        \code{snpHetHint} (optional): provides a hint for the normalized mean intensity of heterozygous SNPs
+        \code{snpHetHint} (optional): provides a hint for the normalized mean
+        intensity of heterozygous SNPs
         
-        \code{isPAR} (optional): if \code{TRUE} this indicates that this SNP is in the pseudoautosomal region (PAR). This should only be set to \code{TRUE} for SNPs where \code{snpInfo$chrId == "X"}
+        \code{isPAR} (optional): if \code{TRUE} this indicates that this SNP is
+        in the pseudoautosomal region (PAR). This should only be set to
+        \code{TRUE} for SNPs where \code{snpInfo$chrId == "X"}
     }
     
     \item{snpReferenceDistribution}{
@@ -58,14 +65,17 @@ simpleCNV(
     \item{invariantProbeInfo}{
         A data-frame containing probe-level data for the invariants we are
         performing CNV on, or a list of data frames where each data frame in the
-        list represents an invariant group which should be normalized seperately
+        list represents an invariant group which should be normalized separately
         from the others. The data-frame should contain the following components:
         
-        \code{probesetId}: the ID of the probeset that this probe belongs to. These IDs should correspond to the same component in the \code{invariantProbesetInfo} argument
+        \code{probesetId}: the ID of the probeset that this probe belongs to.
+        These IDs should correspond to the same component in the
+        \code{invariantProbesetInfo} argument
 
         \code{probeIndex}: the index for the probe (used to get intensity data)
 
-        \code{correction} (optional): if present this correction will be applied by adding it to probe mean intesity vales
+        \code{correction} (optional): if present this correction will be applied
+        by adding it to probe mean intensity vales
     }
     
     \item{invariantProbesetInfo}{
@@ -77,7 +87,8 @@ simpleCNV(
         
         \code{probesetId}: the ID of this probeset
 
-        \code{chrId}: the chromosome that this probeset belongs to. Like \dQuote{15} or \dQuote{X}
+        \code{chrId}: the chromosome that this probeset belongs to. Like
+        \dQuote{15} or \dQuote{X}
 
         \code{positionBp}: the chromosome position in base pairs
     }
@@ -86,7 +97,7 @@ simpleCNV(
         A numeric vector which is the reference distribution used for the
         quantile normalization, or a list of vectors where each data frame in
         the list represents an invariant group which should be normalized
-        seperately from the others.
+        separately from the others.
     }
   
     \item{celFiles}{
@@ -94,19 +105,34 @@ simpleCNV(
         will be expanded to the listing of CEL files found in the directory
     }
   
-  \item{referenceCelFile}{the CEL file used as a reference when testing for CNV gains and losses}
-  
-  \item{chromosomes}{character vector of chromosome IDs that you want to CNV. These should correspond to the values in \code{snpInfo$chrId}. Eg: \code{chromosomes=c(1 : 19, "X", "Y", "M")}.}
-  \item{verbose}{if set to \code{TRUE} status information will be printed while the function executes}
-  \item{cluster}{a cluster object as created by the \pkg{SNOW} package. If this value is non-NULL then this function will run CNV computations in parallel on the given cluster}
-  \item{summaryOutputFile}{the file that you would like to write a summary-level
-      CNV table to. NULL (the default) indicates that no summary file should be
-      generated. If a valid filename is given the output table will have the
-      following columns:
-      Name, Status, Chromosome, StartPosition, EndPosition,
-      Number of Probe sets, Size, Number of SNP probe sets,
-      Number of exon1 sets, Number of exon2 sets,
-      Mean intensity of reference sample, Mean intensity of sample}
+    \item{referenceCelFile}{
+        the CEL file used as a reference when testing for CNV gains and losses
+    }
+    
+    \item{chromosomes}{
+        character vector of chromosome IDs that you want to CNV. These should
+        correspond to the values in \code{snpInfo$chrId}.
+        Eg: \code{chromosomes=c(1 : 19, "X", "Y", "M")}.
+    }
+    \item{verbose}{
+        if set to \code{TRUE} status information will be printed while the
+        function executes
+    }
+    \item{cluster}{
+        a cluster object as created by the \pkg{SNOW} package. If this value is
+        non-NULL then this function will run CNV computations in parallel on the
+        given cluster
+    }
+    \item{summaryOutputFile}{
+        the file that you would like to write a summary-level
+        CNV table to. NULL (the default) indicates that no summary file should be
+        generated. If a valid filename is given the output table will have the
+        following columns:
+        Name, Status, Chromosome, StartPosition, EndPosition,
+        Number of Probe sets, Size, Number of SNP probe sets,
+        Number of exon1 sets, Number of exon2 sets,
+        Mean intensity of reference sample, Mean intensity of sample
+    }
 }
 
 \value{

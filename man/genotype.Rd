@@ -20,11 +20,15 @@ homozygous genotypes such as SNPs from male Y and X chromosomes, and Mitochondri
 }
 
 \arguments{
-  \item{nm}{A vector of intensity contrasts for a single SNP.}
-  \item{ns}{A vector of intensity averages for a single SNP.}
-  \item{hint1}{A mean of AB group contrast intensities.}
-  \item{trans}{CCStrans or MAtrans.}
-  \item{logfn}{A function used to write a line to our debug log. If non-NULL, the arguments accepted by this function must work the same way as the sprintf(...) function}
+    \item{nm}{A vector of intensity contrasts for a single SNP.}
+    \item{ns}{A vector of intensity averages for a single SNP.}
+    \item{hint1}{A mean of AB group contrast intensities.}
+    \item{trans}{CCStrans or MAtrans.}
+    \item{logfn}{
+        A function used to write a line to our debug log. If non-NULL, the
+        arguments accepted by this function must work the same way as the
+        \code{sprintf(...)} function
+    }
 }
 \value{
   It returns genotype (1 = AA, 2 = AB, 3 = BB), VINOtype (1 = VINO, 0 = not), and confidence score
