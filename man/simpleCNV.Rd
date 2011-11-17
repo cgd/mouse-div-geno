@@ -14,7 +14,7 @@ simpleCNV(
         referenceCelFile,
         chromosomes = c(1:19, "X", "Y", "M"),
         verbose = FALSE,
-        cluster = NULL,
+        numCores = NULL,
         summaryOutputFile = NULL)
 }
 
@@ -118,10 +118,10 @@ simpleCNV(
         if set to \code{TRUE} status information will be printed while the
         function executes
     }
-    \item{cluster}{
-        a cluster object as created by the \pkg{SNOW} package. If this value is
-        non-NULL then this function will run CNV computations in parallel on the
-        given cluster
+    \item{numCores}{
+        the number of cores to use. NULL indicates that we should use all
+        available cores. This argument will have no affect if the \pkg{multicore}
+        package is not installed.
     }
     \item{summaryOutputFile}{
         the file that you would like to write a summary-level

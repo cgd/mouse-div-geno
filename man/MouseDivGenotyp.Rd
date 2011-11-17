@@ -27,7 +27,7 @@ mouseDivGenotype(
         transformFunction = ccsTransform,
         isMale = NULL, confScoreThreshold = 1e-05,
         chromosomes = c(1:19, "X", "Y", "M"),
-        cluster = NULL,
+        numCores = NULL,
         probesetChunkSize = 1000, outputDir = NULL, outputFilePrefix = "mouseDivResults_",
         logFile = NULL)
 mouseDivGenotypeCEL(
@@ -36,7 +36,7 @@ mouseDivGenotypeCEL(
         transformFunction = ccsTransform,
         isMale = NULL, confScoreThreshold = 1e-05,
         chromosomes = c(1:19, "X", "Y", "M"),
-        cluster = NULL,
+        numCores = NULL,
         probesetChunkSize = 1000, outputDir = NULL, outputFilePrefix = "mouseDivResults_",
         logFile = NULL)
 mouseDivGenotypeTab(
@@ -44,7 +44,7 @@ mouseDivGenotypeTab(
         transformFunction = ccsTransform,
         isMale = NULL, confScoreThreshold = 1e-05,
         chromosomes = c(1:19, "X", "Y", "M"),
-        cluster = NULL,
+        numCores = NULL,
         probesetChunkSize = 1000, outputDir = NULL, outputFilePrefix = "mouseDivResults_",
         logFile = NULL)
 }
@@ -116,10 +116,10 @@ mouseDivGenotypeTab(
         should correspond to the values in \code{snpInfo$chrId}.
         Eg: \code{chromosomes=c(1 : 19, "X", "Y", "M")}.
     }
-    \item{cluster}{
-        a cluster object as created by the \pkg{SNOW} package. If this value is
-        non-NULL then this function will run genotyping computations in parallel
-        on the given cluster
+    \item{numCores}{
+        the number of cores to use. NULL indicates that we should use all
+        available cores. This argument will have no affect if the \pkg{multicore}
+        package is not installed.
     }
     \item{probesetChunkSize}{
         determines how many SNPs will be processed at a time (in a single chunk).

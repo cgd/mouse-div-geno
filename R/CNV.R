@@ -833,7 +833,7 @@ simpleCNV <- function(
         referenceCelFile,
         chromosomes = c(1:19, "X", "Y", "M"),
         verbose = FALSE,
-        cluster = NULL,
+        numCores = NULL,
         summaryOutputFile = NULL) {
 
     snpCount <- nrow(snpInfo)
@@ -872,6 +872,15 @@ simpleCNV <- function(
        invariantGroupCount != length(invariantReferenceDistribution)) {
         stop("there is a missmatch between the \"invariantProbeInfo\", ",
             "\"invariantProbesetInfo\", \"invariantReferenceDistribution\"")
+    }
+    
+    # multicore init
+    if(is.null(numCores) || numCores != 1) {
+        if(!require("multicore", character.only=T)) {
+            numCores <- 1
+        } else if(is.null(numCores)) {
+            numCores <- multicore:::detectCores()
+        }
     }
     
     # initialize the summary output
@@ -1003,7 +1012,7 @@ simpleCNV <- function(
                 invariantProbeInfo, invariantProbesetInfo, invariantReferenceDistribution,
                 verbose)
             
-            if(length(cluster) == 0) {
+            if(numCores < 2) {
                 cnvs <- list()
                 for(chr in names(currIntensities)) {
                     if(verbose) {
@@ -1015,11 +1024,11 @@ simpleCNV <- function(
                 }
             } else {
                 if(verbose) {
-                    cat("Applying cluster resources to infer CNVs for ", currCelFile, "\n")
+                    cat("Applying multicore resources to infer CNVs for ", currCelFile, "\n")
                 }
                 
                 # we need to do some strange data massaging here so that we
-                # can apply cluster resources
+                # can apply multicore resources
                 combinedIntList <- mapply(
                     function(intToTest, refInt) {
                         list(testInt = intToTest, refInt = refInt)
@@ -1027,7 +1036,7 @@ simpleCNV <- function(
                     currIntensities,
                     refIntensities,
                     SIMPLIFY = FALSE)
-                cnvs <- parLapply(cluster, combinedIntList, .applyInferCNVFromIntensity)
+                cnvs <- mclapply(combinedIntList, .applyInferCNVFromIntensity, mc.cores=numCores)
             }
             
             if(!is.null(summaryOutputFile)) {

@@ -62,25 +62,53 @@ readCELFiles <- function(
         celFiles,
         snpProbeInfo,
         referenceDistribution = NULL,
+        numCores = NULL,
         logFile = NULL) {
 
-    readNext <- function(index) {
-        headFunc <- function() {
-            readCELFiles(celFiles[index], snpProbeInfo, referenceDistribution, logFile)
+    if(is.null(numCores) || numCores != 1) {
+        if(!require("multicore", character.only=T)) {
+            numCores <- 1
+        } else if(is.null(numCores)) {
+            numCores <- multicore:::detectCores()
+        }
+    }
+    
+    readEmpty <- function(index) {
+        readCELs <- list()
+        if(numCores == 1) {
+            readCELs[[1]] <- readCELFiles(celFiles[index], snpProbeInfo, referenceDistribution, logFile)
+        } else {
+            endIndex <- min(index + numCores - 1, length(celFiles))
+            currCELFiles <- as.list(celFiles[index : endIndex])
+            readCELs <- mclapply(currCELFiles, readCELFiles, snpProbeInfo, referenceDistribution, logFile, mc.cores=numCores)
         }
         
-        tailFunc <-
-            if(index == length(celFiles)) {
-                NULL
-            } else {
-                function() readNext(index + 1)
+        readNext <- function(offset) {
+            headFunc <- function() {
+                readCELs[[offset + 1]]
             }
+            
+            tailFunc <-
+                if(index + offset == length(celFiles)) {
+                    NULL
+                } else {
+                    function() {
+                        if(offset + 1 < length(readCELs)) {
+                            readNext(offset + 1)
+                        } else {
+                            readEmpty(index + offset + 1)
+                        }
+                    }
+                }
+            
+            list(head = headFunc, tail = tailFunc)
+        }
         
-        list(head = headFunc, tail = tailFunc)
+        readNext(0)
     }
     
     if(length(celFiles)) {
-        function() {readNext(1)}
+        function() {readEmpty(1)}
     } else {
         NULL
     }

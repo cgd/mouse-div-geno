@@ -14,7 +14,7 @@ mouseDivGenotype <- function(
         transformFunction = ccsTransform,
         isMale = NULL, confScoreThreshold = 1e-05,
         chromosomes = c(1:19, "X", "Y", "M"),
-        cluster = NULL,
+        numCores = NULL,
         probesetChunkSize = 1000, outputDir = NULL, outputFilePrefix = "mouseDivResults_",
         logFile = NULL) {
 
@@ -71,7 +71,7 @@ mouseDivGenotype <- function(
         isMale              = isMale,
         confScoreThreshold  = confScoreThreshold,
         chromosomes         = chromosomes,
-        cluster             = cluster,
+        numCores            = numCores,
         probesetChunkSize   = probesetChunkSize,
         outputDir           = outputDir,
         outputFilePrefix    = outputFilePrefix,
@@ -84,7 +84,7 @@ mouseDivGenotypeCEL <- function(
         transformFunction = ccsTransform,
         isMale = NULL, confScoreThreshold = 1e-05,
         chromosomes = c(1:19, "X", "Y", "M"),
-        cluster = NULL,
+        numCores = NULL,
         probesetChunkSize = 1000, outputDir = NULL, outputFilePrefix = "mouseDivResults_",
         logFile = NULL) {
 
@@ -107,6 +107,7 @@ mouseDivGenotypeCEL <- function(
             celFiles                = celFiles,
             snpProbeInfo            = snpProbeInfo,
             referenceDistribution   = referenceDistribution,
+            numCores                = numCores,
             logFile                 = logFile)
     .mouseDivGenotypeInternal(
             snpIntensities      = snpIntensities,
@@ -115,7 +116,7 @@ mouseDivGenotypeCEL <- function(
             isMale              = isMale,
             confScoreThreshold  = confScoreThreshold,
             chromosomes         = chromosomes,
-            cluster             = cluster,
+            numCores            = numCores,
             probesetChunkSize   = probesetChunkSize,
             outputDir           = outputDir,
             outputFilePrefix    = outputFilePrefix,
@@ -127,7 +128,7 @@ mouseDivGenotypeTab <- function(
         transformFunction = ccsTransform,
         isMale = NULL, confScoreThreshold = 1e-05,
         chromosomes = c(1:19, "X", "Y", "M"),
-        cluster = NULL,
+        numCores = NULL,
         probesetChunkSize = 1000, outputDir = NULL, outputFilePrefix = "mouseDivResults_",
         logFile = NULL) {
 
@@ -148,7 +149,7 @@ mouseDivGenotypeTab <- function(
             isMale              = isMale,
             confScoreThreshold  = confScoreThreshold,
             chromosomes         = chromosomes,
-            cluster             = cluster,
+            numCores            = numCores,
             probesetChunkSize   = probesetChunkSize,
             outputDir           = outputDir,
             outputFilePrefix    = outputFilePrefix,
@@ -160,7 +161,7 @@ mouseDivGenotypeTab <- function(
         transformFunction = ccsTransform,
         isMale = NULL, confScoreThreshold = 1e-05,
         chromosomes = c(1:19, "X", "Y", "M"), cacheDir = tempdir(),
-        retainCache = FALSE, cluster = NULL,
+        retainCache = FALSE, numCores = NULL,
         probesetChunkSize = 1000, outputDir = NULL, outputFilePrefix = "mouseDivResults_",
         logFile = NULL) {
 
@@ -204,9 +205,12 @@ mouseDivGenotypeTab <- function(
         }
     }
     
-    # we only need the snow library if the cluster is non-null
-    if(!is.null(cluster) && !require("snow")) {
-        stop("failed to load the snow library")
+    if(is.null(numCores) || numCores != 1) {
+        if(!require("multicore", character.only=T)) {
+            numCores <- 1
+        } else if(is.null(numCores)) {
+            numCores <- multicore:::detectCores()
+        }
     }
     
     # make sure that the chromosome vector is not numeric
@@ -363,7 +367,7 @@ mouseDivGenotypeTab <- function(
             #timeReport(startTime)
             
             #startTime <- getTime()
-            if(length(cluster) >= 1) {
+            if(numCores >= 2) {
                 # the arg list is used to accumulate arguments until we're
                 # ready to execute them in parallel
                 argLists[[length(argLists) + 1]] <- list(
@@ -376,12 +380,12 @@ mouseDivGenotypeTab <- function(
                     logOn = logOn,
                     logSnp = chrLogSNP[chunkRange])
                 
-                if(length(argLists) >= length(cluster) ||
+                if(length(argLists) >= numCores ||
                    (chri == chromosomes[length(chromosomes)] &&
                    chunkIndex == length(chrChunks[[chri]]))) {
 
                     # parallel apply using snow then reset the arg list
-                    chunkResultsList <- parLapply(cluster, argLists, .applyGenotypeAnyChrChunk)
+                    chunkResultsList <- mclapply(argLists, .applyGenotypeAnyChrChunk, mc.cores=numCores)
 
                     for(i in 1 : length(chunkResultsList)) {
                         for(logLine in chunkResultsList[[i]]$logLines) {

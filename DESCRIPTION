@@ -8,5 +8,5 @@ License: GPL (>= 2)
 URL:  http://genomedynamics.org/tools/MouseDivGeno/CDFfiles
 Depends: R (>= 2.9.0)
 Imports: cluster, affyio, preprocessCore (>= 1.4.0)
-Suggests: snow, HiddenMarkov
+Suggests: HiddenMarkov, multicore
 biocViews: SNP, genotype, vinotype
