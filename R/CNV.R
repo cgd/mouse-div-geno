@@ -2,7 +2,7 @@ buildPennCNVInputFiles <- function(
         outdir = getwd(), allowOverwrite = FALSE,
         genotypes, snpProbeInfo, snpInfo, snpReferenceDistribution = NULL,
         invariantProbeInfo, invariantProbesetInfo, invariantReferenceDistribution = NULL,
-        transformMethod = c("CCS", "MA"), celFiles = getwd(),
+        transformFunction = ccsTransform, celFiles = getwd(),
         isMale = NULL,
         chromosomes = c(1:19, "X", "Y", "M"),
         chromosomeRenameMap = list(X = "20", Y = "21", M = "22"),
@@ -12,8 +12,6 @@ buildPennCNVInputFiles <- function(
 
     snpCount <- nrow(snpInfo)
     sampleCount <- ncol(genotypes)
-    
-    transformMethod <- match.arg(transformMethod)
     
     # validate snp info parameters
     if(!inherits(snpProbeInfo, "data.frame") ||
@@ -167,13 +165,7 @@ buildPennCNVInputFiles <- function(
                     # do that now
                     if(is.null(msList)) {
                         normCel <- readCELFiles(celfile, snpProbeInfo, snpReferenceDistribution)
-                        if(transformMethod == "CCS") {
-                            transCel <- ccsTransform(normCel)
-                        } else if(transformMethod == "MA") {
-                            transCel <- maTransform(normCel)
-                        } else {
-                            stop("expected transformMethod to be \"CCS\" or \"MA\"")
-                        }
+                        transCel <- transformFunction(normCel)
                         
                         msList <- list()
                         for(chr in snpChromosomes) {
@@ -240,6 +232,7 @@ buildPennCNVInputFiles <- function(
         sep = "\t",
         row.names = FALSE,
         col.names = FALSE)
+    flush(pfbConnection)
     
     if(verbose) {
         cat("generating PennCNV input for SNP probes\n")
@@ -454,6 +447,7 @@ buildPennCNVInputFiles <- function(
         sep = "\t",
         row.names = FALSE,
         col.names = FALSE)
+    flush(pfbConnection)
 }
 
 # append PennCNV data for the given LRR/BAF files and the PFB file using SNP
@@ -556,6 +550,7 @@ buildPennCNVInputFiles <- function(
         sep = "\t",
         row.names = FALSE,
         col.names = FALSE)
+    flush(pfbConnection)
 }
 
 # calculates LRR and BAF values for a single SNP position
@@ -907,6 +902,7 @@ simpleCNV <- function(
                 file = summaryOutputFile,
                 row.names = FALSE,
                 col.names = FALSE)
+        flush(summaryOutputFile)
     }
     
     for(i in 1 : invariantGroupCount) {
@@ -1058,6 +1054,7 @@ simpleCNV <- function(
                                 file = summaryOutputFile,
                                 row.names = FALSE,
                                 col.names = FALSE)
+                        flush(summaryOutputFile)
                     }
                 }
             }
