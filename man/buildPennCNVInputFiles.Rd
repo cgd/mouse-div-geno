@@ -10,7 +10,7 @@ buildPennCNVInputFiles(
         outdir = getwd(), allowOverwrite = FALSE,
         genotypes, snpProbeInfo, snpInfo, snpReferenceDistribution = NULL,
         invariantProbeInfo, invariantProbesetInfo, invariantReferenceDistribution = NULL,
-        transformMethod = c("CCS", "MA"), celFiles = getwd(),
+        transformFunction = ccsTransform, celFiles = getwd(),
         isMale = NULL,
         chromosomes = c(1:19, "X", "Y", "M"),
         chromosomeRenameMap = list(X = "20", Y = "21", M = "22"),
@@ -111,15 +111,10 @@ buildPennCNVInputFiles(
         the list represents an invariant group which should be normalized
         seperately from the others.
     }
-    \item{transformMethod}{
-        The MouseDivGenotype package genotype the array based on contrast and
-        summation, and offers two transformations to obtain contrast;
-        CCS and MA transformation. CCS (contrast centers stretch) transformation
-        proposed by BRLMM-P algorithm obtains contrast via
-        \code{asinh(K*(A-B)/(A+B))/asinh(K)}, where \code{A} and \code{B} is
-        intensity of A and B allele and K is a hyperparameter. MA transformation
-        obtains contrast by log2(A) - log2(B). In both cases summation is
-        defined by \code{(log2(A) + log2(B))/2}
+    \item{transformFunction}{
+        function used to transform SNP A/B intensities into intensity averages
+        and contrasts. This function should either be ccsTransform, maTransform
+        or your own function built using the CCS and MA code as an example
     }
     \item{celFiles}{
         either a vector of CEL file name(s) or directory name(s). Any directories

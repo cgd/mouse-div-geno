@@ -30,8 +30,12 @@ level information about the Mouse Diversity Array platform which we will use in
 several examples throughout this vignette. You can obtain this data from
 {\tt http://genomedynamics.org/tools/mousedivgeno}
 
+<<include = FALSE, echo = FALSE, eval = TRUE>>=
+working_dir <- "/Users/kss/projects/MouseDivGenoDirs"
+@
+
 <<keep.source = TRUE, eval = TRUE>>=
-load("../../../MouseDivData.RData")
+load(file.path(working_dir, "MouseDivData.RData"))
 ls()
 @
 
@@ -50,7 +54,7 @@ png(file = "array-image.png", width = 1200, height = 1200, pointsize = 24, bg = 
 @
 
 <<keep.source = TRUE, eval = TRUE>>=
-plotMouseDivArrayImage("../../../celFiles/SNP_mDIV_A8-8_081308.CEL")
+plotMouseDivArrayImage(file.path(working_dir, "celFiles/SNP_mDIV_A8-8_081308.CEL"))
 @
 
 <<include = FALSE, echo = FALSE, eval = TRUE>>=
@@ -77,7 +81,7 @@ different array). This can help you to determine whether your arrays should be
 quantile normalized or not:
 
 <<label = arraydesities, keep.source = TRUE, eval = TRUE>>=
-mouseDivDensityPlot(expandCelFiles("../../../celFiles"), snpProbeInfo)
+mouseDivDensityPlot(file.path(working_dir, "celFiles"), snpProbeInfo)
 @
 
 \begin{figure}
@@ -147,33 +151,31 @@ were calculated based on 350 training arrays.
 \end{itemize}
 
 Now we're ready to genotype our CEL files. To do this we will use the
-\verb#mouseDivGenotype(...)# function. You will notice in this example that we
+\verb#mouseDivGenotypeCEL(...)# function. You will notice in this example that we
 use all of the SNP data objects described above. We also are only genotyping
 four chromosomes rather than the default which is to genotype all chromosomes.
-We set the \verb#celFiles# parameter using the \verb#expandCelFiles# convenience
-function which saves us the trouble of having to explicitly list all of the CEL
-files in the \verb#../../../celFiles# directory. As specified here gender
+As specified here gender
 will be inferred from the CEL files but you can also explicitly set gender
 if you have that information ahead of time. See the
-\verb#mouseDivGenotype(...)# function's documentation for details on how to do
+\verb#mouseDivGenotypeCEL(...)# function's documentation for details on how to do
 this.
 
 <<keep.source = TRUE, results = hide, eval = TRUE>>=
 # we use confScoreThreshold = 0 so that we get most likely genotypes even for
 # the low confidence SNPs. We will need these genotypes later for CNV analysis
-genoVinoResult <- mouseDivGenotype(
+genoVinoResult <- mouseDivGenotypeCEL(
     snpProbeInfo            = snpProbeInfo,
     snpInfo                 = snpInfo,
     referenceDistribution   = snpReferenceDistribution,
     chromosomes             = c(19, "X", "Y", "M"),
-    celFiles                = expandCelFiles("../../../celFiles"),
+    celFiles                = file.path(working_dir, "celFiles"),
     confScoreThreshold      = 0)
 @
 
 The \verb#genoVinoResult# object contains the genotype calls, vinotype calls and
 confidence values for every SNP along with an isMale vector which indicates for
 each CEL file whether the sample was inferred as male or female (the
-\verb#mouseDivGenotype(...)# documentation shows how you can provide gender information
+\verb#mouseDivGenotypeCEL(...)# documentation shows how you can provide gender information
 using the \verb#celFiles# argument if you know it a priori). Here is a small subset
 of the output to give you an idea of what it looks like:
 
@@ -204,7 +206,7 @@ before you will be able to use this package. Here we assume those intensity
 matrices are named \verb#aIntensities# and \verb#bIntensities#:
 
 <<keep.source = FALSE, echo = FALSE, eval = TRUE>>=
-load("../../../abIntensities.RData")
+load(file.path(working_dir, "abIntensities.RData"))
 @
 <<keep.source = TRUE, eval = TRUE>>=
 dim(aIntensities)
@@ -216,15 +218,22 @@ and genotype them:
 
 <<keep.source = TRUE, eval = TRUE>>=
 # for this example I will only genotype SNPs 15 and 1281
-intenCont <- convertToContrastAndAverage(
-        aIntensities[c(15, 1281), ],
-        bIntensities[c(15, 1281), ],
-        intensitiesAreLog2 = TRUE)
-genoVinoConfForChr19 <- genotypeAnyChrChunk(
-        "19",
-        intenCont$intensityConts,
-        intenCont$intensityAvgs)
-genoVinoConfForChr19
+snpInten <- makeSnpIntensities(
+    aIntensities[c(15, 1281), ],
+    bIntensities[c(15, 1281), ],
+    snpIds=c("SNP15", "SNP1281"),
+    sampleNames=colnames(aIntensities))
+snpContAvg <- ccsTransform(snpInten)
+
+# Here we create a minimal snpInfo data frame that contains
+# SNP IDs and chromosome IDs for each SNP
+minimalSnpInfo <- data.frame(
+    snpId=c("SNP15", "SNP1281"),
+    chrId=c("19", "19"))
+
+# finally we can genotype the SNPs and print the result
+genoVinoConf <- genotypeSnps(snpContAvg, minimalSnpInfo)
+genoVinoConf
 @
 
 The function documentation for genotypeAnyChrChunk contains an explanation for
@@ -232,14 +241,18 @@ all of the value codes shown.
 
 You may be interested in visually inspecting the distribution of intensity
 contrasts and averages for a particular SNP across samples. If this is the
-case you can use the \verb#plotSnp(...)# function to do this. Here we will
+case you can use the \verb#plotSnpContAvg(...)# and \verb#pointsSnpContAvg(...)#
+functions to do this. Here we will
 plot the first SNP (which is SNP number 15 in the original matrix):
 
 <<label = snpplot, keep.source = TRUE, eval = TRUE>>=
-plotSNP(intenCont$intensityConts[1, ],
-        intenCont$intensityAvgs[1, ],
-        genoVinoConfForChr19$geno[1, ],
-        genoVinoConfForChr19$vino[1, ])
+# all sample contrast averages for SNP15
+plotSnpContAvg(snpContAvg["SNP15", ])
+
+# now highlight the A alleles
+pointsSnpContAvg(
+    snpContAvg["SNP15", ],
+    renderMask=(genoVinoConf["SNP15", ]$geno == 1))
 @
 
 \begin{figure}
@@ -388,9 +401,9 @@ explaination of these input parameters.
 In order to generate the LRR and BAF files we can enter a command like:
 
 <<keep.source = TRUE, results = hide, eval = TRUE>>=
-dir.create("../../../lrr-baf-output")
+dir.create(file.path(working_dir, "lrr-baf-output"))
 buildPennCNVInputFiles(
-    outdir                          = "../../../lrr-baf-output",
+    outdir                          = file.path(working_dir, "lrr-baf-output"),
     allowOverwrite                  = TRUE,
     genotypes                       = genoVinoResult$geno,
     snpProbeInfo                    = snpProbeInfo,
@@ -399,7 +412,7 @@ buildPennCNVInputFiles(
     invariantProbeInfo              = invariantProbeInfo,
     invariantProbesetInfo           = invariantProbesetInfo,
     invariantReferenceDistribution  = invariantReferenceDistribution,
-    celFiles                        = expandCelFiles("../../../celFiles"),
+    celFiles                        = file.path(working_dir, "celFiles"),
     isMale                          = genoVinoResult$isMale,
     chromosomes                     = c("19", "X", "Y", "M"))
 @
@@ -428,10 +441,10 @@ simpleCNVResult <- simpleCNV(
     invariantProbeInfo              = invariantProbeInfo,
     invariantProbesetInfo           = invariantProbesetInfo,
     invariantReferenceDistribution  = invariantReferenceDistribution,
-    celFiles                        = expandCelFiles("../../../celFiles"),
-    referenceCelFile                = "../../../celFiles/SNP_mDIV_A7-7_081308.CEL",
+    celFiles                        = file.path(working_dir, "celFiles"),
+    referenceCelFile                = file.path(working_dir, "celFiles/SNP_mDIV_A7-7_081308.CEL"),
     chromosomes                     = c("19"),
-    summaryOutputFile               = "../../../vignetteCNVSummaryOut.txt")
+    summaryOutputFile               = file.path(working_dir, "vignetteCNVSummaryOut.txt"))
 @
 
 In the returned matrix list a value of

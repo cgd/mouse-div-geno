@@ -90,7 +90,8 @@ mouseDivDensityPlot <- function(celFilenames, snpProbeInfo, type = c("Average", 
     type <- match.arg(type)
     isMatchedSet <- type == "MatchedSet"
     
-    for(i in 1 : length(celFilenames)) {
+    celFilenames <- .expandCelFiles(celFilenames)
+    for(i in seq_along(celFilenames)) {
         y <- as.matrix(read.celfile(as.character(celFilenames[i]), intensity.means.only = TRUE)[["INTENSITY"]][["MEAN"]][snpProbeInfo$probeIndex])
         y <- log2(y)
         allAint <- y[snpProbeInfo$isAAllele, 1, drop = FALSE]

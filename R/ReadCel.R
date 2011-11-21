@@ -24,6 +24,7 @@ readCELFiles <- function(
     for(celFile in celFiles) {
         if(!is.null(logFile)) {
             cat("Reading and normalizing CEL file: ", celFile, "\n", file=logFile, sep="")
+            flush(logFile)
         }
         
         celData <- read.celfile(celFile, intensity.means.only = TRUE)
@@ -121,15 +122,11 @@ readCELFiles <- function(
     }
     
     logOn <- !is.null(logFile)
-    logf <- function(fmt, ...) {
-        if(logOn) {
-            cat(sprintf(fmt, ...), file=logFile)
-        }
-    }
     logfn <- function(fmt, ...) {
         if(logOn) {
-            logf(fmt, ...)
+            cat(sprintf(fmt, ...), file=logFile)
             cat("\n", file=logFile)
+            flush(logFile)
         }
     }
     

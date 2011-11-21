@@ -14,6 +14,7 @@ mouseDivGenotype <- function(
         transformFunction = ccsTransform,
         isMale = NULL, confScoreThreshold = 1e-05,
         chromosomes = c(1:19, "X", "Y", "M"),
+        cacheDir = tempdir(), retainCache = FALSE,
         numCores = NULL,
         probesetChunkSize = 1000, outputDir = NULL, outputFilePrefix = "mouseDivResults_",
         logFile = NULL) {
@@ -71,6 +72,8 @@ mouseDivGenotype <- function(
         isMale              = isMale,
         confScoreThreshold  = confScoreThreshold,
         chromosomes         = chromosomes,
+        cacheDir            = cacheDir,
+        retainCache         = retainCache,
         numCores            = numCores,
         probesetChunkSize   = probesetChunkSize,
         outputDir           = outputDir,
@@ -84,6 +87,7 @@ mouseDivGenotypeCEL <- function(
         transformFunction = ccsTransform,
         isMale = NULL, confScoreThreshold = 1e-05,
         chromosomes = c(1:19, "X", "Y", "M"),
+        cacheDir = tempdir(), retainCache = FALSE,
         numCores = NULL,
         probesetChunkSize = 1000, outputDir = NULL, outputFilePrefix = "mouseDivResults_",
         logFile = NULL) {
@@ -116,6 +120,8 @@ mouseDivGenotypeCEL <- function(
             isMale              = isMale,
             confScoreThreshold  = confScoreThreshold,
             chromosomes         = chromosomes,
+            cacheDir            = cacheDir,
+            retainCache         = retainCache,
             numCores            = numCores,
             probesetChunkSize   = probesetChunkSize,
             outputDir           = outputDir,
@@ -128,6 +134,7 @@ mouseDivGenotypeTab <- function(
         transformFunction = ccsTransform,
         isMale = NULL, confScoreThreshold = 1e-05,
         chromosomes = c(1:19, "X", "Y", "M"),
+        cacheDir = tempdir(), retainCache = FALSE,
         numCores = NULL,
         probesetChunkSize = 1000, outputDir = NULL, outputFilePrefix = "mouseDivResults_",
         logFile = NULL) {
@@ -149,6 +156,8 @@ mouseDivGenotypeTab <- function(
             isMale              = isMale,
             confScoreThreshold  = confScoreThreshold,
             chromosomes         = chromosomes,
+            cacheDir            = cacheDir,
+            retainCache         = retainCache,
             numCores            = numCores,
             probesetChunkSize   = probesetChunkSize,
             outputDir           = outputDir,
@@ -160,8 +169,9 @@ mouseDivGenotypeTab <- function(
         snpIntensities, snpInfo,
         transformFunction = ccsTransform,
         isMale = NULL, confScoreThreshold = 1e-05,
-        chromosomes = c(1:19, "X", "Y", "M"), cacheDir = tempdir(),
-        retainCache = FALSE, numCores = NULL,
+        chromosomes = c(1:19, "X", "Y", "M"),
+        cacheDir = tempdir(), retainCache = FALSE,
+        numCores = NULL,
         probesetChunkSize = 1000, outputDir = NULL, outputFilePrefix = "mouseDivResults_",
         logFile = NULL) {
 
@@ -187,6 +197,7 @@ mouseDivGenotypeTab <- function(
             logfnTry <- function() {
                 cat(sprintf(fmt, ...), file=logFile)
                 cat("\n", file=logFile)
+                flush(logFile)
             }
             onError <- function(e) {
                 warning("failed to log message")
@@ -244,26 +255,24 @@ mouseDivGenotypeTab <- function(
     # loop through all the CELL files. We need to read and normalize the CEL
     # file data and save it to file in chunks no bigger than probesetChunkSize
     sampleNames <- character()
-    while(!is.null(snpIntensities)) {
-        curr <- snpIntensities()
-        head <- curr$head()
-        snpIntensities <- curr$tail
-        logfn("preprocessing intensities from %s ", head$sampleNames)
-        if(ncol(head) != 1) {
-            stop("expected there to be exactly 1 sample but there are ", ncol(head))
+    normSample <- function(sample) {
+        logfn("preprocessing intensities from %s ", sample$sampleNames)
+        if(ncol(sample) != 1) {
+            stop("expected there to be exactly 1 sample but there are ", ncol(sample))
         }
-        sampleNames <- c(sampleNames, head$sampleNames)
         
         if(genderInferenceRequired) {
-            meanIntensityXPerArray[head$sampleNames] <- 0
-            meanIntensityYPerArray[head$sampleNames] <- 0
+            sumIntenX <- 0
+            sumIntenY <- 0
+            sumIntenPerAuto <- rep(0, length(allAutosomes))
+            names(sumIntenPerAuto) <- allAutosomes
         }
         
         for(currChr in allChr) {
             chrSnpInfo <- snpInfo[snpInfo$chrId == currChr, , drop=FALSE]
-            chrMatch <- match(chrSnpInfo$snpId, rownames(head))
+            chrMatch <- match(chrSnpInfo$snpId, rownames(sample))
             chrMatch <- chrMatch[!is.na(chrMatch)]
-            chrData <- head[chrMatch, , drop=FALSE]
+            chrData <- sample[chrMatch, , drop=FALSE]
             for(chunkIndex in 1 : length(chrChunks[[currChr]])) {
                 chunk <- chrChunks[[currChr]][[chunkIndex]]
                 probesetIndices <- chunk$start : chunk$end
@@ -271,21 +280,60 @@ mouseDivGenotypeTab <- function(
                 
                 if(genderInferenceRequired) {
                     if(currChr %in% allAutosomes) {
-                        meanIntensityPerAutosome[currChr] <-
-                            meanIntensityPerAutosome[currChr] + sum(as.double(chunkData$snpAverages))
+                        sumIntenPerAuto[currChr] <-
+                            sumIntenPerAuto[currChr] + sum(as.double(chunkData$snpAverages))
                     } else if(currChr == "X") {
-                    	meanIntensityXPerArray[head$sampleNames] <-
-                            meanIntensityXPerArray[head$sampleNames] + sum(as.double(chunkData$snpAverages))
+                        sumIntenX <- sumIntenX + sum(as.double(chunkData$snpAverages))
                     } else if(currChr == "Y") {
-                        meanIntensityYPerArray[head$sampleNames] <-
-                            meanIntensityYPerArray[head$sampleNames] + sum(as.double(chunkData$snpAverages))
+                        sumIntenY <- sumIntenY + sum(as.double(chunkData$snpAverages))
                     }
                 }
                 
                 # cache the data
-                chunkFile <- .chunkFileName(cacheDir, "snp", head$sampleNames, currChr, probesetChunkSize, chunkIndex)
+                chunkFile <- .chunkFileName(cacheDir, "snp", sample$sampleNames, currChr, probesetChunkSize, chunkIndex)
                 save(chunkData, file=chunkFile)
             }
+        }
+        
+        if(genderInferenceRequired) {
+            list(
+                sampleName=sample$sampleNames,
+                sumIntenPerAuto=sumIntenPerAuto,
+                sumIntenX=sumIntenX,
+                sumIntenY=sumIntenY)
+        } else {
+            NULL
+        }
+    }
+    
+    while(!is.null(snpIntensities)) {
+        parIntens <- list()
+        for(i in seq_len(numCores)) {
+            if(!is.null(snpIntensities)) {
+                curr <- snpIntensities()
+                currHead <- curr$head()
+                parIntens[[currHead$sampleNames]] <- currHead
+                snpIntensities <- curr$tail
+            }
+        }
+        
+        applyResult <-
+            if(numCores >= 2 && length(parIntens) >= 2) {
+                mclapply(parIntens, normSample, mc.cores=numCores)
+            } else {
+                lapply(parIntens, normSample)
+            }
+        
+        for(currRes in applyResult) {
+            if(genderInferenceRequired) {
+                for(currChr in names(currRes$sumIntenPerAuto)) {
+                    meanIntensityPerAutosome[currChr] <-
+                        meanIntensityPerAutosome[currChr] + currRes$sumIntenPerAuto[currChr]
+                }
+                meanIntensityXPerArray[currRes$sampleName] <- currRes$sumIntenX
+                meanIntensityYPerArray[currRes$sampleName] <- currRes$sumIntenY
+            }
+            sampleNames <- c(sampleNames, currRes$sampleName)
         }
     }
     
@@ -603,35 +651,39 @@ inferGenderFromSnpContAvg <- function(snpContAvg, snpInfo) {
     
     allChr <- as.character(unique(snpInfo$chrId))
     allAutosomes <- setdiff(allChr, c("X", "Y", "M"))
-    
-    getChrSnpAvgs <- function(chrName) {
-        chrSnpInfo <- snpInfo[snpInfo$chrId == chrName, ]
-        chrMatch <- match(chrSnpInfo$snpId, rownames(snpContAvg))
-        chrMatch <- chrMatch[!is.na(chrMatch)]
-        if(length(chrMatch) == 0) {
-            stop("failed to find any data matches for chromosome ", chrName)
+    if(length(allAutosomes) >= 1 && ("X" %in% allChr) && ("Y" %in% allChr)) {
+        getChrSnpAvgs <- function(chrName) {
+            chrSnpInfo <- snpInfo[snpInfo$chrId == chrName, ]
+            chrMatch <- match(chrSnpInfo$snpId, rownames(snpContAvg))
+            chrMatch <- chrMatch[!is.na(chrMatch)]
+            if(length(chrMatch) == 0) {
+                stop("failed to find any data matches for chromosome ", chrName)
+            }
+            
+            snpContAvg$snpAverages[chrMatch, , drop=FALSE]
         }
         
-        snpContAvg$snpAverages[chrMatch, , drop=FALSE]
+        meanChrIntensityPerArray <- function(chrName) {
+            chrSnpAvgs <- getChrSnpAvgs(chrName)
+            meanPerArr <- apply(chrSnpAvgs, 2, sum) / nrow(chrSnpAvgs)
+            names(meanPerArr) <- colnames(snpContAvg)
+            meanPerArr
+        }
+        
+        meanIntensityPerAutosome <- NULL
+        for(currChr in allAutosomes) {
+            chrSnpAvgs <- getChrSnpAvgs(currChr)
+            meanIntensityPerAutosome[currChr] <- sum(chrSnpAvgs) / length(chrSnpAvgs)
+        }
+        
+        inferGender(
+            meanIntensityXPerArray = meanChrIntensityPerArray("X"),
+            meanIntensityYPerArray = meanChrIntensityPerArray("Y"),
+            meanIntensityPerAutosome = meanIntensityPerAutosome)
+    } else {
+        # if we don't have X, Y and at least one autosome we can't infer gender
+        NULL
     }
-    
-    meanChrIntensityPerArray <- function(chrName) {
-        chrSnpAvgs <- getChrSnpAvgs(chrName)
-        meanPerArr <- apply(chrSnpAvgs, 2, sum) / nrow(chrSnpAvgs)
-        names(meanPerArr) <- colnames(snpContAvg)
-        meanPerArr
-    }
-    
-    meanIntensityPerAutosome <- NULL
-    for(currChr in allAutosomes) {
-        chrSnpAvgs <- getChrSnpAvgs(currChr)
-        meanIntensityPerAutosome[currChr] <- sum(chrSnpAvgs) / length(chrSnpAvgs)
-    }
-    
-    inferGender(
-        meanIntensityXPerArray = meanChrIntensityPerArray("X"),
-        meanIntensityYPerArray = meanChrIntensityPerArray("Y"),
-        meanIntensityPerAutosome = meanIntensityPerAutosome)
 }
 
 genotypeSnps <- function(
@@ -662,6 +714,7 @@ genotypeSnps <- function(
             logfnTry <- function() {
                 cat(sprintf(fmt, ...), file=logFile)
                 cat("\n", file=logFile)
+                flush(logFile)
             }
             onError <- function(e) {
                 warning("failed to log message")

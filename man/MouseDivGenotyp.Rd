@@ -27,6 +27,7 @@ mouseDivGenotype(
         transformFunction = ccsTransform,
         isMale = NULL, confScoreThreshold = 1e-05,
         chromosomes = c(1:19, "X", "Y", "M"),
+        cacheDir = tempdir(), retainCache = FALSE,
         numCores = NULL,
         probesetChunkSize = 1000, outputDir = NULL, outputFilePrefix = "mouseDivResults_",
         logFile = NULL)
@@ -36,6 +37,7 @@ mouseDivGenotypeCEL(
         transformFunction = ccsTransform,
         isMale = NULL, confScoreThreshold = 1e-05,
         chromosomes = c(1:19, "X", "Y", "M"),
+        cacheDir = tempdir(), retainCache = FALSE,
         numCores = NULL,
         probesetChunkSize = 1000, outputDir = NULL, outputFilePrefix = "mouseDivResults_",
         logFile = NULL)
@@ -44,6 +46,7 @@ mouseDivGenotypeTab(
         transformFunction = ccsTransform,
         isMale = NULL, confScoreThreshold = 1e-05,
         chromosomes = c(1:19, "X", "Y", "M"),
+        cacheDir = tempdir(), retainCache = FALSE,
         numCores = NULL,
         probesetChunkSize = 1000, outputDir = NULL, outputFilePrefix = "mouseDivResults_",
         logFile = NULL)
@@ -116,6 +119,15 @@ mouseDivGenotypeTab(
         should correspond to the values in \code{snpInfo$chrId}.
         Eg: \code{chromosomes=c(1 : 19, "X", "Y", "M")}.
     }
+    \item{cacheDir}{
+        directory used to store intermediate results. By default a temporary
+        directory is used.
+    }
+    \item{retainCache}{
+        defaults to \code{FALSE}. If \code{FALSE} the data cache is deleted before
+        returning. Setting this value to \code{TRUE} could save processing time
+        on subsequent calls at the expense of taking up extra disk space
+    }
     \item{numCores}{
         the number of cores to use. NULL indicates that we should use all
         available cores. This argument will have no affect if the \pkg{multicore}
@@ -175,11 +187,6 @@ mouseDivGenotypeTab(
 
 \examples{
 \dontrun{
-baseDir <- "."
-
-# the directory that contains all of our CEL files
-celfiledir <- file.path(baseDir, "celFiles/")
-
 ################################################################################
 # This command loads the snpProbeInfo, snpInfo and reference objects
 # you should download this from the CGD website in order to be able to run
@@ -187,28 +194,22 @@ celfiledir <- file.path(baseDir, "celFiles/")
 ################################################################################
 load("MouseDivData.RData")
 
-# genotype in serial and save the results to "." (the current directory)
-cat("Running mouseDivGenotype in serial and saving to serialGenoVinoResults.csv\n")
-mouseDivGenotype(
-    snpProbeInfo = snpProbeInfo, snpInfo = snpInfo, referenceDistribution=reference,
-    chromosomes=c("19", "X", "Y"), celFiles=expandCelFiles(celfiledir),
-    logFile = stdout(), resultsOutputFile = ".")
+# genotype and save the results to text files in "." (the current directory)
+mouseDivGenotypeCEL(
+    snpProbeInfo            = snpProbeInfo,
+    snpInfo                 = snpInfo,
+    referenceDistribution   = snpReferenceDistribution,
+    celFiles                = "./celFiles/",
+    confScoreThreshold      = 0,
+    outputDir               = ".")
 
-# Run in parallel and this time save the resulting raw R object to file rather
-# than using the processResultsFunction argument to create a CSV file
-library("snow")
-numCores <- 2
-cl <- makeSOCKcluster(rep("localhost", numCores))
-clusterEvalQ(cl, library("MouseDivGeno"))
-
-cat("Running MouseDivGenotype in parallel and saving to parallelGenoVinoResult.RData.csv\n")
-genoVinoResult <- mouseDivGenotype(
-    snpProbeInfo = snpProbeInfo, snpInfo = snpInfo, referenceDistribution=reference,
-    chromosomes=c("19", "X", "Y"), celFiles=expandCelFiles(celfiledir),
-    logFile=stdout(), cluster=cl)
-save(genoVinoResult, file = "parallelGenoVinoResult.RData")
-
-stopCluster(cl)
+# this time perform the same genotyping but save it to an R object instead
+genoVinoResult <- mouseDivGenotypeCEL(
+    snpProbeInfo            = snpProbeInfo,
+    snpInfo                 = snpInfo,
+    referenceDistribution   = snpReferenceDistribution,
+    celFiles                = "./celFiles/",
+    confScoreThreshold      = 0)
   }
 }
 

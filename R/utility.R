@@ -19,6 +19,7 @@
                 row.names = FALSE,
                 col.names = FALSE,
                 qmethod = "double")
+        flush(con)
     }
     
     connections
@@ -30,7 +31,7 @@
         stop("number of file connections must match number of matrices")
     }
     
-    for(i in 1 : n) {
+    for(i in seq_len(n)) {
         write.table(
                 matrices[[i]],
                 file = connections[[i]],
@@ -38,6 +39,7 @@
                 row.names = TRUE,
                 col.names = FALSE,
                 qmethod = "double")
+        flush(connections[[i]])
     }
 }
 
