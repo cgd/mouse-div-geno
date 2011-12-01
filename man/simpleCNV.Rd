@@ -146,11 +146,6 @@ simpleCNV(
 
 \examples{
 \dontrun{
-baseDir <- "."
-celfiledir <- file.path(baseDir, "celFiles/")
-celfiles <- expandCelFiles(celfiledir)
-
-
 ################################################################################
 # This command loads the snpProbeInfo, snpInfo and reference objects
 # you should download this from the CGD website in order to be able to run
@@ -161,7 +156,6 @@ load("MouseDivData.RData")
 # so that we can print timing information
 library("time")
 
-# First so simple CNV analysis without any clustering
 startTime <- getTime()
 simpleCNVResultNotClustered <- simpleCNV(
     snpProbeInfo = snpProbeInfo,
@@ -170,48 +164,17 @@ simpleCNVResultNotClustered <- simpleCNV(
     invariantProbeInfo = invariantProbeInfo,
     invariantProbesetInfo = invariantProbesetInfo,
     invariantReferenceDistribution = invariantReferenceDistribution,
-    celFiles = celfiles,
-    referenceCelFile = file.path(celfiledir, "SNP_mDIV_A1-1_081308.CEL"),
+    celFiles = "celFiles/",
+    referenceCelFile = "celFiles/"SNP_mDIV_A1-1_081308.CEL",
     chromosomes = c("19", "X", "Y"),
     verbose = TRUE)
-cat("time it took us to do non-clustered CNV\n")
+cat("time it took us to do CNV\n")
 timeReport(startTime)
 
 timeStampFileName <- file.path(
     baseDir,
     format(Sys.time(), "simpleCNVResultNotClustered-%Y-%m-%d_%H.%M.%OS5.RData"))
 save(simpleCNVResultNotClustered, file = timeStampFileName)
-
-# Do simple CNV analysis using a "local" SNOW cluster
-library("snow")
-setDefaultClusterOptions(outfile = "/dev/tty")
-numCores <- 2
-cl <- makeSOCKcluster(rep("localhost", numCores))
-clusterEvalQ(cl, library("MouseDivGeno"))
-
-startTime <- getTime()
-simpleCNVResultClustered <- simpleCNV(
-    snpProbeInfo = snpProbeInfo,
-    snpInfo = snpInfo,
-    snpReferenceDistribution = snpReferenceDistribution,
-    invariantProbeInfo = invariantProbeInfo,
-    invariantProbesetInfo = invariantProbesetInfo,
-    invariantReferenceDistribution = invariantReferenceDistribution,
-    celFiles = celfiles,
-    referenceCelFile = file.path(celfiledir, "SNP_mDIV_A1-1_081308.CEL"),
-    chromosomes = c("19", "X", "Y"),
-    verbose = TRUE,
-    cluster = cl)
-cat("time it took us to do clustered CNV\n")
-timeReport(startTime)
-
-timeStampFileName <- file.path(
-    baseDir,
-    format(Sys.time(), "simpleCNVResultClustered-%Y-%m-%d_%H.%M.%OS5.RData"))
-save(simpleCNVResultClustered, file = timeStampFileName)
-rm(simpleCNVResultClustered)
-
-stopCluster(cl)
   }
 }
 

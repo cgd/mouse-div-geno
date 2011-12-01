@@ -93,6 +93,28 @@ mouseDivDensityPlot(file.path(working_dir, "celFiles"), snpProbeInfo)
 \caption{Average SNP Intensities: (A + B) / 2}
 \end{figure}
 
+Likewise we can do a boxplot of the A and B allele intensities of our CEL files.
+In this example we will plot the intensities of \verb#SNP_mDIV_A1-1_081308.CEL#
+and \verb#SNP_mDIV_A10-10_081308.CEL#.
+
+<<label = intenboxplot, keep.source = TRUE, eval = FALSE>>=
+celInten <- readCELFiles(
+    c(
+        file.path(working_dir, "celFiles/SNP_mDIV_A1-1_081308.CEL"),
+        file.path(working_dir, "celFiles/SNP_mDIV_A10-10_081308.CEL")),
+    snpProbeInfo)
+boxplot(celInten)
+@
+
+\begin{figure}
+\begin{center}
+<<fig = TRUE, echo = FALSE, eval = FALSE>>=
+<<intenboxplot>>
+@
+\end{center}
+\caption{Boxplot the intensities of two CEL files}
+\end{figure}
+
 \section{Genotyping and Vinotyping for the Mouse Diversity Genotyping Array}
 
 For the purposes of genotyping we only care about the "snp" data so we will take
@@ -142,6 +164,10 @@ Column descriptions:
     \item \verb#isPAR# (optional): if \verb#TRUE# this indicates that this SNP
     is in the pseudoautosomal region (PAR). This should only be set to
     \verb#TRUE# for SNPs where \verb#snpInfo$chrId == "X"#
+    
+    \item \verb#...# (optional): all of the remaining columns are ignored by the
+    \verb#MouseDivGeno# package and are only present as a convenience in order
+    to help you to annotate your results
 \end{itemize}
 
 \item \verb#snpReferenceDistribution#: a numeric vector which is the reference
@@ -195,6 +221,27 @@ You can interpret the returned matrix values as follows:
     from 0 to 1 based on Mohalanobis distance with chi-squre distribution
     approximation. Smaller confidence score implies less reliable data.
 \end{itemize}
+
+Now if we want we can annotate our results to make them a little bit more
+meaningful.
+
+<<keep.source = TRUE, eval = FALSE>>=
+annoResults <- matrix("", ncol=ncol(genoVinoResult), nrow=nrow(genoVinoResult))
+rownames(annoResults) <- rownames(genoVinoResult)
+colnames(annoResults) <- colnames(genoVinoResult)
+
+annoResults[c(genoVinoResult$geno) == -1] <- "N"
+annoResults[c(genoVinoResult$geno) == 1] <- "A"
+annoResults[c(genoVinoResult$geno) == 2] <- "H"
+annoResults[c(genoVinoResult$geno) == 3] <- "B"
+annoResults[c(genoVinoResult$vino) == 1] <- "V"
+
+infoMatched <- snpInfo[match(rownames(genoVinoResult), snpInfo$snpId), ]
+annoResults <- cbind(infoMatched, annoResults)
+
+# now let's just take a look at just one of the annotated SNP results
+annoResults[1, , drop=FALSE]
+@
 
 \section{Genotyping and Vinotyping on Other Platforms}
 

@@ -41,7 +41,7 @@ mouseDivDensityPlot(celFilenames, snpProbeInfo, type = c("Average", "MatchedSet"
 # load snpProbeInfo into scope
 load("../../../MouseDivData.RData")
 
-mouseDivDensityPlot(expandCelFiles("../../../celFiles"), snpProbeInfo)
+mouseDivDensityPlot("../../../celFiles", snpProbeInfo)
 }}
 
 \keyword{plot}

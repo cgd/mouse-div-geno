@@ -167,12 +167,12 @@ buildPennCNVInputFiles(
 
 load("../../../MouseDivData.RData")
 dir.create("../../../lrr-baf-output")
-genoVinoResult <- mouseDivGenotype(
+genoVinoResult <- mouseDivGenotypeCEL(
     snpProbeInfo            = snpProbeInfo,
     snpInfo                 = snpInfo,
     referenceDistribution   = snpReferenceDistribution,
     chromosomes             = c(19, "X", "Y", "M"),
-    celFiles                = expandCelFiles("../../../celFiles"),
+    celFiles                = "../../../celFiles",
     confScoreThreshold      = 0)
 buildPennCNVInputFiles(
     outdir                          = "../../../lrr-baf-output",
@@ -184,7 +184,7 @@ buildPennCNVInputFiles(
     invariantProbeInfo              = invariantProbeInfo,
     invariantProbesetInfo           = invariantProbesetInfo,
     invariantReferenceDistribution  = invariantReferenceDistribution,
-    celFiles                        = expandCelFiles("../../../celFiles"),
+    celFiles                        = "../../../celFiles",
     isMale                          = genoVinoResult$isMale,
     chromosomes                     = c("19", "X", "Y", "M"))
   }
