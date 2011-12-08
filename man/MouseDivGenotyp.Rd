@@ -26,7 +26,7 @@ mouseDivGenotype(
         snpProbeInfo, snpInfo, referenceDistribution = NULL,
         transformFunction = ccsTransform,
         isMale = NULL, confScoreThreshold = 1e-05,
-        chromosomes = c(1:19, "X", "Y", "M"),
+        samplesToKeep = NULL, chromosomes = c(1:19, "X", "Y", "M"),
         cacheDir = tempdir(), retainCache = FALSE,
         numCores = NULL,
         probesetChunkSize = 1000, outputDir = NULL, outputFilePrefix = "mouseDivResults_",
@@ -36,7 +36,7 @@ mouseDivGenotypeCEL(
         snpProbeInfo, snpInfo, referenceDistribution = NULL,
         transformFunction = ccsTransform,
         isMale = NULL, confScoreThreshold = 1e-05,
-        chromosomes = c(1:19, "X", "Y", "M"),
+        samplesToKeep = NULL, chromosomes = c(1:19, "X", "Y", "M"),
         cacheDir = tempdir(), retainCache = FALSE,
         numCores = NULL,
         probesetChunkSize = 1000, outputDir = NULL, outputFilePrefix = "mouseDivResults_",
@@ -45,7 +45,7 @@ mouseDivGenotypeTab(
         snpIntensityFile, snpInfo,
         transformFunction = ccsTransform,
         isMale = NULL, confScoreThreshold = 1e-05,
-        chromosomes = c(1:19, "X", "Y", "M"),
+        samplesToKeep = NULL, chromosomes = c(1:19, "X", "Y", "M"),
         cacheDir = tempdir(), retainCache = FALSE,
         numCores = NULL,
         probesetChunkSize = 1000, outputDir = NULL, outputFilePrefix = "mouseDivResults_",
@@ -113,6 +113,19 @@ mouseDivGenotypeTab(
     \item{isMale}{
         a logical vector the same length as celFiles or NULL if gender should
         be inferred from the CEL file intensities
+    }
+    \item{samplesToKeep}{
+        this argument determines which samples we will generate output data for.
+        The default value of NULL indicates that we should generate output
+        for all available samples. The reason you may want to use this parameter
+        is that the genotyping algorithm works best when it is run with many samples.
+        So, you may want to genotype with many samples but you may only be interested
+        in the genotype values of some subset of these samples
+        This value can either be an integer vector
+        which (will identify samples by index) or a character vector (which
+        will identify samples by sample ID). Note that for the
+        \code{mouseDivGenotypeCEL} you are allowed to use either the full file
+        name or a shortened CEL file ID
     }
     \item{chromosomes}{
         character vector of chromosome IDs that you want to genotype. These

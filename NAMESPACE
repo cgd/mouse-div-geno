@@ -15,8 +15,8 @@ export(
     genotype, genotypeHomozygous,
     mouseDivGenotype, mouseDivGenotypeCEL, mouseDivGenotypeTab, inferGender, inferGenderFromSnpContAvg, genotypeSnps,
     plotSnpContAvg, pointsSnpContAvg, plotMouseDivArrayImage, mouseDivDensityPlot,
-    readCELFiles, makeProbesetSampleMatrixes, makeSnpIntensities, makeSnpContAvg, ccsTransform, maTransform,
-    vinotype)
+    readCELFiles, readCELFilesInvariants, makeProbesetSampleMatrixes, makeSnpIntensities,
+    makeSnpContAvg, ccsTransform, maTransform, vinotype)
 
 S3method("[", "probesetSampleMatrixes")
 S3method("dim", "probesetSampleMatrixes")

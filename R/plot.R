@@ -74,10 +74,10 @@ boxplot.snpIntensities <- function(x, ...) {
 }
 
 plotMouseDivArrayImage <- function(celFilename) {
-    celData <- as.matrix(read.celfile(celFilename, intensity.means.only = TRUE)[["INTENSITY"]][["MEAN"]][1:6892960])
+    celData <- as.matrix(read.celfile(celFilename, intensity.means.only = TRUE)[["INTENSITY"]][["MEAN"]][seq_len(6892960)])
     image(
-        1 : 2572,
-        1 : 2680,
+        seq_len(2572),
+        seq_len(2680),
         matrix(log2(celData), byrow = T, ncol = 2680),
         col = c("green", "black", "red"),
         xlab = "",

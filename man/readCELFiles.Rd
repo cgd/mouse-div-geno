@@ -12,11 +12,16 @@ readCELFiles(
         celFiles,
         snpProbeInfo,
         referenceDistribution = NULL,
-        logFile = NULL)
+        logFile = NULL,
+        numCores = NULL)
 }
 
 \arguments{
-    \item{celFiles}{the names of CEL files to read and normalize}
+    \item{celFiles}{
+        The CEL files to read. Must be a vector of CEL file name(s) or
+        directory name(s). Any directories will be expanded to the listing of
+        CEL files found in the directory
+    }
     \item{snpProbeInfo}{
         A data-frame containing probe-level data for the SNPs we are genotyping.
         The data-frame should contain the following components:
@@ -42,6 +47,11 @@ readCELFiles(
     \item{logFile}{
         if non-NULL this must be a connection type to which log messages will
         be written
+    }
+    \item{numCores}{
+        the number of cores to use. NULL indicates that we should use all
+        available cores. Using this argument requires that the \pkg{multicore}
+        package is installed.
     }
 }
 \value{

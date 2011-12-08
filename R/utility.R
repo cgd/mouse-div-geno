@@ -356,3 +356,40 @@ maTransform.snpIntensities <- function(ab) {
     
     makeSnpContAvg(m, s, rownames(ab), colnames(ab), "MA")
 }
+
+.defaultNumCores <-
+    if(require("multicore", character.only=T)) {
+        multicore:::detectCores()
+    } else {
+        1
+    }
+
+.mylapply <- function(X, FUN, ..., numCores) {
+    if(is.null(numCores)) {
+        numCores <- .defaultNumCores
+    }
+    
+    if(numCores >= 2 && length(X) >= 2 && require("multicore", character.only=T)) {
+        mclapply(X, FUN, ..., mc.cores=numCores)
+    } else {
+        lapply(X, FUN, ...)
+    }
+}
+
+# a value is considered a "true" list if it is a list that is not also a
+# data frame
+.isTrueList <- function(x) {
+    is.list(x) && !is.data.frame(x)
+}
+
+# a little function to make sure that we turn any item which is not a list into
+# a list (which makes some algorithms more general/consistent)
+.listify <- function(x) {
+    if(is.na(x) || is.null(x)) {
+        x <- list()
+    } else if(!.isTrueList(x)) {
+        x <- list(x)
+    }
+    
+    x
+}
