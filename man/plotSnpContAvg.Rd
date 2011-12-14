@@ -44,12 +44,4 @@ plotSnpContAvg(
     \item{...}{all remaining arguments which are passed on to the \code{plot} function}
 }
 
-\value{
-}
-
-\examples{
-\dontrun{
-  }
-}
-
 \keyword{plot}

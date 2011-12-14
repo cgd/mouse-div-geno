@@ -227,12 +227,13 @@ mouseDivGenotypeTab <- function(
         }
     }
     
+    allChr <- as.character(unique(snpInfo$chrId))
+    allAutosomes <- setdiff(allChr, c("X", "Y", "M"))
+    
     # make sure that the chromosome vector is not numeric
     # TODO is toupper the right thing to do here?
     chromosomes <- toupper(as.character(chromosomes))
-    
-    allChr <- as.character(unique(snpInfo$chrId))
-    allAutosomes <- setdiff(allChr, c("X", "Y", "M"))
+    chromosomes <- chromosomes[chromosomes %in% allChr]
     logfn("genotyping the following chromosomes: %s", paste(chromosomes, collapse = ", "))
     
     # we must infer gender if we don't yet have it and we need to
@@ -354,6 +355,8 @@ mouseDivGenotypeTab <- function(
                 collapse=", ")
             stop(stopMsg)
         }
+    } else if(is.logical(samplesToKeep)) {
+        samplesToKeep <- which(samplesToKeep)
     }
     
     sampleNamesToKeep <- sampleNames
@@ -450,10 +453,7 @@ mouseDivGenotypeTab <- function(
                (chri == chromosomes[length(chromosomes)] &&
                chunkIndex == length(chrChunks[[chri]]))) {
 
-                # parallel apply using snow then reset the arg list
                 chunkResultsList <- .mylapply(argLists, .applyGenotypeAnyChrChunk, numCores=numCores)
-                #chunkResultsList <- lapply(argLists, .applyGenotypeAnyChrChunk)
-    
                 for(i in seq_along(chunkResultsList)) {
                     for(logLine in chunkResultsList[[i]]$logLines) {
                         logfn(logLine)
@@ -687,6 +687,7 @@ genotypeSnps <- function(
              "at a minimum the \"snpId\" and \"chrId\" ",
              "components. Please see the help documentation for more details.")
     }
+    snpInfo <- snpInfo[snpInfo$snpId %in% rownames(snpContAvg), , drop=FALSE]
     snpInfo$snpId <- as.factor(snpInfo$snpId)
 
     if(inherits(logFile, "character")) {
@@ -722,6 +723,8 @@ genotypeSnps <- function(
                 collapse=", ")
             stop(stopMsg)
         }
+    } else if (is.logical(samplesToKeep)) {
+        samplesToKeep <- which(samplesToKeep)
     }
     
     sampleNamesToKeep <- colnames(snpContAvg)

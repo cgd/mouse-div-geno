@@ -173,7 +173,8 @@ mouseDivGenotypeTab(
     }
     \item{logFile}{
         the file name or connection that log messages should be written to. Use
-        \code{stdout()} to print to standard-out
+        \code{stdout()} to print to standard-out. The default value of NULL
+        indicates that no logging should be done
     }
 }
 

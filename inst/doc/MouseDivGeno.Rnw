@@ -1,4 +1,7 @@
 \documentclass{article}
+\usepackage[margin=1.0in]{geometry}
+\usepackage{Sweave}
+\usepackage{hyperref}
 
 % \VignetteIndexEntry{MouseDivGeno Example}
 
@@ -23,12 +26,50 @@ allow you to perform genotyping, identify probe sets
 potentially harboring a new mutation (Variable INtensity Oligonucleotide or
 VINO, here we call it a vinotyping) and perform CNV analysis. The R package,
 annotations, and further information can be obtained from
-{\tt http://genomedynamics.org/tools/mousedivgeno}.
+{\url http://genomedynamics.org/tools/mousedivgeno}.
+
+\section{Installation}
+
+Before installing this package you should install the package dependencies:
+\begin{itemize}
+    \item required packages: cluster, affyio, preprocessCore
+    
+    \item optional packages: HiddenMarkov, multicore
+\end{itemize}
+
+You can use the following commands to install all of the dependencies:
+
+<<keep.source = TRUE, eval = FALSE>>=
+# install packages from cran
+install.packages("cluster")
+install.packages("HiddenMarkov")
+install.packages("multicore")
+
+# install bioconductor packages
+source("http://bioconductor.org/biocLite.R")
+biocLite("affyio")
+biocLite("preprocessCore")
+@
+
+Now that you have installed the dependencies you can install the MouseDivGeno
+package. On Mac OS X or Linux you can do this by entering the following command
+in your terminal:
+
+% the "cat" below is the only way I've been able to get the "R CMD INSTALL ..."
+% to render as I want it to in the doc but it does seem like a hack
+<<include = FALSE, echo = FALSE>>=
+cat("> R CMD INSTALL MouseDivGeno_", packageDescription("MouseDivGeno")$Version, ".tar.gz\n", sep="")
+@
+
+If you are using windows start R and use "packages->Install package(s) from local zip files..."
+to install \verb#MouseDivGeno_\Sexpr{packageDescription("MouseDivGeno")$Version}.tar.gz#
+
+\section{Quality Checks for the Mouse Diversity Genotyping Array}
 
 Before we get started we will to load some data into scope which will give us probe and probeset
 level information about the Mouse Diversity Array platform which we will use in
 several examples throughout this vignette. You can obtain this data from
-{\tt http://genomedynamics.org/tools/mousedivgeno}
+{\url http://genomedynamics.org/tools/mousedivgeno}
 
 <<include = FALSE, echo = FALSE, eval = TRUE>>=
 working_dir <- "/Users/kss/projects/MouseDivGenoDirs"
@@ -38,8 +79,6 @@ working_dir <- "/Users/kss/projects/MouseDivGenoDirs"
 load(file.path(working_dir, "MouseDivData.RData"))
 ls()
 @
-
-\section{Quality Checks for the Mouse Diversity Genotyping Array}
 
 You will want to perform some quality checks on the arrays that you are
 genotyping. The quality checks in this section are specific to the Mouse
@@ -97,7 +136,7 @@ Likewise we can do a boxplot of the A and B allele intensities of our CEL files.
 In this example we will plot the intensities of \verb#SNP_mDIV_A1-1_081308.CEL#
 and \verb#SNP_mDIV_A10-10_081308.CEL#.
 
-<<label = intenboxplot, keep.source = TRUE, eval = FALSE>>=
+<<label = intenboxplot, keep.source = TRUE, eval = TRUE>>=
 celInten <- readCELFiles(
     c(
         file.path(working_dir, "celFiles/SNP_mDIV_A1-1_081308.CEL"),
@@ -108,7 +147,7 @@ boxplot(celInten)
 
 \begin{figure}
 \begin{center}
-<<fig = TRUE, echo = FALSE, eval = FALSE>>=
+<<fig = TRUE, echo = FALSE, eval = TRUE>>=
 <<intenboxplot>>
 @
 \end{center}
@@ -206,10 +245,10 @@ using the \verb#celFiles# argument if you know it a priori). Here is a small sub
 of the output to give you an idea of what it looks like:
 
 <<keep.source = TRUE, eval = TRUE>>=
-genoVinoResult$geno[1 : 2, 10 : 12]
-genoVinoResult$vino[1 : 2, 10 : 12]
-genoVinoResult$conf[1 : 2, 10 : 12]
-genoVinoResult$isMale[10 : 12]
+genoVinoResult$geno[1 : 2, 10 : 11]
+genoVinoResult$vino[1 : 2, 10 : 11]
+genoVinoResult$conf[1 : 2, 10 : 11]
+genoVinoResult$isMale[10 : 11]
 @
 
 You can interpret the returned matrix values as follows:
@@ -225,7 +264,7 @@ You can interpret the returned matrix values as follows:
 Now if we want we can annotate our results to make them a little bit more
 meaningful.
 
-<<keep.source = TRUE, eval = FALSE>>=
+<<keep.source = TRUE, eval = TRUE>>=
 annoResults <- matrix("", ncol=ncol(genoVinoResult), nrow=nrow(genoVinoResult))
 rownames(annoResults) <- rownames(genoVinoResult)
 colnames(annoResults) <- colnames(genoVinoResult)
@@ -240,7 +279,79 @@ infoMatched <- snpInfo[match(rownames(genoVinoResult), snpInfo$snpId), ]
 annoResults <- cbind(infoMatched, annoResults)
 
 # now let's just take a look at just one of the annotated SNP results
-annoResults[1, , drop=FALSE]
+annoResults[2, , drop=FALSE]
+@
+
+\subsection{Subsetting the SNPs To Genotype}
+
+As already demonstrated by the example code for \verb#mouseDivGenotypeCEL(...)#
+you can use the \verb#chromosomes# parameter to easily subset the genotyped
+SNPs by chromosome. If you need a more fine grained control for excluding SNP
+genotypes from your results you can use one of the following two strategies:
+
+Genotype as usual and subset the results as a post processing step. For instance,
+if we want to look at just the SNPs between 60,000,000 and 60,030,000 mega base pairs
+on chromosome 19 we can do something like this.
+
+<<keep.source = TRUE, eval = TRUE>>=
+# figure out which IDs fall between 60,000,000 and 60,030,000
+snpsToKeep <- snpInfo$chrId == "19" & snpInfo$positionBp >= 60000000 & snpInfo$positionBp <= 60030000
+snpIdsToKeep <- snpInfo$snpId[snpsToKeep]
+snpIdsToKeep
+
+# subset the data based on the IDs that we've found
+genoVinoResultSubset <- genoVinoResult[match(snpIdsToKeep, rownames(genoVinoResult)), ]
+genoVinoResultSubset$geno[, 3 : 4]
+genoVinoResultSubset$vino[, 3 : 4]
+genoVinoResultSubset$conf[, 3 : 4]
+@
+
+Alternatively you can subset the SNP data that you give to the \verb#genotypeSnps(...)#
+function as shown in the example below.
+
+<<keep.source = TRUE, eval = TRUE>>=
+celDataSubset <- readCELFiles(
+    celFiles                = file.path(working_dir, "celFiles"),
+    snpProbeInfo            = snpProbeInfo,
+    referenceDistribution   = snpReferenceDistribution,
+    snpIdsToKeep            = snpIdsToKeep)
+celDataSubset <- ccsTransform(celDataSubset)
+genoVinoResultSubset <- genotypeSnps(celDataSubset, snpInfo)
+@
+
+This approach can be much faster than subseting all of the genotypes after
+genotyping but you do have to be careful if you are genotyping on the X or Y
+chromosomes. If you are genotyping X or Y SNPs and you do not provide gender
+information via the \verb#isMale# parameter you must include representative
+SNPs from at least one of the autosomes, the X chromosome and the Y chromosome.
+This is because the algorithm for genotyping X or Y SNPs relies on sample gender
+which can only be inferred if representative autosome, X and Y data are present.
+
+\subsection{Genotyping with Few Samples}
+
+The genotyping algorithms used by \verb#MouseDivGeno# requires a large set of
+samples, such as the set of 351 CEL files which are made available at
+{\url http://genomedynamics.org/tools/mousedivgeno}, in order to generate high
+quality genotype results. However you may only be interested in obtaining the
+genotypes for a small subset of these samples. You can of course do this
+by genotyping all of the samples as shown in previous examples and subsetting
+the results after the fact, but it will be much more memory efficient to
+use the \verb#samplesToKeep# parameter as shown in the example below:
+
+<<keep.source = TRUE, eval = TRUE>>=
+samplesToKeep <- c("SNP_mDIV_A8-8_081308", "SNP_mDIV_A9-57_082108")
+genoVinoResultKeep2 <- mouseDivGenotypeCEL(
+    snpProbeInfo            = snpProbeInfo,
+    snpInfo                 = snpInfo,
+    referenceDistribution   = snpReferenceDistribution,
+    samplesToKeep           = samplesToKeep,
+    chromosomes             = c(19, "X", "Y", "M"),
+    celFiles                = file.path(working_dir, "celFiles"),
+    confScoreThreshold      = 0)
+genoVinoResultKeep2$geno[1 : 2, ]
+genoVinoResultKeep2$vino[1 : 2, ]
+genoVinoResultKeep2$conf[1 : 2, ]
+genoVinoResultKeep2$isMale
 @
 
 \section{Genotyping and Vinotyping on Other Platforms}
@@ -283,7 +394,7 @@ genoVinoConf <- genotypeSnps(snpContAvg, minimalSnpInfo)
 genoVinoConf
 @
 
-The function documentation for genotypeAnyChrChunk contains an explanation for
+The function documentation for \verb#genotypeSnps(...)# contains an explanation for
 all of the value codes shown.
 
 You may be interested in visually inspecting the distribution of intensity
@@ -332,7 +443,7 @@ annotation files and is used to normalize a new array.
 Quantile normalization is commonly used in microarray data to remove array
 specific noise, and the reference distribution is often derived from each batch
 of arrays. However obtaining a reference distribution each time introduces
-an unnecessary batch effect , so we derived one reference distribution using
+an unnecessary batch effect, so we derived one reference distribution using
 350 training arrays, and saved this reference distribution. Note that the
 quantile normalization can only be applied to samples having the same underlying
 distribution to classical inbred strains (such as C57BL/6J). If there is sample

@@ -34,12 +34,4 @@ pointsSnpContAvg(
     \item{...}{all remaining arguments which are passed on to the \code{points} function}
 }
 
-\value{
-}
-
-\examples{
-\dontrun{
-  }
-}
-
 \keyword{plot}

@@ -9,11 +9,18 @@ readCELFiles <- function(
         celFiles,
         snpProbeInfo,
         referenceDistribution = NULL,
+        snpIdsToKeep = NULL,
         logFile = NULL,
         numCores = NULL) {
 
-    if(!is.null(logFile) && !inherits(logFile, "connection")) {
-        stop("the logFile parameter should be a connection")
+    if(inherits(logFile, "character")) {
+        logFile <- file(logFile, "wt")
+    } else if(!is.null(logFile) && !inherits(logFile, "connection")) {
+        stop("the logFile parameter should be either NULL, a file name, or a connection")
+    }
+    
+    if(!is.null(snpIdsToKeep) && !is.character(snpIdsToKeep)) {
+        stop("snpIdsToKeep should be either a character vector or NULL")
     }
     
     snpId <- as.factor(snpProbeInfo$snpId)
@@ -53,6 +60,12 @@ readCELFiles <- function(
                 "for the B alleles but they do not.")
         }
         
+        if(!is.null(snpIdsToKeep)) {
+            keepers <- aSnpIds %in% snpIdsToKeep
+            allAint <- allAint[keepers, , drop=FALSE]
+            allBint <- allBint[keepers, , drop=FALSE]
+        }
+        
         list(allAint, allBint)
     }
     
@@ -78,8 +91,10 @@ readCELFilesInvariants <- function(
     logFile = NULL,
     numCores = NULL) {
     
-    if(!is.null(logFile) && !inherits(logFile, "connection")) {
-        stop("the logFile parameter should be a connection")
+    if(inherits(logFile, "character")) {
+        logFile <- file(logFile, "wt")
+    } else if(!is.null(logFile) && !inherits(logFile, "connection")) {
+        stop("the logFile parameter should be either NULL, a file name, or a connection")
     }
     
     trueList <- .isTrueList(invariantProbeInfo)
@@ -158,7 +173,7 @@ readCELFilesInvariants <- function(
     readEmpty <- function(index) {
         endIndex <- min(index + numCores - 1, length(celFiles))
         currCELFiles <- as.list(celFiles[index : endIndex])
-        readCELs <- .mylapply(currCELFiles, readCELFiles, snpProbeInfo, referenceDistribution, logFile, 1, numCores=numCores)
+        readCELs <- .mylapply(currCELFiles, readCELFiles, snpProbeInfo, referenceDistribution, NULL, logFile, 1, numCores=numCores)
         
         readNext <- function(offset) {
             headFunc <- function() {
