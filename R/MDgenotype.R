@@ -10,7 +10,7 @@
 
 mouseDivGenotype <- function(
         snpIntensities,
-        snpProbeInfo, snpInfo, referenceDistribution = NULL,
+        snpInfo, referenceDistribution = NULL,
         transformFunction = ccsTransform,
         isMale = NULL, confScoreThreshold = 1e-05,
         samplesToKeep = NULL, chromosomes = c(1:19, "X", "Y", "M"),
@@ -24,14 +24,6 @@ mouseDivGenotype <- function(
     } else if(!is.null(logFile) && !inherits(logFile, "connection")) {
         stop("the logFile parameter should be either NULL, a file name, or a connection")
     }
-    
-    if(!inherits(snpProbeInfo, "data.frame") ||
-        !all(c("probeIndex", "isAAllele", "snpId") %in% names(snpProbeInfo))) {
-        stop("You must supply a \"snpProbeInfo\" data frame parameter which has ",
-            "at a minimum the \"probeIndex\", \"isAAllele\" and \"snpId\" ",
-            "components. Please see the help documentation for more details.")
-    }
-    snpProbeInfo$snpId <- as.factor(snpProbeInfo$snpId)
     
     if(!inherits(snpIntensities, "snpIntensities")) {
         stop(
@@ -238,7 +230,11 @@ mouseDivGenotypeTab <- function(
     
     # we must infer gender if we don't yet have it and we need to
     # genotype either sex chromosome
-    genderInferenceRequired <- is.null(isMale)
+    genderInferenceRequired <-
+        is.null(isMale) &&
+        ("X" %in% allChr) &&
+        ("Y" %in% allChr) &&
+        length(allAutosomes) >= 1
     if(genderInferenceRequired) {
         meanIntensityXPerArray <- NULL
         meanIntensityYPerArray <- NULL
@@ -264,12 +260,10 @@ mouseDivGenotypeTab <- function(
             stop("expected there to be exactly 1 sample but there are ", ncol(sample))
         }
         
-        if(genderInferenceRequired) {
-            sumIntenX <- 0
-            sumIntenY <- 0
-            sumIntenPerAuto <- rep(0, length(allAutosomes))
-            names(sumIntenPerAuto) <- allAutosomes
-        }
+        sumIntenX <- 0
+        sumIntenY <- 0
+        sumIntenPerAuto <- rep(0, length(allAutosomes))
+        names(sumIntenPerAuto) <- allAutosomes
         
         for(currChr in allChr) {
             chrSnpInfo <- snpInfo[snpInfo$chrId == currChr, , drop=FALSE]
@@ -298,15 +292,11 @@ mouseDivGenotypeTab <- function(
             }
         }
         
-        if(genderInferenceRequired) {
-            list(
-                sampleName=sample$sampleNames,
-                sumIntenPerAuto=sumIntenPerAuto,
-                sumIntenX=sumIntenX,
-                sumIntenY=sumIntenY)
-        } else {
-            NULL
-        }
+        list(
+            sampleName=sample$sampleNames,
+            sumIntenPerAuto=sumIntenPerAuto,
+            sumIntenX=sumIntenX,
+            sumIntenY=sumIntenY)
     }
     
     sampleNames <- character()

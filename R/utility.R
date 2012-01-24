@@ -358,7 +358,7 @@ maTransform.snpIntensities <- function(ab) {
 }
 
 .defaultNumCores <-
-    if(require("multicore", character.only=T)) {
+    if(require("multicore", character.only=T, quietly=TRUE)) {
         multicore:::detectCores()
     } else {
         1
@@ -369,7 +369,7 @@ maTransform.snpIntensities <- function(ab) {
         numCores <- .defaultNumCores
     }
     
-    if(numCores >= 2 && length(X) >= 2 && require("multicore", character.only=T)) {
+    if(numCores >= 2 && length(X) >= 2 && require("multicore", character.only=T, quietly=TRUE)) {
         mclapply(X, FUN, ..., mc.cores=numCores)
     } else {
         lapply(X, FUN, ...)

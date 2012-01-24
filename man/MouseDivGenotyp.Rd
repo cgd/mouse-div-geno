@@ -23,7 +23,7 @@
 \usage{
 mouseDivGenotype(
         snpIntensities,
-        snpProbeInfo, snpInfo, referenceDistribution = NULL,
+        snpInfo, referenceDistribution = NULL,
         transformFunction = ccsTransform,
         isMale = NULL, confScoreThreshold = 1e-05,
         samplesToKeep = NULL, chromosomes = c(1:19, "X", "Y", "M"),
